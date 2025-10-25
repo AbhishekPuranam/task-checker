@@ -36,7 +36,9 @@ import {
   FormControlLabel,
   Collapse,
   Divider,
-  Menu
+  Menu,
+  Checkbox,
+  Toolbar
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -97,6 +99,7 @@ const StructuralElementsList = () => {
   
   // Column visibility state - Default visible columns
   const [visibleColumns, setVisibleColumns] = useState({
+    select: true,
     serialNo: false,
     structureNumber: true,
     drawingNo: false, // Hidden by user action
@@ -162,6 +165,14 @@ const StructuralElementsList = () => {
     status: 'pending'
   });
 
+  // Bulk selection state
+  const [selectedElements, setSelectedElements] = useState([]);
+  const [showBulkJobDialog, setShowBulkJobDialog] = useState(false);
+  const [bulkJobForm, setBulkJobForm] = useState({
+    jobType: '',
+    fireproofingType: ''
+  });
+
   const jobTypes = [
     { value: 'cement_fire_proofing', label: 'Cement Fire Proofing' },
     { value: 'gypsum_fire_proofing', label: 'Gypsum Fire Proofing' },
@@ -181,6 +192,49 @@ const StructuralElementsList = () => {
     { value: 'completed', label: 'Completed', color: '#4caf50' },
     { value: 'not_applicable', label: 'Not Applicable', color: '#4caf50' }
   ];
+
+
+
+  // Bulk selection handlers
+  const handleSelectElement = (elementId) => {
+    setSelectedElements(prev => {
+      if (prev.includes(elementId)) {
+        return prev.filter(id => id !== elementId);
+      } else {
+        return [...prev, elementId];
+      }
+    });
+  };
+
+
+
+  const handleBulkCreateJobs = async () => {
+    if (selectedElements.length === 0) {
+      toast.error('Please select at least one element');
+      return;
+    }
+
+    if (!bulkJobForm.jobType) {
+      toast.error('Please select a fire proofing type');
+      return;
+    }
+
+    try {
+      const response = await api.post('/api/jobs/bulk-create', {
+        elementIds: selectedElements,
+        jobType: bulkJobForm.jobType
+      });
+
+      toast.success(`Successfully created jobs for ${selectedElements.length} elements`);
+      setSelectedElements([]);
+      setShowBulkJobDialog(false);
+      setBulkJobForm({ jobType: '', fireproofingType: '' });
+      fetchElements(); // Refresh the list
+    } catch (error) {
+      console.error('Error creating bulk jobs:', error);
+      toast.error(error.response?.data?.message || 'Failed to create jobs');
+    }
+  };
 
   // Fetch job types and predefined jobs data
   const fetchJobTypesData = async () => {
@@ -764,6 +818,7 @@ const StructuralElementsList = () => {
 
   // Available columns configuration - All structural element fields
   const availableColumns = [
+    { key: 'select', label: '', sortable: false },
     { key: 'serialNo', label: 'Serial No.', sortable: true },
     { key: 'structureNumber', label: 'Structure No.', sortable: true },
     { key: 'drawingNo', label: 'Drawing No.', sortable: true },
@@ -927,6 +982,59 @@ const StructuralElementsList = () => {
     return sortedGroups;
   }, [filteredElements, groupBy, showGroupedView]);
 
+  // Calculate if all visible elements are selected
+  const isSelectAll = useMemo(() => {
+    let visibleElements;
+    
+    if (showGroupedView && groupBy) {
+      // In grouped view, get all visible elements from expanded groups
+      visibleElements = Object.entries(groupedElements)
+        .filter(([groupKey, groupElements]) => expandedGroups[groupKey])
+        .flatMap(([groupKey, groupElements]) => groupElements);
+    } else {
+      // In regular view, use current page elements
+      visibleElements = filteredElements.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+    }
+    
+    return visibleElements.length > 0 && visibleElements.every(el => selectedElements.includes(el._id));
+  }, [selectedElements, groupedElements, expandedGroups, showGroupedView, groupBy, filteredElements, page, rowsPerPage]);
+
+  const handleSelectAll = () => {
+    let currentPageElements;
+    
+    if (showGroupedView && groupBy) {
+      // In grouped view, get all visible elements from expanded groups
+      currentPageElements = Object.entries(groupedElements)
+        .filter(([groupKey, groupElements]) => expandedGroups[groupKey])
+        .flatMap(([groupKey, groupElements]) => groupElements);
+    } else {
+      // In regular view, use pagination
+      currentPageElements = filteredElements.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+    }
+    
+    if (isSelectAll) {
+      setSelectedElements(prev => prev.filter(id => !currentPageElements.some(el => el._id === id)));
+    } else {
+      const newSelections = currentPageElements.map(el => el._id).filter(id => !selectedElements.includes(id));
+      setSelectedElements(prev => [...prev, ...newSelections]);
+    }
+  };
+
+  // Handle selecting all elements within a specific group
+  const handleSelectGroup = (groupElements) => {
+    const groupElementIds = groupElements.map(el => el._id);
+    const allSelected = groupElementIds.every(id => selectedElements.includes(id));
+    
+    if (allSelected) {
+      // Deselect all elements in this group
+      setSelectedElements(prev => prev.filter(id => !groupElementIds.includes(id)));
+    } else {
+      // Select all elements in this group that aren't already selected
+      const newSelections = groupElementIds.filter(id => !selectedElements.includes(id));
+      setSelectedElements(prev => [...prev, ...newSelections]);
+    }
+  };
+
   // Get unique values for filter dropdowns
   const uniqueMemberTypes = [...new Set(elements.map(e => e.memberType))].filter(Boolean);
   const uniqueStatuses = [...new Set(elements.map(e => e.status))].filter(Boolean);
@@ -974,6 +1082,15 @@ const StructuralElementsList = () => {
   // Render cell content dynamically
   const renderCellContent = (element, columnKey) => {
     switch (columnKey) {
+      case 'select':
+        return (
+          <Checkbox
+            checked={selectedElements.includes(element._id)}
+            onChange={() => handleSelectElement(element._id)}
+            size="small"
+            color="primary"
+          />
+        );
       case 'structureNumber':
         return (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -1312,6 +1429,42 @@ const StructuralElementsList = () => {
           </Box>
         </Box>
 
+        {/* Bulk Actions Toolbar */}
+        {selectedElements.length > 0 && (
+          <Paper sx={{ 
+            p: 2, 
+            mb: 2, 
+            backgroundColor: 'primary.50',
+            border: '1px solid',
+            borderColor: 'primary.200'
+          }}>
+            <Toolbar sx={{ minHeight: '48px !important', px: '0 !important' }}>
+              <Typography variant="body1" sx={{ flex: 1, fontWeight: 600, color: 'primary.main' }}>
+                {selectedElements.length} element{selectedElements.length > 1 ? 's' : ''} selected
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="contained"
+                  startIcon={<WorkIcon />}
+                  onClick={() => setShowBulkJobDialog(true)}
+                  size="small"
+                >
+                  Assign Fire Proofing Workflow
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setSelectedElements([]);
+                  }}
+                  size="small"
+                >
+                  Clear Selection
+                </Button>
+              </Box>
+            </Toolbar>
+          </Paper>
+        )}
+
         {/* Search and Filters Section - ArmorCode Style */}
         <Paper sx={{ 
           p: 3, 
@@ -1609,6 +1762,29 @@ const StructuralElementsList = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           {/* Left Side - Title and Stats */}
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            {/* Group Selection Checkbox */}
+                            <Checkbox
+                              checked={groupElements.every(el => selectedElements.includes(el._id))}
+                              indeterminate={
+                                groupElements.some(el => selectedElements.includes(el._id)) && 
+                                !groupElements.every(el => selectedElements.includes(el._id))
+                              }
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleSelectGroup(groupElements);
+                              }}
+                              size="small"
+                              sx={{
+                                color: 'rgba(255,255,255,0.7)',
+                                '&.Mui-checked': {
+                                  color: 'white',
+                                },
+                                '&.MuiCheckbox-indeterminate': {
+                                  color: 'white',
+                                }
+                              }}
+                            />
+                            
                             <Box sx={{ 
                               display: 'flex', 
                               alignItems: 'center', 
@@ -1706,7 +1882,16 @@ const StructuralElementsList = () => {
                                       key={column.key} 
                                       sx={{ fontWeight: 600, color: 'text.primary' }}
                                     >
-                                      {column.label}
+                                      {column.key === 'select' ? (
+                                        <Checkbox
+                                          checked={isSelectAll}
+                                          onChange={handleSelectAll}
+                                          size="small"
+                                          color="primary"
+                                        />
+                                      ) : (
+                                        column.label
+                                      )}
                                     </TableCell>
                                   ))}
                                 </TableRow>
@@ -1752,7 +1937,16 @@ const StructuralElementsList = () => {
                           key={column.key} 
                           sx={{ fontWeight: 600, color: 'text.primary' }}
                         >
-                          {column.label}
+                          {column.key === 'select' ? (
+                            <Checkbox
+                              checked={isSelectAll}
+                              onChange={handleSelectAll}
+                              size="small"
+                              color="primary"
+                            />
+                          ) : (
+                            column.label
+                          )}
                         </TableCell>
                       ))}
                     </TableRow>
@@ -2816,7 +3010,68 @@ const StructuralElementsList = () => {
         )}
       </Menu>
 
+      {/* Bulk Job Creation Dialog */}
+      <Dialog 
+        open={showBulkJobDialog} 
+        onClose={() => setShowBulkJobDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <WorkIcon color="primary" />
+            <Box>
+              <Typography variant="h6">
+                Assign Fire Proofing Workflow
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Create jobs for {selectedElements.length} selected element{selectedElements.length > 1 ? 's' : ''}
+              </Typography>
+            </Box>
+          </Box>
+        </DialogTitle>
 
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            <FormControl fullWidth>
+              <InputLabel>Fire Proofing Type *</InputLabel>
+              <Select
+                value={bulkJobForm.jobType}
+                onChange={(e) => setBulkJobForm({ ...bulkJobForm, jobType: e.target.value })}
+                label="Fire Proofing Type *"
+              >
+                {jobTypes.map(type => (
+                  <MenuItem key={type.value} value={type.value}>
+                    {type.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <Alert severity="info" sx={{ mt: 2 }}>
+              This will create predefined job workflows for all selected elements. 
+              Each element will receive the complete sequence of jobs for the selected fire proofing type.
+            </Alert>
+          </Box>
+        </DialogContent>
+
+        <DialogActions>
+          <Button 
+            onClick={() => setShowBulkJobDialog(false)}
+            color="inherit"
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleBulkCreateJobs}
+            variant="contained"
+            startIcon={<WorkIcon />}
+            disabled={!bulkJobForm.jobType}
+          >
+            Create Jobs for {selectedElements.length} Element{selectedElements.length > 1 ? 's' : ''}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
     </Container>
   );

@@ -114,6 +114,102 @@ router.post('/create-predefined', auth, async (req, res) => {
   }
 });
 
+// Bulk create predefined jobs for multiple structural elements
+router.post('/bulk-create', auth, async (req, res) => {
+  try {
+    const { elementIds, jobType } = req.body;
+
+    // Validate required fields
+    if (!elementIds || !Array.isArray(elementIds) || elementIds.length === 0) {
+      return res.status(400).json({ 
+        message: 'Element IDs array is required and cannot be empty' 
+      });
+    }
+
+    if (!jobType) {
+      return res.status(400).json({ 
+        message: 'Job type is required' 
+      });
+    }
+
+    // Verify all structural elements exist and get their project info
+    const elements = await StructuralElement.find({ 
+      _id: { $in: elementIds } 
+    }).populate('project');
+
+    if (elements.length !== elementIds.length) {
+      return res.status(404).json({ 
+        message: 'Some structural elements were not found' 
+      });
+    }
+
+    const results = [];
+    const errors = [];
+
+    // Process each element
+    for (const element of elements) {
+      try {
+        // Check if jobs of this type already exist for this element
+        const existingJobs = await Job.find({
+          structuralElement: element._id,
+          jobType: jobType
+        });
+
+        if (existingJobs.length > 0) {
+          errors.push({
+            elementId: element._id,
+            structureNumber: element.structureNumber,
+            message: `Jobs of type '${jobType}' already exist`
+          });
+          continue;
+        }
+
+        // Create predefined jobs for this element
+        const createdJobs = await Job.createPredefinedJobs(
+          jobType,
+          element._id,
+          element.project._id,
+          req.user.id
+        );
+
+        results.push({
+          elementId: element._id,
+          structureNumber: element.structureNumber,
+          jobsCreated: createdJobs.length,
+          jobs: createdJobs
+        });
+
+      } catch (error) {
+        errors.push({
+          elementId: element._id,
+          structureNumber: element.structureNumber,
+          message: error.message
+        });
+      }
+    }
+
+    const successCount = results.length;
+    const errorCount = errors.length;
+    const totalJobsCreated = results.reduce((sum, result) => sum + result.jobsCreated, 0);
+
+    res.status(200).json({
+      message: `Bulk job creation completed. Successfully processed ${successCount}/${elementIds.length} elements.`,
+      summary: {
+        totalElements: elementIds.length,
+        successCount,
+        errorCount,
+        totalJobsCreated
+      },
+      results,
+      errors
+    });
+
+  } catch (error) {
+    console.error('Error in bulk job creation:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // Create a new job for a structural element
 router.post('/', auth, async (req, res) => {
   try {
