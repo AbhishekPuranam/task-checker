@@ -45,6 +45,15 @@ const jobSchema = new mongoose.Schema({
     enum: ['low', 'medium', 'high', 'urgent'],
     default: 'medium'
   },
+  // Step tracking for predefined job sequences
+  stepNumber: {
+    type: Number,
+    min: 1
+  },
+  totalSteps: {
+    type: Number,
+    min: 1
+  },
   // Time tracking
   estimatedHours: {
     type: Number,
@@ -153,7 +162,7 @@ jobSchema.statics.getByStructuralElement = function(structuralElementId) {
     .populate('assignedTo', 'name email')
     .populate('createdBy', 'name email')
     .populate('qualityCheckedBy', 'name email')
-    .sort({ createdAt: -1 });
+    .sort({ stepNumber: 1, createdAt: 1 }); // Sort by step number first (ascending), then by creation date
 };
 
 // Static method to get jobs by project
@@ -162,7 +171,7 @@ jobSchema.statics.getByProject = function(projectId) {
     .populate('structuralElement')
     .populate('assignedTo', 'name email')
     .populate('createdBy', 'name email')
-    .sort({ dueDate: 1 });
+    .sort({ stepNumber: 1, dueDate: 1, createdAt: 1 }); // Sort by step number first, then due date, then creation date
 };
 
 // Predefined job types and their corresponding jobs in order
@@ -227,12 +236,15 @@ jobSchema.statics.createPredefinedJobs = async function(jobType, structuralEleme
   
   for (let i = 0; i < jobsToCreate.length; i++) {
     const jobTitle = jobsToCreate[i];
+    const stepNumber = i + 1;
     const job = new this({
       structuralElement: structuralElementId,
       project: projectId,
-      jobTitle: jobTitle,
-      jobDescription: `${jobTitle} - Step ${i + 1} of ${jobsToCreate.length} for ${jobType.replace(/_/g, ' ')}`,
+      jobTitle: `Step ${stepNumber}: ${jobTitle}`,
+      jobDescription: `${jobTitle} - Step ${stepNumber} of ${jobsToCreate.length} for ${jobType.replace(/_/g, ' ')}`,
       jobType: jobType,
+      stepNumber: stepNumber,
+      totalSteps: jobsToCreate.length,
       status: i === 0 ? 'pending' : 'pending', // First job can be started, others are pending
       priority: 'medium',
       createdBy: createdBy,

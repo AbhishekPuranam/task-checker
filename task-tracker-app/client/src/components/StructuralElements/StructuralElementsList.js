@@ -155,6 +155,13 @@ const StructuralElementsList = () => {
   const [jobMenuAnchor, setJobMenuAnchor] = useState(null);
   const [selectedJobForMenu, setSelectedJobForMenu] = useState(null);
 
+  // Manual job creation state
+  const [showManualJobForm, setShowManualJobForm] = useState(false);
+  const [manualJobForm, setManualJobForm] = useState({
+    jobTitle: '',
+    status: 'pending'
+  });
+
   const jobTypes = [
     { value: 'cement_fire_proofing', label: 'Cement Fire Proofing' },
     { value: 'gypsum_fire_proofing', label: 'Gypsum Fire Proofing' },
@@ -167,6 +174,12 @@ const StructuralElementsList = () => {
     { value: 'medium', label: 'Medium' },
     { value: 'high', label: 'High' },
     { value: 'urgent', label: 'Urgent' }
+  ];
+
+  const jobStatuses = [
+    { value: 'pending', label: 'Pending', color: '#ff9800' },
+    { value: 'completed', label: 'Completed', color: '#4caf50' },
+    { value: 'not_applicable', label: 'Not Applicable', color: '#4caf50' }
   ];
 
   // Fetch job types and predefined jobs data
@@ -207,7 +220,42 @@ const StructuralElementsList = () => {
     }
   };
 
+  // Create manual/custom job
+  const handleCreateManualJob = async () => {
+    if (!selectedElement || !manualJobForm.jobTitle.trim()) {
+      toast.error('Please fill in job title');
+      return;
+    }
 
+    try {
+      const jobData = {
+        structuralElement: selectedElement._id,
+        project: projectId,
+        jobTitle: manualJobForm.jobTitle.trim(),
+        jobDescription: manualJobForm.jobTitle.trim(), // Use title as description for simplicity
+        status: manualJobForm.status,
+        jobType: 'custom', // Simple job type for custom jobs
+        priority: 'medium' // Default priority
+      };
+
+      const response = await api.post('/api/jobs', jobData);
+      toast.success('Manual job created successfully');
+      
+      // Reset form and hide it
+      setManualJobForm({
+        jobTitle: '',
+        status: 'pending'
+      });
+      setShowManualJobForm(false);
+      
+      // Refresh jobs and elements
+      fetchElementJobs(selectedElement._id);
+      fetchElements();
+    } catch (error) {
+      console.error('Error creating manual job:', error);
+      toast.error(error.response?.data?.message || 'Failed to create manual job');
+    }
+  };
 
   const fetchElements = async () => {
     try {
@@ -334,7 +382,19 @@ const StructuralElementsList = () => {
   const fetchElementJobs = async (elementId) => {
     try {
       const response = await api.get(`/api/jobs/by-element/${elementId}`);
-      setElementJobs(response.data);
+      // Sort jobs by step number (ascending) for proper workflow order
+      const sortedJobs = response.data.sort((a, b) => {
+        // If both jobs have step numbers, sort by step number
+        if (a.stepNumber && b.stepNumber) {
+          return a.stepNumber - b.stepNumber;
+        }
+        // If only one has step number, put it first
+        if (a.stepNumber && !b.stepNumber) return -1;
+        if (b.stepNumber && !a.stepNumber) return 1;
+        // If neither has step number, sort by creation date
+        return new Date(a.createdAt) - new Date(b.createdAt);
+      });
+      setElementJobs(sortedJobs);
     } catch (error) {
       console.error('Error fetching jobs:', error);
       toast.error('Failed to load jobs for this element');
@@ -658,11 +718,12 @@ const StructuralElementsList = () => {
   const getJobStatusColor = (status) => {
     switch (status) {
       case 'completed': return 'success';
-      case 'in_progress': return 'primary';
+      case 'not_applicable': return 'success';
       case 'pending': return 'warning';
+      case 'in_progress': return 'primary';
       case 'on_hold': return 'info';
       case 'cancelled': return 'error';
-      default: return 'default';
+      default: return 'warning';
     }
   };
 
@@ -1983,153 +2044,583 @@ const StructuralElementsList = () => {
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>
+        <DialogTitle sx={{ 
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
+          m: 0,
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          <Box sx={{ 
+            position: 'absolute', 
+            top: -20, 
+            right: -20, 
+            width: 60, 
+            height: 60, 
+            borderRadius: '50%', 
+            bgcolor: 'rgba(255,255,255,0.1)' 
+          }} />
           {selectedElement && (
-            <Box>
-              <Typography variant="h6">
-                Jobs for {selectedElement.structureNumber}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {selectedElement.memberType} - {selectedElement.sectionSizes}
-              </Typography>
+            <Box sx={{ position: 'relative', zIndex: 1, py: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <WorkIcon sx={{ fontSize: 32 }} />
+                <Box>
+                  <Typography variant="h5" fontWeight="bold" sx={{ mb: 0.5 }}>
+                    🏗️ Jobs for {selectedElement.structureNumber}
+                  </Typography>
+                  <Typography variant="body1" sx={{ opacity: 0.9 }}>
+                    {selectedElement.memberType} - {selectedElement.sectionSizes}
+                  </Typography>
+                </Box>
+              </Box>
             </Box>
           )}
         </DialogTitle>
 
-        <DialogContent>
+        <DialogContent sx={{ p: 3 }}>
           {/* Select Fire Proofing Type */}
-          <Box sx={{ mb: 3, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-            <Typography variant="subtitle1" gutterBottom>
-              Select Fire Proofing Type
-            </Typography>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Choose a fire proofing type to create all required jobs automatically in the correct sequence.
-            </Typography>
-            
-            <FormControl fullWidth sx={{ mt: 2, mb: 2 }}>
-              <InputLabel>Fire Proofing Type</InputLabel>
-              <Select
-                value={selectedJobTypeForPredefined}
-                onChange={(e) => setSelectedJobTypeForPredefined(e.target.value)}
-                label="Fire Proofing Type"
-              >
-                {Object.entries(availableJobTypes).map(([key, label]) => (
-                  <MenuItem key={key} value={key}>
-                    {label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {selectedJobTypeForPredefined && predefinedJobsData[selectedJobTypeForPredefined] && (
-              <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper', border: 1, borderColor: 'divider', borderRadius: 1 }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Jobs that will be created:
+          <Paper elevation={2} sx={{ 
+            mb: 4, 
+            p: 3, 
+            borderRadius: 2,
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            <Box sx={{ 
+              position: 'absolute', 
+              top: -50, 
+              right: -50, 
+              width: 100, 
+              height: 100, 
+              borderRadius: '50%', 
+              bgcolor: 'rgba(255,255,255,0.1)' 
+            }} />
+            <Box sx={{ position: 'relative', zIndex: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <WorkIcon sx={{ mr: 2, fontSize: 28 }} />
+                <Typography variant="h6" fontWeight="bold">
+                  🔥 Fire Proofing Workflows
                 </Typography>
-                <Box sx={{ pl: 1 }}>
-                  {predefinedJobsData[selectedJobTypeForPredefined].map((jobTitle, index) => (
-                    <Typography key={index} variant="body2" color="text.secondary">
-                      {index + 1}. {jobTitle}
-                    </Typography>
-                  ))}
-                </Box>
               </Box>
-            )}
+              <Typography variant="body1" sx={{ mb: 3, opacity: 0.9 }}>
+                Select a predefined fire proofing type to automatically create all required jobs in the correct sequence.
+              </Typography>
+              
+              <FormControl fullWidth sx={{ 
+                mb: 2,
+                '& .MuiOutlinedInput-root': {
+                  bgcolor: 'rgba(255,255,255,0.95)',
+                  borderRadius: 2,
+                  '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' }
+                },
+                '& .MuiInputLabel-root': { color: 'rgba(0,0,0,0.7)' },
+                '& .MuiSelect-select': { color: 'rgba(0,0,0,0.87)' }
+              }}>
+                <InputLabel>Fire Proofing Type</InputLabel>
+                <Select
+                  value={selectedJobTypeForPredefined}
+                  onChange={(e) => setSelectedJobTypeForPredefined(e.target.value)}
+                  label="Fire Proofing Type"
+                >
+                  {Object.entries(availableJobTypes).map(([key, label]) => (
+                    <MenuItem key={key} value={key}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <AssignmentIcon sx={{ fontSize: 20 }} />
+                        {label}
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
-              <Button
-                variant="contained"
-                startIcon={<PlaylistAddIcon />}
-                onClick={handleCreatePredefinedJobs}
-                disabled={!selectedJobTypeForPredefined}
-                size="large"
-              >
-                Create Jobs ({selectedJobTypeForPredefined && predefinedJobsData[selectedJobTypeForPredefined] ? predefinedJobsData[selectedJobTypeForPredefined].length : 0} jobs)
-              </Button>
+              {selectedJobTypeForPredefined && predefinedJobsData[selectedJobTypeForPredefined] && (
+                <Paper elevation={1} sx={{ 
+                  mt: 2, 
+                  p: 2, 
+                  bgcolor: 'rgba(255,255,255,0.95)', 
+                  borderRadius: 2,
+                  border: '1px solid rgba(255,255,255,0.3)'
+                }}>
+                  <Typography variant="subtitle2" gutterBottom sx={{ 
+                    color: 'primary.main', 
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1
+                  }}>
+                    <PlaylistAddIcon /> Jobs to be created ({predefinedJobsData[selectedJobTypeForPredefined].length}):
+                  </Typography>
+                  <Box sx={{ pl: 1 }}>
+                    {predefinedJobsData[selectedJobTypeForPredefined].map((jobTitle, index) => (
+                      <Box key={index} sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        py: 0.8,
+                        color: 'text.secondary',
+                        borderLeft: '3px solid',
+                        borderColor: 'primary.main',
+                        pl: 2,
+                        ml: 1,
+                        mb: 0.5,
+                        bgcolor: 'rgba(255,255,255,0.7)',
+                        borderRadius: '0 8px 8px 0'
+                      }}>
+                        <Chip 
+                          label={`Step ${index + 1}`} 
+                          size="small" 
+                          sx={{ 
+                            mr: 2, 
+                            minWidth: 60,
+                            bgcolor: 'primary.main',
+                            color: 'white',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                          }} 
+                        />
+                        <Typography variant="body2" sx={{ fontWeight: 'medium', fontSize: '0.95rem' }}>
+                          {jobTitle}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Paper>
+              )}
+
+              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+                <Button
+                  variant="contained"
+                  startIcon={<PlaylistAddIcon />}
+                  onClick={handleCreatePredefinedJobs}
+                  disabled={!selectedJobTypeForPredefined}
+                  size="large"
+                  sx={{
+                    bgcolor: 'rgba(255,255,255,0.2)',
+                    color: 'white',
+                    borderRadius: 2,
+                    px: 4,
+                    py: 1.5,
+                    fontSize: '1rem',
+                    fontWeight: 'bold',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    '&:hover': {
+                      bgcolor: 'rgba(255,255,255,0.3)',
+                      transform: 'translateY(-1px)',
+                      boxShadow: '0 8px 25px rgba(0,0,0,0.2)'
+                    },
+                    '&:disabled': {
+                      bgcolor: 'rgba(255,255,255,0.1)',
+                      color: 'rgba(255,255,255,0.5)'
+                    },
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  Create {selectedJobTypeForPredefined && predefinedJobsData[selectedJobTypeForPredefined] ? predefinedJobsData[selectedJobTypeForPredefined].length : 0} Jobs
+                </Button>
+              </Box>
             </Box>
-          </Box>
+          </Paper>
+
+          {/* Manual Job Creation */}
+          <Paper elevation={2} sx={{ 
+            mb: 4, 
+            borderRadius: 2,
+            background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+            color: 'white',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            <Box sx={{ 
+              position: 'absolute', 
+              top: -30, 
+              left: -30, 
+              width: 80, 
+              height: 80, 
+              borderRadius: '50%', 
+              bgcolor: 'rgba(255,255,255,0.1)' 
+            }} />
+            <Box sx={{ p: 3, position: 'relative', zIndex: 1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <AddIcon sx={{ fontSize: 28 }} />
+                  <Typography variant="h6" fontWeight="bold">
+                    ⚡ Custom Job Creation
+                  </Typography>
+                </Box>
+                <Button
+                  variant="contained"
+                  size="medium"
+                  onClick={() => setShowManualJobForm(!showManualJobForm)}
+                  startIcon={showManualJobForm ? <KeyboardArrowDownIcon /> : <KeyboardArrowRightIcon />}
+                  sx={{
+                    bgcolor: 'rgba(255,255,255,0.2)',
+                    color: 'white',
+                    borderRadius: 2,
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    '&:hover': {
+                      bgcolor: 'rgba(255,255,255,0.3)',
+                      transform: 'translateY(-1px)'
+                    },
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  {showManualJobForm ? 'Hide Form' : 'Add Custom Job'}
+                </Button>
+              </Box>
+
+              <Collapse in={showManualJobForm}>
+                <Typography variant="body1" sx={{ mb: 3, opacity: 0.9 }}>
+                  Create a custom job with a title and status.
+                </Typography>
+                
+                <Paper elevation={1} sx={{ 
+                  p: 3, 
+                  bgcolor: 'rgba(255,255,255,0.95)', 
+                  borderRadius: 2,
+                  border: '1px solid rgba(255,255,255,0.3)'
+                }}>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={8}>
+                      <TextField
+                        fullWidth
+                        label="Job Title *"
+                        value={manualJobForm.jobTitle}
+                        onChange={(e) => setManualJobForm({ ...manualJobForm, jobTitle: e.target.value })}
+                        placeholder="Enter job title (e.g., 'Custom Inspection' or 'Step 5: Quality Check')"
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: 2,
+                            fontSize: '1.1rem',
+                            '&:hover fieldset': { borderColor: 'primary.main' }
+                          }
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <FormControl fullWidth>
+                        <InputLabel sx={{ fontSize: '1.1rem' }}>Status</InputLabel>
+                        <Select
+                          value={manualJobForm.status}
+                          onChange={(e) => setManualJobForm({ ...manualJobForm, status: e.target.value })}
+                          label="Status"
+                          sx={{ 
+                            borderRadius: 2,
+                            fontSize: '1.1rem'
+                          }}
+                        >
+                          {jobStatuses.map(status => (
+                            <MenuItem key={status.value} value={status.value}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Box sx={{ 
+                                  width: 12, 
+                                  height: 12, 
+                                  borderRadius: '50%', 
+                                  bgcolor: status.color 
+                                }} />
+                                <Typography sx={{ fontSize: '1rem', fontWeight: 'medium' }}>
+                                  {status.label}
+                                </Typography>
+                              </Box>
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                  </Grid>
+
+                  <Box sx={{ mt: 4, display: 'flex', gap: 2, justifyContent: 'center' }}>
+                    <Button
+                      variant="contained"
+                      startIcon={<AddIcon />}
+                      onClick={handleCreateManualJob}
+                      disabled={!manualJobForm.jobTitle.trim()}
+                      sx={{
+                        borderRadius: 2,
+                        px: 4,
+                        py: 1.2,
+                        fontSize: '1rem',
+                        fontWeight: 'bold',
+                        background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                        '&:hover': {
+                          background: 'linear-gradient(45deg, #1976D2 30%, #1CB5E0 90%)',
+                          transform: 'translateY(-1px)',
+                          boxShadow: '0 6px 20px rgba(33, 150, 243, 0.4)'
+                        },
+                        '&:disabled': {
+                          background: 'rgba(0,0,0,0.12)'
+                        },
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      Create Custom Job
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      onClick={() => {
+                        setManualJobForm({
+                          jobTitle: '',
+                          status: 'pending'
+                        });
+                      }}
+                      sx={{
+                        borderRadius: 2,
+                        px: 3,
+                        py: 1.2,
+                        fontSize: '1rem',
+                        borderWidth: 2,
+                        '&:hover': {
+                          borderWidth: 2,
+                          transform: 'translateY(-1px)'
+                        },
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      Clear Form
+                    </Button>
+                  </Box>
+                </Paper>
+              </Collapse>
+            </Box>
+          </Paper>
 
           {/* Existing Jobs List */}
-          <Typography variant="subtitle1" gutterBottom>
-            Existing Jobs ({elementJobs.length})
-          </Typography>
-          {elementJobs.length === 0 ? (
-            <Alert severity="info">No jobs found for this structural element.</Alert>
-          ) : (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Job Title</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Priority</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Due Date</TableCell>
-                    <TableCell>Progress</TableCell>
-                    <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {elementJobs.map((job) => (
-                    <TableRow key={job._id}>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight="medium">
-                          {job.jobTitle}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {job.jobDescription}
-                        </Typography>
+          <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+            <Box sx={{ 
+              p: 3, 
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white'
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <AssignmentIcon sx={{ fontSize: 28 }} />
+                  <Typography variant="h6" fontWeight="bold">
+                    📋 Existing Jobs ({elementJobs.length})
+                  </Typography>
+                </Box>
+                {elementJobs.length > 0 && elementJobs.some(job => job.stepNumber) && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                      Workflow Progress:
+                    </Typography>
+                    <Chip 
+                      label={`${elementJobs.filter(job => job.status === 'completed').length}/${elementJobs.length} Steps`}
+                      size="small"
+                      sx={{ 
+                        bgcolor: 'rgba(255,255,255,0.2)',
+                        color: 'white',
+                        fontWeight: 'bold'
+                      }}
+                    />
+                  </Box>
+                )}
+              </Box>
+            </Box>
+            
+            {elementJobs.length === 0 ? (
+              <Box sx={{ p: 4, textAlign: 'center' }}>
+                <WorkIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+                <Alert 
+                  severity="info" 
+                  sx={{ 
+                    borderRadius: 2,
+                    '& .MuiAlert-message': { fontSize: '1rem' }
+                  }}
+                >
+                  No jobs found for this structural element. Create your first job using the options above!
+                </Alert>
+              </Box>
+            ) : (
+              <TableContainer sx={{ maxHeight: 600 }}>
+                <Table stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ 
+                        bgcolor: 'grey.50', 
+                        fontWeight: 'bold',
+                        borderBottom: 2,
+                        borderColor: 'primary.main',
+                        fontSize: '1.1rem'
+                      }}>
+                        Job Title
                       </TableCell>
-                      <TableCell>
-                        <Chip label={job.jobType} size="small" variant="outlined" />
+                      <TableCell sx={{ 
+                        bgcolor: 'grey.50', 
+                        fontWeight: 'bold',
+                        borderBottom: 2,
+                        borderColor: 'primary.main',
+                        fontSize: '1.1rem',
+                        textAlign: 'center'
+                      }}>
+                        Fireproofing Type
                       </TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={job.priority} 
-                          size="small" 
-                          color={job.priority === 'urgent' ? 'error' : job.priority === 'high' ? 'warning' : 'default'}
-                        />
+                      <TableCell sx={{ 
+                        bgcolor: 'grey.50', 
+                        fontWeight: 'bold',
+                        borderBottom: 2,
+                        borderColor: 'primary.main',
+                        fontSize: '1.1rem',
+                        textAlign: 'center'
+                      }}>
+                        Status
                       </TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={job.status.replace('_', ' ')} 
-                          size="small" 
-                          color={getJobStatusColor(job.status)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {job.dueDate ? new Date(job.dueDate).toLocaleDateString() : 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                        {job.progressPercentage}%
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <Tooltip title="Edit Job">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleEditJob(job)}
-                              color="primary"
-                            >
-                              <EditIcon />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Quick Actions">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleJobMenuOpen(e, job)}
-                            >
-                              <MoreVertIcon />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
+                      <TableCell sx={{ 
+                        bgcolor: 'grey.50', 
+                        fontWeight: 'bold',
+                        borderBottom: 2,
+                        borderColor: 'primary.main',
+                        fontSize: '1.1rem',
+                        textAlign: 'center'
+                      }}>
+                        Actions
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
+                  </TableHead>
+                  <TableBody>
+                    {elementJobs.map((job, index) => (
+                      <TableRow 
+                        key={job._id}
+                        sx={{
+                          '&:hover': { 
+                            bgcolor: 'action.hover',
+                            transform: 'scale(1.01)',
+                            transition: 'all 0.2s ease'
+                          },
+                          '&:nth-of-type(odd)': { bgcolor: 'grey.25' }
+                        }}
+                      >
+                        <TableCell sx={{ py: 3 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            {job.stepNumber && (
+                              <Chip 
+                                label={`${job.stepNumber}/${job.totalSteps || '?'}`}
+                                size="small"
+                                sx={{ 
+                                  minWidth: 50,
+                                  bgcolor: 'primary.main',
+                                  color: 'white',
+                                  fontWeight: 'bold',
+                                  fontSize: '0.8rem'
+                                }}
+                              />
+                            )}
+                            <Typography variant="h6" fontWeight="bold" sx={{ fontSize: '1.1rem' }}>
+                              {job.jobTitle}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell sx={{ py: 3, textAlign: 'center' }}>
+                          <Chip 
+                            label={job.jobType ? job.jobType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Custom'} 
+                            size="medium"
+                            variant="outlined"
+                            sx={{ 
+                              borderRadius: 3,
+                              fontWeight: 'bold',
+                              fontSize: '0.85rem',
+                              px: 2,
+                              py: 1,
+                              minWidth: 140,
+                              borderColor: 'primary.main',
+                              color: 'primary.main',
+                              '&:hover': {
+                                bgcolor: 'primary.light',
+                                color: 'white',
+                                transform: 'scale(1.05)'
+                              },
+                              transition: 'all 0.2s ease'
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ py: 3, textAlign: 'center' }}>
+                          <Chip 
+                            label={job.status === 'pending' ? 'Pending' : 
+                                  job.status === 'completed' ? 'Completed' : 
+                                  job.status === 'not_applicable' ? 'Not Applicable' :
+                                  job.status.replace('_', ' ')} 
+                            size="medium"
+                            sx={{ 
+                              borderRadius: 3,
+                              fontWeight: 'bold',
+                              fontSize: '0.9rem',
+                              px: 2,
+                              py: 1,
+                              minWidth: 120,
+                              bgcolor: job.status === 'pending' ? '#ff9800' : 
+                                      (job.status === 'completed' || job.status === 'not_applicable') ? '#4caf50' : '#ff9800',
+                              color: 'white',
+                              '&:hover': {
+                                bgcolor: job.status === 'pending' ? '#f57c00' : 
+                                        (job.status === 'completed' || job.status === 'not_applicable') ? '#388e3c' : '#f57c00',
+                                transform: 'scale(1.05)'
+                              },
+                              transition: 'all 0.2s ease'
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ py: 3, textAlign: 'center' }}>
+                          <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                            <Tooltip title="Edit Job" arrow>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleEditJob(job)}
+                                sx={{
+                                  color: 'primary.main',
+                                  '&:hover': { 
+                                    bgcolor: 'primary.light',
+                                    color: 'white',
+                                    transform: 'scale(1.1)'
+                                  },
+                                  transition: 'all 0.2s ease'
+                                }}
+                              >
+                                <EditIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete Job" arrow>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDeleteJob(job)}
+                                sx={{
+                                  color: 'error.main',
+                                  '&:hover': { 
+                                    bgcolor: 'error.light',
+                                    color: 'white',
+                                    transform: 'scale(1.1)'
+                                  },
+                                  transition: 'all 0.2s ease'
+                                }}
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Quick Actions" arrow>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleJobMenuOpen(e, job)}
+                                sx={{
+                                  color: 'text.secondary',
+                                  '&:hover': { 
+                                    bgcolor: 'grey.200',
+                                    transform: 'scale(1.1)'
+                                  },
+                                  transition: 'all 0.2s ease'
+                                }}
+                              >
+                                <MoreVertIcon />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Paper>
         </DialogContent>
 
         <DialogActions>
@@ -2144,132 +2635,137 @@ const StructuralElementsList = () => {
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>
-          Edit Job
-          {editingJob && (
-            <Typography variant="body2" color="text.secondary">
-              {editingJob.jobTitle}
-            </Typography>
-          )}
+        <DialogTitle sx={{ 
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
+          m: 0
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1 }}>
+            <EditIcon sx={{ fontSize: 28 }} />
+            <Box>
+              <Typography variant="h6" fontWeight="bold">
+                ✏️ Edit Job
+              </Typography>
+              {editingJob && (
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                  {editingJob.jobTitle}
+                </Typography>
+              )}
+            </Box>
+          </Box>
         </DialogTitle>
 
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
+        <DialogContent sx={{ p: 3 }}>
+          <Grid container spacing={3} sx={{ mt: 1 }}>
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Job Title *"
                 value={jobEditForm.jobTitle}
                 onChange={(e) => setJobEditForm({ ...jobEditForm, jobTitle: e.target.value })}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover fieldset': { borderColor: 'primary.main' }
+                  }
+                }}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth>
-                <InputLabel>Job Type</InputLabel>
+                <InputLabel>Fireproofing Type</InputLabel>
                 <Select
                   value={jobEditForm.jobType}
                   onChange={(e) => setJobEditForm({ ...jobEditForm, jobType: e.target.value })}
-                  label="Job Type"
+                  label="Fireproofing Type"
+                  sx={{ borderRadius: 2 }}
                 >
                   {jobTypes.map(type => (
                     <MenuItem key={type.value} value={type.value}>
-                      {type.label}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <WorkIcon sx={{ fontSize: 18 }} />
+                        {type.label}
+                      </Box>
                     </MenuItem>
                   ))}
+                  <MenuItem value="custom">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <WorkIcon sx={{ fontSize: 18 }} />
+                      Custom
+                    </Box>
+                  </MenuItem>
                 </Select>
               </FormControl>
             </Grid>
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                multiline
-                rows={2}
-                label="Job Description *"
-                value={jobEditForm.jobDescription}
-                onChange={(e) => setJobEditForm({ ...jobEditForm, jobDescription: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <FormControl fullWidth>
-                <InputLabel>Priority</InputLabel>
-                <Select
-                  value={jobEditForm.priority}
-                  onChange={(e) => setJobEditForm({ ...jobEditForm, priority: e.target.value })}
-                  label="Priority"
-                >
-                  {priorities.map(priority => (
-                    <MenuItem key={priority.value} value={priority.value}>
-                      {priority.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={4}>
               <FormControl fullWidth>
                 <InputLabel>Status</InputLabel>
                 <Select
                   value={jobEditForm.status}
                   onChange={(e) => setJobEditForm({ ...jobEditForm, status: e.target.value })}
                   label="Status"
+                  sx={{ borderRadius: 2 }}
                 >
-                  <MenuItem value="pending">Pending</MenuItem>
-                  <MenuItem value="in_progress">In Progress</MenuItem>
-                  <MenuItem value="completed">Completed</MenuItem>
-                  <MenuItem value="on_hold">On Hold</MenuItem>
-                  <MenuItem value="cancelled">Cancelled</MenuItem>
+                  {jobStatuses.map(status => (
+                    <MenuItem key={status.value} value={status.value}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ 
+                          width: 12, 
+                          height: 12, 
+                          borderRadius: '50%', 
+                          bgcolor: status.color 
+                        }} />
+                        <Typography sx={{ fontSize: '1rem', fontWeight: 'medium' }}>
+                          {status.label}
+                        </Typography>
+                      </Box>
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                type="number"
-                label="Progress %"
-                value={jobEditForm.progressPercentage}
-                onChange={(e) => setJobEditForm({ ...jobEditForm, progressPercentage: e.target.value })}
-                inputProps={{ min: 0, max: 100 }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                type="number"
-                label="Estimated Hours"
-                value={jobEditForm.estimatedHours}
-                onChange={(e) => setJobEditForm({ ...jobEditForm, estimatedHours: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                type="date"
-                label="Due Date"
-                value={jobEditForm.dueDate}
-                onChange={(e) => setJobEditForm({ ...jobEditForm, dueDate: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={jobEditForm.qualityCheckRequired}
-                    onChange={(e) => setJobEditForm({ ...jobEditForm, qualityCheckRequired: e.target.checked })}
-                  />
-                }
-                label="Quality Check Required"
-              />
             </Grid>
           </Grid>
         </DialogContent>
 
-        <DialogActions>
-          <Button onClick={handleCloseJobEditDialog}>Cancel</Button>
+        <DialogActions sx={{ p: 3, gap: 2 }}>
+          <Button 
+            onClick={handleCloseJobEditDialog}
+            sx={{
+              borderRadius: 2,
+              px: 3,
+              py: 1.2,
+              fontSize: '1rem',
+              borderWidth: 2,
+              '&:hover': {
+                borderWidth: 2,
+                transform: 'translateY(-1px)'
+              },
+              transition: 'all 0.3s ease'
+            }}
+          >
+            Cancel
+          </Button>
           <Button 
             onClick={handleUpdateJob}
             variant="contained"
-            disabled={!jobEditForm.jobTitle.trim() || !jobEditForm.jobDescription.trim()}
+            disabled={!jobEditForm.jobTitle.trim()}
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              py: 1.2,
+              fontSize: '1rem',
+              fontWeight: 'bold',
+              background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+              '&:hover': {
+                background: 'linear-gradient(45deg, #1976D2 30%, #1CB5E0 90%)',
+                transform: 'translateY(-1px)',
+                boxShadow: '0 6px 20px rgba(33, 150, 243, 0.4)'
+              },
+              '&:disabled': {
+                background: 'rgba(0,0,0,0.12)'
+              },
+              transition: 'all 0.3s ease'
+            }}
           >
             Update Job
           </Button>
