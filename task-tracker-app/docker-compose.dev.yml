@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: tasktracker-dev-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: tasktracker
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_dev_data:/data/db
+    networks:
+      - tasktracker-dev-network
+
+  # Task Tracker Application (Development)
+  tasktracker-app-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: tasktracker-app-dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 5000
+      MONGODB_URI: mongodb://mongodb:27017/tasktracker
+      JWT_SECRET: dev-jwt-secret-key
+      CLIENT_URL: http://localhost:3000
+      SESSION_SECRET: dev-session-secret
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./uploads:/app/uploads
+    depends_on:
+      - mongodb
+    networks:
+      - tasktracker-dev-network
+    command: npm run dev
+
+  # React Client (Development)
+  tasktracker-client-dev:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
+    container_name: tasktracker-client-dev
+    restart: unless-stopped
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    networks:
+      - tasktracker-dev-network
+    command: npm start
+
+# Named volumes
+volumes:
+  mongodb_dev_data:
+    driver: local
+
+# Networks
+networks:
+  tasktracker-dev-network:
+    driver: bridge
