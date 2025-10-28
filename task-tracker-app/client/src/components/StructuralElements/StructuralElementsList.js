@@ -38,7 +38,12 @@ import {
   Divider,
   Menu,
   Checkbox,
-  Toolbar
+  Toolbar,
+  Popover,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemButton
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -91,7 +96,7 @@ const StructuralElementsList = () => {
   
   // Global filter state removed - now using individual section filters only
   
-  // Individual section filters for status-based sections
+  // Individual section filters for status-based sections with column-specific filters
   const [sectionFilters, setSectionFilters] = useState({
     'non clearance': {
       searchTerm: '',
@@ -100,7 +105,17 @@ const StructuralElementsList = () => {
       groupBy: '',
       page: 0,
       rowsPerPage: 10,
-      expandedGroups: {}
+      expandedGroups: {},
+      columnFilters: {
+        structureNumber: [],
+        memberType: [],
+        gridNo: [],
+        sectionSizes: [],
+        surfaceAreaSqm: { min: '', max: '' },
+        status: [],
+        currentPendingJob: [],
+        progress: { min: '', max: '' }
+      }
     },
     'no jobs': {
       searchTerm: '',
@@ -109,7 +124,17 @@ const StructuralElementsList = () => {
       groupBy: '',
       page: 0,
       rowsPerPage: 10,
-      expandedGroups: {}
+      expandedGroups: {},
+      columnFilters: {
+        structureNumber: [],
+        memberType: [],
+        gridNo: [],
+        sectionSizes: [],
+        surfaceAreaSqm: { min: '', max: '' },
+        status: [],
+        currentPendingJob: [],
+        progress: { min: '', max: '' }
+      }
     },
     'active': {
       searchTerm: '',
@@ -118,7 +143,17 @@ const StructuralElementsList = () => {
       groupBy: '',
       page: 0,
       rowsPerPage: 10,
-      expandedGroups: {}
+      expandedGroups: {},
+      columnFilters: {
+        structureNumber: [],
+        memberType: [],
+        gridNo: [],
+        sectionSizes: [],
+        surfaceAreaSqm: { min: '', max: '' },
+        status: [],
+        currentPendingJob: [],
+        progress: { min: '', max: '' }
+      }
     },
     'complete': {
       searchTerm: '',
@@ -127,7 +162,17 @@ const StructuralElementsList = () => {
       groupBy: '',
       page: 0,
       rowsPerPage: 10,
-      expandedGroups: {}
+      expandedGroups: {},
+      columnFilters: {
+        structureNumber: [],
+        memberType: [],
+        gridNo: [],
+        sectionSizes: [],
+        surfaceAreaSqm: { min: '', max: '' },
+        status: [],
+        currentPendingJob: [],
+        progress: { min: '', max: '' }
+      }
     }
   });
   
@@ -953,6 +998,115 @@ const StructuralElementsList = () => {
     }
   };
 
+  // Helper function to get unique values for column filters
+  const getUniqueColumnValues = (elements, columnKey) => {
+    const values = new Set();
+    elements.forEach(element => {
+      let value;
+      switch (columnKey) {
+        case 'structureNumber':
+          value = element.memberNumber;
+          break;
+        case 'memberType':
+          value = element.memberType;
+          break;
+        case 'gridNo':
+          value = element.gridLocation;
+          break;
+        case 'sectionSizes':
+          value = element.sectionSize;
+          break;
+        case 'status':
+          value = element.status;
+          break;
+        case 'currentPendingJob':
+          // Get current pending job
+          const jobs = element.jobs || jobsByElement[element._id] || [];
+          if (jobs.length === 0) {
+            value = 'No jobs';
+          } else {
+            const pendingJob = jobs.find(job => job.status === 'pending' || job.status === 'in_progress');
+            value = pendingJob ? pendingJob.jobTitle : 'All jobs complete';
+          }
+          break;
+        default:
+          value = element[columnKey];
+      }
+      if (value !== null && value !== undefined && value !== '') {
+        values.add(String(value));
+      }
+    });
+    return Array.from(values).sort();
+  };
+
+  // Function to apply column filters
+  const applyColumnFilters = (elements, columnFilters) => {
+    return elements.filter(element => {
+      return Object.entries(columnFilters).every(([columnKey, filterValue]) => {
+        if (!filterValue || (Array.isArray(filterValue) && filterValue.length === 0) || 
+            (typeof filterValue === 'object' && filterValue.min === '' && filterValue.max === '')) {
+          return true; // No filter applied
+        }
+
+        let elementValue;
+        switch (columnKey) {
+          case 'structureNumber':
+            elementValue = element.memberNumber;
+            break;
+          case 'memberType':
+            elementValue = element.memberType;
+            break;
+          case 'gridNo':
+            elementValue = element.gridLocation;
+            break;
+          case 'sectionSizes':
+            elementValue = element.sectionSize;
+            break;
+          case 'status':
+            elementValue = element.status;
+            break;
+          case 'surfaceAreaSqm':
+            elementValue = parseFloat(element.surfaceAreaSqm) || 0;
+            break;
+          case 'progress':
+            // Calculate progress percentage
+            const jobs = element.jobs || jobsByElement[element._id] || [];
+            if (jobs.length === 0) {
+              elementValue = 0;
+            } else {
+              const completedJobs = jobs.filter(job => job.status === 'completed').length;
+              elementValue = Math.round((completedJobs / jobs.length) * 100);
+            }
+            break;
+          case 'currentPendingJob':
+            const elementJobs = element.jobs || jobsByElement[element._id] || [];
+            if (elementJobs.length === 0) {
+              elementValue = 'No jobs';
+            } else {
+              const pendingJob = elementJobs.find(job => job.status === 'pending' || job.status === 'in_progress');
+              elementValue = pendingJob ? pendingJob.jobTitle : 'All jobs complete';
+            }
+            break;
+          default:
+            elementValue = element[columnKey];
+        }
+
+        if (Array.isArray(filterValue)) {
+          // Multi-select filter
+          return filterValue.includes(String(elementValue));
+        } else if (typeof filterValue === 'object') {
+          // Range filter for numbers
+          const numValue = parseFloat(elementValue) || 0;
+          const min = filterValue.min === '' ? -Infinity : parseFloat(filterValue.min);
+          const max = filterValue.max === '' ? Infinity : parseFloat(filterValue.max);
+          return numValue >= min && numValue <= max;
+        }
+
+        return true;
+      });
+    });
+  };
+
   // Global filtering logic moved to individual sections
 
   // Available columns configuration - All structural element fields
@@ -981,6 +1135,139 @@ const StructuralElementsList = () => {
     { key: 'progress', label: 'Progress', sortable: true },
     { key: 'actions', label: 'Actions', sortable: false }
   ];
+
+  // Column Filter Component
+  const ColumnFilter = ({ column, sectionKey, elements }) => {
+    const [anchorEl, setAnchorEl] = useState(null);
+    const sectionFilter = sectionFilters[sectionKey];
+    const columnFilter = sectionFilter?.columnFilters?.[column.key] || [];
+
+    if (column.key === 'select' || column.key === 'actions') {
+      return column.label;
+    }
+
+    const handleClick = (event) => {
+      setAnchorEl(event.currentTarget);
+    };
+
+    const handleClose = () => {
+      setAnchorEl(null);
+    };
+
+    const updateColumnFilter = (newFilter) => {
+      setSectionFilters(prev => ({
+        ...prev,
+        [sectionKey]: {
+          ...prev[sectionKey],
+          columnFilters: {
+            ...prev[sectionKey].columnFilters,
+            [column.key]: newFilter
+          }
+        }
+      }));
+    };
+
+    const clearFilter = () => {
+      if (column.key === 'surfaceAreaSqm' || column.key === 'progress') {
+        updateColumnFilter({ min: '', max: '' });
+      } else {
+        updateColumnFilter([]);
+      }
+    };
+
+    const uniqueValues = getUniqueColumnValues(elements, column.key);
+    const isActive = Array.isArray(columnFilter) ? columnFilter.length > 0 : 
+                    (columnFilter.min !== '' || columnFilter.max !== '');
+
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          {column.label}
+        </Typography>
+        <IconButton 
+          size="small" 
+          onClick={handleClick}
+          sx={{ 
+            p: 0.25,
+            color: isActive ? 'primary.main' : 'text.secondary',
+            '&:hover': { backgroundColor: 'action.hover' }
+          }}
+        >
+          <FilterListIcon fontSize="small" />
+        </IconButton>
+        <Popover
+          open={Boolean(anchorEl)}
+          anchorEl={anchorEl}
+          onClose={handleClose}
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'left',
+          }}
+          transformOrigin={{
+            vertical: 'top',
+            horizontal: 'left',
+          }}
+        >
+          <Box sx={{ p: 2, minWidth: 200, maxWidth: 300 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="subtitle2">Filter {column.label}</Typography>
+              {isActive && (
+                <Button size="small" onClick={clearFilter} color="error">
+                  Clear
+                </Button>
+              )}
+            </Box>
+
+            {(column.key === 'surfaceAreaSqm' || column.key === 'progress') ? (
+              // Range filter for numeric columns
+              <Box>
+                <TextField
+                  label="Min"
+                  type="number"
+                  size="small"
+                  value={columnFilter.min || ''}
+                  onChange={(e) => updateColumnFilter({ ...columnFilter, min: e.target.value })}
+                  sx={{ mb: 1, mr: 1, width: '45%' }}
+                />
+                <TextField
+                  label="Max"
+                  type="number"
+                  size="small"
+                  value={columnFilter.max || ''}
+                  onChange={(e) => updateColumnFilter({ ...columnFilter, max: e.target.value })}
+                  sx={{ mb: 1, width: '45%' }}
+                />
+              </Box>
+            ) : (
+              // Multi-select filter for text columns
+              <List sx={{ maxHeight: 200, overflow: 'auto' }}>
+                {uniqueValues.map((value) => (
+                  <ListItemButton
+                    key={value}
+                    dense
+                    onClick={() => {
+                      const currentFilter = Array.isArray(columnFilter) ? columnFilter : [];
+                      const newFilter = currentFilter.includes(value)
+                        ? currentFilter.filter(v => v !== value)
+                        : [...currentFilter, value];
+                      updateColumnFilter(newFilter);
+                    }}
+                  >
+                    <Checkbox
+                      edge="start"
+                      checked={Array.isArray(columnFilter) && columnFilter.includes(value)}
+                      size="small"
+                    />
+                    <ListItemText primary={value} />
+                  </ListItemButton>
+                ))}
+              </List>
+            )}
+          </Box>
+        </Popover>
+      </Box>
+    );
+  };
 
   // Old grouping options removed - now using individual section grouping
 
@@ -1596,8 +1883,8 @@ const StructuralElementsList = () => {
                   const sectionElements = elements.filter(el => el.status === statusName);
                   const sectionFilter = sectionFilters[statusName];
                   
-                  // Filter elements within this section (only section-specific filters)
-                  const filteredSectionElements = sectionElements.filter(element => {
+                  // Filter elements within this section (section-specific filters + column filters)
+                  let filteredSectionElements = sectionElements.filter(element => {
                     // Section-specific search term filter
                     if (sectionFilter.searchTerm && !Object.values(element).some(value => 
                       value?.toString().toLowerCase().includes(sectionFilter.searchTerm.toLowerCase())
@@ -1612,6 +1899,11 @@ const StructuralElementsList = () => {
                     
                     return true;
                   });
+
+                  // Apply column-specific filters
+                  if (sectionFilter.columnFilters) {
+                    filteredSectionElements = applyColumnFilters(filteredSectionElements, sectionFilter.columnFilters);
+                  }
                   
                   // Group elements if groupBy is selected
                   const groupedSectionElements = (() => {
@@ -1938,7 +2230,11 @@ const StructuralElementsList = () => {
                                                     color="primary"
                                                   />
                                                 ) : (
-                                                  column.label
+                                                  <ColumnFilter 
+                                                    column={column} 
+                                                    sectionKey={statusName}
+                                                    elements={sectionElements}
+                                                  />
                                                 )}
                                               </TableCell>
                                             ))}
@@ -2010,7 +2306,11 @@ const StructuralElementsList = () => {
                                               color="primary"
                                             />
                                           ) : (
-                                            column.label
+                                            <ColumnFilter 
+                                              column={column} 
+                                              sectionKey={statusName}
+                                              elements={sectionElements}
+                                            />
                                           )}
                                         </TableCell>
                                       ))}
