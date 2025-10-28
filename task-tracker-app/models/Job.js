@@ -30,9 +30,20 @@ const jobSchema = new mongoose.Schema({
       'cement_fire_proofing', 
       'gypsum_fire_proofing', 
       'intumescent_coatings', 
-      'refinery_fire_proofing'
+      'refinery_fire_proofing',
+      'custom'
     ],
     required: true
+  },
+  // For custom jobs - track the parent fireproofing workflow type
+  parentFireproofingType: {
+    type: String,
+    enum: [
+      'cement_fire_proofing', 
+      'gypsum_fire_proofing', 
+      'intumescent_coatings', 
+      'refinery_fire_proofing'
+    ]
   },
   // Status tracking
   status: {
@@ -53,6 +64,11 @@ const jobSchema = new mongoose.Schema({
   totalSteps: {
     type: Number,
     min: 1
+  },
+  // Order index for drag and drop reordering (independent of stepNumber)
+  orderIndex: {
+    type: Number,
+    default: 0
   },
   // Time tracking
   estimatedHours: {
@@ -162,7 +178,7 @@ jobSchema.statics.getByStructuralElement = function(structuralElementId) {
     .populate('assignedTo', 'name email')
     .populate('createdBy', 'name email')
     .populate('qualityCheckedBy', 'name email')
-    .sort({ stepNumber: 1, createdAt: 1 }); // Sort by step number first (ascending), then by creation date
+    .sort({ orderIndex: 1, stepNumber: 1, createdAt: 1 }); // Sort by order index first, then step number, then creation date
 };
 
 // Static method to get jobs by project
@@ -171,7 +187,7 @@ jobSchema.statics.getByProject = function(projectId) {
     .populate('structuralElement')
     .populate('assignedTo', 'name email')
     .populate('createdBy', 'name email')
-    .sort({ stepNumber: 1, dueDate: 1, createdAt: 1 }); // Sort by step number first, then due date, then creation date
+    .sort({ orderIndex: 1, stepNumber: 1, dueDate: 1, createdAt: 1 }); // Sort by order index first, then step number, then due date, then creation date
 };
 
 // Predefined job types and their corresponding jobs in order
@@ -245,6 +261,7 @@ jobSchema.statics.createPredefinedJobs = async function(jobType, structuralEleme
       jobType: jobType,
       stepNumber: stepNumber,
       totalSteps: jobsToCreate.length,
+      orderIndex: stepNumber, // Initialize orderIndex to match stepNumber
       status: i === 0 ? 'pending' : 'pending', // First job can be started, others are pending
       priority: 'medium',
       createdBy: createdBy,
@@ -264,7 +281,8 @@ jobSchema.statics.getJobTypeDisplayNames = function() {
     'cement_fire_proofing': 'Cement Fire Proofing',
     'gypsum_fire_proofing': 'Gypsum Fire Proofing', 
     'intumescent_coatings': 'Intumescent Coatings',
-    'refinery_fire_proofing': 'Refinery Fire Proofing'
+    'refinery_fire_proofing': 'Refinery Fire Proofing',
+    'custom': 'Custom Job'
   };
 };
 

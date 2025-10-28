@@ -5,6 +5,12 @@ const StructuralElement = require('../models/StructuralElement');
 const Task = require('../models/Task');
 const { auth, adminAuth } = require('../middleware/auth');
 
+// Debug middleware to log all requests
+router.use((req, res, next) => {
+  console.log(`=== JOBS ROUTER DEBUG: ${req.method} ${req.originalUrl} ===`);
+  next();
+});
+
 // Cleanup endpoint - delete all jobs (for development/testing)
 router.delete('/cleanup', async (req, res) => {
   try {
@@ -217,8 +223,19 @@ router.post('/', auth, async (req, res) => {
       structuralElement,
       project,
       jobTitle,
-      jobType
+      jobType,
+      parentFireproofingType,
+      orderIndex
     } = req.body;
+
+    console.log('🚀 Creating job with data:', {
+      structuralElement,
+      project,
+      jobTitle,
+      jobType,
+      parentFireproofingType,
+      orderIndex: orderIndex || 'not provided'
+    });
 
     // Validate required fields
     if (!jobTitle || !jobType) {
@@ -241,6 +258,19 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: 'Structural element does not belong to this project' });
     }
 
+    // Determine the order index
+    let finalOrderIndex;
+    if (orderIndex !== undefined && orderIndex !== null) {
+      // Use the provided orderIndex from frontend calculation
+      finalOrderIndex = orderIndex;
+      console.log('📍 Using provided orderIndex:', finalOrderIndex);
+    } else {
+      // Fallback to auto-increment behavior
+      const existingJobs = await Job.find({ structuralElement }).sort({ orderIndex: -1 }).limit(1);
+      finalOrderIndex = existingJobs.length > 0 ? (existingJobs[0].orderIndex || 0) + 10 : 100;
+      console.log('📍 Auto-generated orderIndex:', finalOrderIndex);
+    }
+
     // Create the job with simplified fields
     const job = new Job({
       structuralElement,
@@ -248,10 +278,13 @@ router.post('/', auth, async (req, res) => {
       jobTitle,
       jobDescription: jobTitle, // Use job title as description
       jobType,
+      parentFireproofingType, // For custom jobs, track parent workflow
       priority: 'medium', // Default priority
+      orderIndex: finalOrderIndex, // Use calculated order index
       createdBy: req.user.id
     });
 
+    console.log('💾 Saving job with orderIndex:', finalOrderIndex);
     await job.save();
     
     // Populate the response
@@ -371,6 +404,58 @@ router.get('/by-project/:projectId', auth, async (req, res) => {
   }
 });
 
+// Reorder jobs via drag and drop
+router.put('/reorder', auth, async (req, res) => {
+  try {
+    const { structuralElement, jobOrder } = req.body;
+
+    // Validate input
+    if (!structuralElement || !Array.isArray(jobOrder)) {
+      return res.status(400).json({ message: 'Structural element ID and job order array are required' });
+    }
+
+    console.log('=== JOB REORDER DEBUG ===');
+    console.log('Structural Element:', structuralElement);
+    console.log('New Job Order:', jobOrder);
+
+    // Get all jobs for this structural element
+    const allJobs = await Job.find({ structuralElement });
+    
+    if (allJobs.length === 0) {
+      return res.status(404).json({ message: 'No jobs found for this structural element' });
+    }
+
+    console.log('Found jobs:', allJobs.length);
+
+    // Update orderIndex for all jobs based on the new order
+    const updatePromises = [];
+    
+    jobOrder.forEach((jobId, index) => {
+      const job = allJobs.find(j => j._id.toString() === jobId);
+      if (job) {
+        const newOrderIndex = index + 1;
+        if (job.orderIndex !== newOrderIndex) {
+          console.log(`Updating job ${job.jobTitle} from order ${job.orderIndex} to ${newOrderIndex}`);
+          updatePromises.push(
+            Job.findByIdAndUpdate(jobId, { orderIndex: newOrderIndex })
+          );
+        }
+      }
+    });
+
+    await Promise.all(updatePromises);
+
+    res.json({ 
+      success: true, 
+      message: 'Jobs reordered successfully' 
+    });
+
+  } catch (error) {
+    console.error('Error reordering jobs:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // Get a specific job
 router.get('/:id', auth, async (req, res) => {
   try {
@@ -442,6 +527,125 @@ router.put('/:id', auth, async (req, res) => {
     res.json(updatedJob);
   } catch (error) {
     console.error('Error updating job:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Move job up or down in order
+router.put('/:id/move', auth, async (req, res) => {
+  try {
+    const jobId = req.params.id;
+    const { direction, structuralElement } = req.body;
+
+    console.log('=== JOB MOVE DEBUG ===');
+    console.log('Job ID:', jobId);
+    console.log('Direction:', direction);
+    console.log('Structural Element:', structuralElement);
+
+    // Validate input
+    if (!direction || !['up', 'down'].includes(direction)) {
+      return res.status(400).json({ message: 'Direction must be "up" or "down"' });
+    }
+
+    if (!structuralElement) {
+      return res.status(400).json({ message: 'Structural element ID is required' });
+    }
+
+    // Find the job to move
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+
+    console.log('Found job:', job.jobTitle, 'Step:', job.stepNumber);
+
+    // Check permissions
+    if (req.user.role !== 'admin' && 
+        job.createdBy.toString() !== req.user.id && 
+        (!job.assignedTo || job.assignedTo.toString() !== req.user.id)) {
+      return res.status(403).json({ message: 'Not authorized to move this job' });
+    }
+
+    // Get all jobs for this structural element
+    const allJobs = await Job.find({ 
+      structuralElement: structuralElement 
+    });
+    
+    console.log('All jobs for element:', allJobs.length);
+    allJobs.forEach(j => console.log(`  - ${j.jobTitle} (Step: ${j.stepNumber})`));
+    
+    // Separate jobs with step numbers and custom jobs, then sort each group
+    const regularJobs = allJobs
+      .filter(job => job.stepNumber != null)
+      .sort((a, b) => (a.stepNumber || 0) - (b.stepNumber || 0));
+    
+    const customJobs = allJobs
+      .filter(job => job.stepNumber == null)
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    
+    console.log('Regular jobs:', regularJobs.length, 'Custom jobs:', customJobs.length);
+    
+    // Combine them - regular jobs first, then custom jobs
+    const sortedJobs = [...regularJobs, ...customJobs];
+
+    // Find the current job's position in the sorted array
+    const currentIndex = sortedJobs.findIndex(j => j._id.toString() === jobId);
+    if (currentIndex === -1) {
+      return res.status(404).json({ message: 'Job not found in structural element jobs' });
+    }
+
+    // Calculate new position
+    let newIndex;
+    if (direction === 'up') {
+      if (currentIndex === 0) {
+        return res.status(400).json({ message: 'Job is already at the top' });
+      }
+      newIndex = currentIndex - 1;
+    } else {
+      if (currentIndex === sortedJobs.length - 1) {
+        return res.status(400).json({ message: 'Job is already at the bottom' });
+      }
+      newIndex = currentIndex + 1;
+    }
+
+    // Swap positions
+    const jobToMove = sortedJobs[currentIndex];
+    const jobAtNewPosition = sortedJobs[newIndex];
+
+    console.log('Current job:', jobToMove.jobTitle, 'Step:', jobToMove.stepNumber);
+    console.log('Target job:', jobAtNewPosition.jobTitle, 'Step:', jobAtNewPosition.stepNumber);
+
+    // If both jobs have step numbers, swap them
+    if (jobToMove.stepNumber && jobAtNewPosition.stepNumber) {
+      const tempStep = jobToMove.stepNumber;
+      console.log(`Swapping steps: ${jobToMove.stepNumber} <-> ${jobAtNewPosition.stepNumber}`);
+      await Job.findByIdAndUpdate(jobToMove._id, { stepNumber: jobAtNewPosition.stepNumber });
+      await Job.findByIdAndUpdate(jobAtNewPosition._id, { stepNumber: tempStep });
+      console.log('Step numbers swapped successfully');
+    } else {
+      // For jobs without step numbers (custom jobs), we'll update their creation order
+      // by slightly adjusting their createdAt timestamp
+      const now = new Date();
+      if (direction === 'up') {
+        // Move the job slightly before the previous job
+        const prevJobDate = new Date(jobAtNewPosition.createdAt);
+        const newDate = new Date(prevJobDate.getTime() - 1000); // 1 second before
+        await Job.findByIdAndUpdate(jobToMove._id, { createdAt: newDate });
+      } else {
+        // Move the job slightly after the next job
+        const nextJobDate = new Date(jobAtNewPosition.createdAt);
+        const newDate = new Date(nextJobDate.getTime() + 1000); // 1 second after
+        await Job.findByIdAndUpdate(jobToMove._id, { createdAt: newDate });
+      }
+    }
+
+    res.json({ 
+      success: true, 
+      message: `Job moved ${direction} successfully` 
+    });
+
+  } catch (error) {
+    console.error('Error moving job:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });

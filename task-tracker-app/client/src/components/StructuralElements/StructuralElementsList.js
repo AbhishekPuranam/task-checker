@@ -60,7 +60,9 @@ import {
   KeyboardArrowDown as KeyboardArrowDownIcon,
   KeyboardArrowRight as KeyboardArrowRightIcon,
   ViewModule as ViewModuleIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  Warning as WarningIcon,
+  CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 import { useParams } from 'react-router-dom';
 import api from '../../utils/api';
@@ -119,6 +121,7 @@ const StructuralElementsList = () => {
     projectName: false,
     siteLocation: false,
     status: true,
+    currentPendingJob: true,
     progress: true,
     actions: true
   });
@@ -160,10 +163,17 @@ const StructuralElementsList = () => {
 
   // Manual job creation state
   const [showManualJobForm, setShowManualJobForm] = useState(false);
+  const [showJobCreationDialog, setShowJobCreationDialog] = useState(false);
+  const [insertionIndex, setInsertionIndex] = useState(null); // Track where to insert the job
   const [manualJobForm, setManualJobForm] = useState({
     jobTitle: '',
+    fireproofingType: '',
     status: 'pending'
   });
+
+  // Delete confirmation state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [jobToDelete, setJobToDelete] = useState(null);
 
   // Bulk selection state
   const [selectedElements, setSelectedElements] = useState([]);
@@ -190,7 +200,7 @@ const StructuralElementsList = () => {
   const jobStatuses = [
     { value: 'pending', label: 'Pending', color: '#ff9800' },
     { value: 'completed', label: 'Completed', color: '#4caf50' },
-    { value: 'not_applicable', label: 'Not Applicable', color: '#4caf50' }
+    { value: 'not_applicable', label: 'Non clearance', color: '#4caf50' }
   ];
 
 
@@ -282,25 +292,116 @@ const StructuralElementsList = () => {
     }
 
     try {
+      let orderIndex;
+      
+      // Calculate orderIndex if inserting at a specific position
+      if (insertionIndex !== null) {
+        console.log(`🎯 Inserting job at position ${insertionIndex + 1}. Current jobs:`, elementJobs.length);
+        console.log('Current jobs order:', elementJobs.map((job, idx) => ({
+          index: idx,
+          title: job.jobTitle,
+          stepNumber: job.stepNumber,
+          orderIndex: job.orderIndex
+        })));
+        
+        if (elementJobs.length === 0) {
+          orderIndex = 100;
+          console.log(`📍 No existing jobs - setting orderIndex to ${orderIndex}`);
+        } else if (insertionIndex === 0) {
+          // Insert at beginning
+          const orders = elementJobs.map(j => {
+            if (j.orderIndex !== undefined && j.orderIndex !== null) return j.orderIndex;
+            if (j.stepNumber !== undefined && j.stepNumber !== null) return j.stepNumber * 10;
+            return 1000;
+          });
+          const minOrder = Math.min(...orders);
+          orderIndex = minOrder - 10;
+          console.log(`📍 Inserting at beginning - minOrder: ${minOrder}, new orderIndex: ${orderIndex}`);
+        } else if (insertionIndex >= elementJobs.length) {
+          // Insert at end
+          const orders = elementJobs.map(j => {
+            if (j.orderIndex !== undefined && j.orderIndex !== null) return j.orderIndex;
+            if (j.stepNumber !== undefined && j.stepNumber !== null) return j.stepNumber * 10;
+            return 0;
+          });
+          const maxOrder = Math.max(...orders);
+          orderIndex = maxOrder + 10;
+          console.log(`📍 Inserting at end - maxOrder: ${maxOrder}, new orderIndex: ${orderIndex}`);
+        } else {
+          // Insert between existing jobs
+          const prevJob = elementJobs[insertionIndex - 1];
+          const nextJob = elementJobs[insertionIndex];
+          
+          console.log(`📍 Inserting between jobs:`, {
+            prevJob: { title: prevJob?.jobTitle, stepNumber: prevJob?.stepNumber, orderIndex: prevJob?.orderIndex },
+            nextJob: { title: nextJob?.jobTitle, stepNumber: nextJob?.stepNumber, orderIndex: nextJob?.orderIndex }
+          });
+          
+          let prevOrder, nextOrder;
+          
+          // Get previous job order
+          if (prevJob?.orderIndex !== undefined && prevJob?.orderIndex !== null) {
+            prevOrder = prevJob.orderIndex;
+          } else if (prevJob?.stepNumber !== undefined && prevJob?.stepNumber !== null) {
+            prevOrder = prevJob.stepNumber * 10;
+          } else {
+            prevOrder = 0;
+          }
+          
+          // Get next job order
+          if (nextJob?.orderIndex !== undefined && nextJob?.orderIndex !== null) {
+            nextOrder = nextJob.orderIndex;
+          } else if (nextJob?.stepNumber !== undefined && nextJob?.stepNumber !== null) {
+            nextOrder = nextJob.stepNumber * 10;
+          } else {
+            nextOrder = prevOrder + 20; // Default gap
+          }
+          
+          orderIndex = (prevOrder + nextOrder) / 2;
+          
+          // Ensure we have enough precision
+          if (nextOrder - prevOrder < 1) {
+            orderIndex = prevOrder + 0.1;
+          }
+          
+          console.log(`📍 Between insertion - prevOrder: ${prevOrder}, nextOrder: ${nextOrder}, calculated orderIndex: ${orderIndex}`);
+        }
+      }
+
       const jobData = {
         structuralElement: selectedElement._id,
         project: projectId,
         jobTitle: manualJobForm.jobTitle.trim(),
         jobDescription: manualJobForm.jobTitle.trim(), // Use title as description for simplicity
         status: manualJobForm.status,
-        jobType: 'custom', // Simple job type for custom jobs
+        jobType: manualJobForm.fireproofingType || 'custom', // Use fireproofingType or default to custom
         priority: 'medium' // Default priority
       };
 
+      // Add orderIndex if we're inserting at a specific position
+      if (orderIndex !== undefined) {
+        jobData.orderIndex = orderIndex;
+        console.log('🚀 Sending job data with orderIndex:', orderIndex);
+      }
+
+      console.log('📤 Final job data being sent:', jobData);
       const response = await api.post('/api/jobs', jobData);
-      toast.success('Manual job created successfully');
       
-      // Reset form and hide it
+      if (insertionIndex !== null) {
+        toast.success(`Custom job created and inserted at position ${insertionIndex + 1}`);
+      } else {
+        toast.success('Manual job created successfully');
+      }
+      
+      // Reset form and state
       setManualJobForm({
         jobTitle: '',
+        fireproofingType: '',
         status: 'pending'
       });
       setShowManualJobForm(false);
+      setShowJobCreationDialog(false);
+      setInsertionIndex(null); // Reset insertion index
       
       // Refresh jobs and elements
       fetchElementJobs(selectedElement._id);
@@ -436,19 +537,8 @@ const StructuralElementsList = () => {
   const fetchElementJobs = async (elementId) => {
     try {
       const response = await api.get(`/api/jobs/by-element/${elementId}`);
-      // Sort jobs by step number (ascending) for proper workflow order
-      const sortedJobs = response.data.sort((a, b) => {
-        // If both jobs have step numbers, sort by step number
-        if (a.stepNumber && b.stepNumber) {
-          return a.stepNumber - b.stepNumber;
-        }
-        // If only one has step number, put it first
-        if (a.stepNumber && !b.stepNumber) return -1;
-        if (b.stepNumber && !a.stepNumber) return 1;
-        // If neither has step number, sort by creation date
-        return new Date(a.createdAt) - new Date(b.createdAt);
-      });
-      setElementJobs(sortedJobs);
+      // Backend already sorts by orderIndex, stepNumber, createdAt - just use the response directly
+      setElementJobs(response.data);
     } catch (error) {
       console.error('Error fetching jobs:', error);
       toast.error('Failed to load jobs for this element');
@@ -492,6 +582,22 @@ const StructuralElementsList = () => {
   const handleEditElement = (element) => {
     setEditingElement(element);
     setShowEditDialog(true);
+  };
+
+  const handleInsertJobAt = (insertAtIndex) => {
+    if (!selectedElement) {
+      toast.error('Please select an element first');
+      return;
+    }
+
+    // Set the insertion index and show the job creation dialog
+    setInsertionIndex(insertAtIndex);
+    setManualJobForm({
+      jobTitle: '',
+      fireproofingType: '',
+      status: 'pending'
+    });
+    setShowJobCreationDialog(true);
   };
 
   const handleEditProject = () => {
@@ -627,18 +733,25 @@ const StructuralElementsList = () => {
     });
   };
 
-  const handleDeleteJob = async (job) => {
-    if (!window.confirm(`Are you sure you want to delete the job "${job.jobTitle}"? This action cannot be undone.`)) {
-      return;
-    }
+  const handleDeleteJob = (job) => {
+    setJobToDelete(job);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeleteJob = async () => {
+    if (!jobToDelete) return;
 
     try {
-      await api.delete(`/api/jobs/${job._id}`);
+      await api.delete(`/api/jobs/${jobToDelete._id}`);
       toast.success('Job deleted successfully');
       
       // Refresh jobs list and elements table
       fetchElementJobs(selectedElement._id);
       fetchElements(); // Refresh the main elements table to show updated status
+      
+      // Reset delete dialog state
+      setShowDeleteDialog(false);
+      setJobToDelete(null);
     } catch (error) {
       console.error('Error deleting job:', error);
       toast.error(error.response?.data?.message || 'Failed to delete job');
@@ -680,8 +793,9 @@ const StructuralElementsList = () => {
         }
       }, 1000);
       
-      // Refresh jobs list
+      // Refresh jobs list and main elements table
       fetchElementJobs(selectedElement._id);
+      fetchElements(); // Refresh the main elements table to update the "Current Pending Job" column
     } catch (error) {
       console.error('Error updating job status:', error);
       console.error('Full error response:', error.response);
@@ -709,11 +823,8 @@ const StructuralElementsList = () => {
       case 'complete':
         handleQuickStatusUpdate(selectedJobForMenu, 'completed');
         break;
-      case 'start':
-        handleQuickStatusUpdate(selectedJobForMenu, 'in_progress');
-        break;
-      case 'pause':
-        handleQuickStatusUpdate(selectedJobForMenu, 'on_hold');
+      case 'not_applicable':
+        handleQuickStatusUpdate(selectedJobForMenu, 'not_applicable');
         break;
       case 'pending':
         handleQuickStatusUpdate(selectedJobForMenu, 'pending');
@@ -838,6 +949,7 @@ const StructuralElementsList = () => {
     { key: 'projectName', label: 'Project Name', sortable: true },
     { key: 'siteLocation', label: 'Site Location', sortable: true },
     { key: 'status', label: 'Status', sortable: true },
+    { key: 'currentPendingJob', label: 'Current Pending Job', sortable: false },
     { key: 'progress', label: 'Progress', sortable: true },
     { key: 'actions', label: 'Actions', sortable: false }
   ];
@@ -1159,14 +1271,60 @@ const StructuralElementsList = () => {
           <Chip 
             label={element.status} 
             size="small" 
-            color={getStatusColor(element.status)}
+            color={getStatusColor(element.status) === 'warning' ? undefined : getStatusColor(element.status)}
             sx={{ 
               borderRadius: 1,
               fontWeight: 500,
-              textTransform: 'capitalize'
+              textTransform: 'capitalize',
+              // Custom styling for warning/orange status without using Material-UI color prop
+              ...(getStatusColor(element.status) === 'warning' && {
+                backgroundColor: '#ff9800',
+                color: '#ffffff',
+                border: 'none',
+                '& .MuiChip-label': {
+                  color: '#ffffff'
+                }
+              })
             }}
           />
         );
+      case 'currentPendingJob':
+        return (() => {
+          if (!element.jobs || element.jobs.length === 0) {
+            return (
+              <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                No jobs
+              </Typography>
+            );
+          }
+          
+          // Sort jobs by orderIndex and find the first pending job in the correct sequence
+          const sortedJobs = [...element.jobs].sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+          const pendingJob = sortedJobs.find(job => job.status === 'pending');
+          
+          if (!pendingJob) {
+            return (
+              <Typography variant="body2" color="success.main" sx={{ fontWeight: 500 }}>
+                All jobs complete
+              </Typography>
+            );
+          }
+          
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                backgroundColor: 'warning.main',
+                animation: 'pulse 2s infinite'
+              }} />
+              <Typography variant="body2" color="warning.dark" sx={{ fontWeight: 500 }}>
+                {pendingJob.jobTitle}
+              </Typography>
+            </Box>
+          );
+        })();
       case 'progress':
         return (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -1335,7 +1493,14 @@ const StructuralElementsList = () => {
             
             {/* Project Completion Summary */}
             {elements.length > 0 && (
-              <Box sx={{ mt: 1, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}>
+              <Box sx={{ 
+                mt: 1, 
+                p: 2, 
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                borderRadius: 2,
+                boxShadow: '0 4px 20px rgba(102, 126, 234, 0.3)'
+              }}>
                 {(() => {
                   const completedElements = elements.filter(el => el.status === 'complete');
                   const totalSurfaceArea = elements.reduce((sum, el) => sum + (el.surfaceAreaSqm || 0), 0);
@@ -1354,6 +1519,7 @@ const StructuralElementsList = () => {
                     switch (status) {
                       case 'complete': return 'success';
                       case 'in_progress': return 'warning';
+                      case 'pending': return { backgroundColor: '#ff9800', color: 'white' }; // Orange for pending
                       default: return 'default';
                     }
                   };
@@ -1361,26 +1527,42 @@ const StructuralElementsList = () => {
                   return (
                     <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
                       <Box>
-                        <Typography variant="body2" color="text.secondary">Project Status</Typography>
+                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>Project Status</Typography>
                         <Chip 
                           label={projectStatus.replace('_', ' ')} 
-                          color={getProjectStatusColor(projectStatus)}
-                          sx={{ fontWeight: 'bold', textTransform: 'capitalize' }}
+                          color={projectStatus !== 'pending' && getProjectStatusColor(projectStatus) !== 'warning' ? getProjectStatusColor(projectStatus) : undefined}
+                          sx={{ 
+                            fontWeight: 'bold', 
+                            textTransform: 'capitalize',
+                            // Custom styling for warning/orange status (in_progress, etc.)
+                            ...(getProjectStatusColor(projectStatus) === 'warning' && {
+                              backgroundColor: '#ff9800',
+                              color: '#ffffff',
+                              border: 'none',
+                              '& .MuiChip-label': {
+                                color: '#ffffff'
+                              }
+                            }),
+                            // Other status colors
+                            ...(projectStatus === 'complete' && { 
+                              color: 'success.main' 
+                            })
+                          }}
                         />
                       </Box>
                       <Box>
-                        <Typography variant="body2" color="text.secondary">Total Surface Area</Typography>
-                        <Typography variant="h6" fontWeight="bold">{totalSurfaceArea.toFixed(2)} sqm</Typography>
+                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>Total Surface Area</Typography>
+                        <Typography variant="h6" fontWeight="bold" color="white">{totalSurfaceArea.toFixed(2)} sqm</Typography>
                       </Box>
                       <Box>
-                        <Typography variant="body2" color="text.secondary">Completed Surface Area</Typography>
-                        <Typography variant="h6" fontWeight="bold" color="success.main">
+                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>Completed Surface Area</Typography>
+                        <Typography variant="h6" fontWeight="bold" sx={{ color: '#4caf50' }}>
                           {completedSurfaceArea.toFixed(2)} sqm ({completionPercentage.toFixed(1)}%)
                         </Typography>
                       </Box>
                       <Box>
-                        <Typography variant="body2" color="text.secondary">Elements Progress</Typography>
-                        <Typography variant="h6" fontWeight="bold">
+                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>Elements Progress</Typography>
+                        <Typography variant="h6" fontWeight="bold" color="white">
                           {completedElements.length}/{elements.length} elements
                         </Typography>
                       </Box>
@@ -1407,25 +1589,6 @@ const StructuralElementsList = () => {
                 })()}
               </Box>
             )}
-            <Typography variant="h4" gutterBottom>
-              Structural Elements
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setShowAddDialog(true)}
-            >
-              Add Element
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<AddIcon />}
-              onClick={() => setShowUploadDialog(true)}
-            >
-              Upload Excel
-            </Button>
           </Box>
         </Box>
 
@@ -1465,77 +1628,17 @@ const StructuralElementsList = () => {
           </Paper>
         )}
 
-        {/* Search and Filters Section - ArmorCode Style */}
+        {/* Compact Controls Toolbar */}
         <Paper sx={{ 
-          p: 3, 
+          p: 2, 
           mb: 3,
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           color: 'white',
-          borderRadius: 3,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+          borderRadius: 2,
+          boxShadow: '0 4px 20px rgba(102, 126, 234, 0.3)'
         }}>
-          {/* Search Bar */}
-          <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-            <TextField
-              fullWidth
-              placeholder="Search by structure number, drawing number, member type, or section sizes..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon sx={{ color: 'primary.main' }} />
-                  </InputAdornment>
-                ),
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  backgroundColor: 'white',
-                  borderRadius: 2,
-                  '& fieldset': { border: 'none' },
-                  '&:hover fieldset': { border: 'none' },
-                  '&.Mui-focused fieldset': { border: '2px solid', borderColor: 'primary.main' }
-                },
-                '& .MuiInputBase-input': {
-                  fontSize: '0.95rem',
-                  fontWeight: 500
-                }
-              }}
-            />
-            <Box sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 2,
-              backgroundColor: 'rgba(255,255,255,0.15)',
-              borderRadius: 2,
-              px: 2,
-              minWidth: 220
-            }}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h6" fontWeight="600">
-                  {showGroupedView 
-                    ? Object.keys(groupedElements).length
-                    : filteredElements.length
-                  }
-                </Typography>
-                <Typography variant="caption" sx={{ opacity: 0.9 }}>
-                  {showGroupedView ? 'Groups' : 'Elements'}
-                </Typography>
-              </Box>
-              <Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.3)' }} />
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h6" fontWeight="600">
-                  {filteredElements.length}
-                </Typography>
-                <Typography variant="caption" sx={{ opacity: 0.9 }}>
-                  Total Elements
-                </Typography>
-              </Box>
-            </Box>
-          </Box>
-
-          {/* Group By Toggle and Controls */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            {/* Group By Toggle */}
             <FormControlLabel
               control={
                 <Switch
@@ -1549,10 +1652,12 @@ const StructuralElementsList = () => {
               label={
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <ViewModuleIcon />
-                  <Typography>Grouped View</Typography>
+                  <Typography variant="body2">Grouped View</Typography>
                 </Box>
               }
             />
+            
+            {/* Group By Selector */}
             {showGroupedView && (
               <FormControl size="small" sx={{ minWidth: 200 }}>
                 <InputLabel sx={{ color: 'white', '&.Mui-focused': { color: 'white' } }}>Group By</InputLabel>
@@ -1561,10 +1666,10 @@ const StructuralElementsList = () => {
                   onChange={(e) => setGroupBy(e.target.value)}
                   label="Group By"
                   sx={{
-                    backgroundColor: 'rgba(255,255,255,0.15)',
                     color: 'white',
-                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
-                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
                     '& .MuiSvgIcon-root': { color: 'white' }
                   }}
                 >
@@ -1583,131 +1688,73 @@ const StructuralElementsList = () => {
               startIcon={<ViewModuleIcon />}
               onClick={() => setShowColumnSettings(true)}
               sx={{
+                borderColor: 'rgba(255,255,255,0.5)',
                 color: 'white',
-                borderColor: 'rgba(255,255,255,0.3)',
-                backgroundColor: 'rgba(255,255,255,0.1)',
                 '&:hover': {
                   borderColor: 'white',
-                  backgroundColor: 'rgba(255,255,255,0.2)'
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  color: 'white'
                 }
               }}
             >
               Columns
             </Button>
+            
+            {/* Add Element Button */}
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setShowAddDialog(true)}
+              sx={{
+                backgroundColor: 'rgba(255,255,255,0.2)',
+                color: 'white',
+                border: '1px solid rgba(255,255,255,0.3)',
+                '&:hover': {
+                  backgroundColor: 'rgba(255,255,255,0.3)',
+                  transform: 'translateY(-1px)',
+                  boxShadow: '0 4px 12px rgba(255,255,255,0.2)'
+                }
+              }}
+            >
+              Add Element
+            </Button>
+            
+            {/* Upload Excel Button */}
+            <Button
+              variant="outlined"
+              startIcon={<AddIcon />}
+              onClick={() => setShowUploadDialog(true)}
+              sx={{
+                borderColor: 'rgba(255,255,255,0.5)',
+                color: 'white',
+                '&:hover': {
+                  borderColor: 'white',
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  color: 'white'
+                }
+              }}
+            >
+              Upload Excel
+            </Button>
+            
+            {/* Elements Count */}
+            <Box sx={{ 
+              ml: 'auto',
+              px: 2,
+              py: 1,
+              backgroundColor: 'rgba(255,255,255,0.2)',
+              borderRadius: 1,
+              color: 'white',
+              border: '1px solid rgba(255,255,255,0.3)'
+            }}>
+              <Typography variant="body2" fontWeight="bold">
+                {showGroupedView 
+                  ? `${Object.keys(groupedElements).length} Groups`
+                  : `${filteredElements.length} Elements`
+                }
+              </Typography>
+            </Box>
           </Box>
-
-          {/* Filters Accordion */}
-          <Accordion 
-            expanded={filtersExpanded} 
-            onChange={(e, isExpanded) => setFiltersExpanded(isExpanded)}
-          >
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <FilterListIcon />
-                <Typography>Advanced Filters</Typography>
-                {hasActiveFilters && (
-                  <Chip 
-                    label="Filters Active" 
-                    size="small" 
-                    color="primary" 
-                    variant="outlined" 
-                  />
-                )}
-              </Box>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Grid container spacing={3}>
-                {/* Member Type Filter */}
-                <Grid item xs={12} sm={6} md={3}>
-                  <FormControl fullWidth>
-                    <InputLabel>Member Type</InputLabel>
-                    <Select
-                      value={memberTypeFilter}
-                      onChange={(e) => setMemberTypeFilter(e.target.value)}
-                      label="Member Type"
-                    >
-                      <MenuItem value="">All Types</MenuItem>
-                      {uniqueMemberTypes.map(type => (
-                        <MenuItem key={type} value={type}>
-                          <Chip
-                            label={type}
-                            size="small"
-                            variant="outlined"
-                          />
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-
-                {/* Status Filter */}
-                <Grid item xs={12} sm={6} md={3}>
-                  <FormControl fullWidth>
-                    <InputLabel>Status</InputLabel>
-                    <Select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      label="Status"
-                    >
-                      <MenuItem value="">All Statuses</MenuItem>
-                      {uniqueStatuses.map(status => (
-                        <MenuItem key={status} value={status}>
-                          <Chip
-                            label={status}
-                            color={getStatusColor(status)}
-                            size="small"
-                            variant="outlined"
-                          />
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-
-                {/* Surface Area Range Filter */}
-                <Grid item xs={12} sm={6} md={3}>
-                  <Typography gutterBottom>
-                    Surface Area: {surfaceAreaRange[0]} - {surfaceAreaRange[1]} sqm
-                  </Typography>
-                  <Slider
-                    value={surfaceAreaRange}
-                    onChange={(e, newValue) => setSurfaceAreaRange(newValue)}
-                    valueLabelDisplay="auto"
-                    min={0}
-                    max={maxSurfaceArea}
-                    step={0.1}
-                  />
-                </Grid>
-
-                {/* Quantity Range Filter */}
-                <Grid item xs={12} sm={6} md={3}>
-                  <Typography gutterBottom>
-                    Quantity: {quantityRange[0]} - {quantityRange[1]}
-                  </Typography>
-                  <Slider
-                    value={quantityRange}
-                    onChange={(e, newValue) => setQuantityRange(newValue)}
-                    valueLabelDisplay="auto"
-                    min={1}
-                    max={maxQuantity}
-                    step={1}
-                  />
-                </Grid>
-
-                {/* Clear Filters Button */}
-                <Grid item xs={12}>
-                  <Button
-                    variant="outlined"
-                    startIcon={<ClearIcon />}
-                    onClick={clearAllFilters}
-                    disabled={!hasActiveFilters}
-                  >
-                    Clear All Filters & Groups
-                  </Button>
-                </Grid>
-              </Grid>
-            </AccordionDetails>
-          </Accordion>
         </Paper>
 
         {elements.length === 0 && !loading ? (
@@ -2082,6 +2129,8 @@ const StructuralElementsList = () => {
                 projectName: false,
                 siteLocation: false,
                 status: true,
+                currentPendingJob: true,
+                progress: true,
                 actions: true
               });
             }}
@@ -2381,202 +2430,6 @@ const StructuralElementsList = () => {
                   </Box>
                 </Paper>
               )}
-
-              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
-                <Button
-                  variant="contained"
-                  startIcon={<PlaylistAddIcon />}
-                  onClick={handleCreatePredefinedJobs}
-                  disabled={!selectedJobTypeForPredefined}
-                  size="large"
-                  sx={{
-                    bgcolor: 'rgba(255,255,255,0.2)',
-                    color: 'white',
-                    borderRadius: 2,
-                    px: 4,
-                    py: 1.5,
-                    fontSize: '1rem',
-                    fontWeight: 'bold',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255,255,255,0.3)',
-                    '&:hover': {
-                      bgcolor: 'rgba(255,255,255,0.3)',
-                      transform: 'translateY(-1px)',
-                      boxShadow: '0 8px 25px rgba(0,0,0,0.2)'
-                    },
-                    '&:disabled': {
-                      bgcolor: 'rgba(255,255,255,0.1)',
-                      color: 'rgba(255,255,255,0.5)'
-                    },
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  Create {selectedJobTypeForPredefined && predefinedJobsData[selectedJobTypeForPredefined] ? predefinedJobsData[selectedJobTypeForPredefined].length : 0} Jobs
-                </Button>
-              </Box>
-            </Box>
-          </Paper>
-
-          {/* Manual Job Creation */}
-          <Paper elevation={2} sx={{ 
-            mb: 4, 
-            borderRadius: 2,
-            background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-            color: 'white',
-            position: 'relative',
-            overflow: 'hidden'
-          }}>
-            <Box sx={{ 
-              position: 'absolute', 
-              top: -30, 
-              left: -30, 
-              width: 80, 
-              height: 80, 
-              borderRadius: '50%', 
-              bgcolor: 'rgba(255,255,255,0.1)' 
-            }} />
-            <Box sx={{ p: 3, position: 'relative', zIndex: 1 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <AddIcon sx={{ fontSize: 28 }} />
-                  <Typography variant="h6" fontWeight="bold">
-                    ⚡ Custom Job Creation
-                  </Typography>
-                </Box>
-                <Button
-                  variant="contained"
-                  size="medium"
-                  onClick={() => setShowManualJobForm(!showManualJobForm)}
-                  startIcon={showManualJobForm ? <KeyboardArrowDownIcon /> : <KeyboardArrowRightIcon />}
-                  sx={{
-                    bgcolor: 'rgba(255,255,255,0.2)',
-                    color: 'white',
-                    borderRadius: 2,
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255,255,255,0.3)',
-                    '&:hover': {
-                      bgcolor: 'rgba(255,255,255,0.3)',
-                      transform: 'translateY(-1px)'
-                    },
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  {showManualJobForm ? 'Hide Form' : 'Add Custom Job'}
-                </Button>
-              </Box>
-
-              <Collapse in={showManualJobForm}>
-                <Typography variant="body1" sx={{ mb: 3, opacity: 0.9 }}>
-                  Create a custom job with a title and status.
-                </Typography>
-                
-                <Paper elevation={1} sx={{ 
-                  p: 3, 
-                  bgcolor: 'rgba(255,255,255,0.95)', 
-                  borderRadius: 2,
-                  border: '1px solid rgba(255,255,255,0.3)'
-                }}>
-                  <Grid container spacing={3}>
-                    <Grid item xs={12} sm={8}>
-                      <TextField
-                        fullWidth
-                        label="Job Title *"
-                        value={manualJobForm.jobTitle}
-                        onChange={(e) => setManualJobForm({ ...manualJobForm, jobTitle: e.target.value })}
-                        placeholder="Enter job title (e.g., 'Custom Inspection' or 'Step 5: Quality Check')"
-                        sx={{
-                          '& .MuiOutlinedInput-root': {
-                            borderRadius: 2,
-                            fontSize: '1.1rem',
-                            '&:hover fieldset': { borderColor: 'primary.main' }
-                          }
-                        }}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                      <FormControl fullWidth>
-                        <InputLabel sx={{ fontSize: '1.1rem' }}>Status</InputLabel>
-                        <Select
-                          value={manualJobForm.status}
-                          onChange={(e) => setManualJobForm({ ...manualJobForm, status: e.target.value })}
-                          label="Status"
-                          sx={{ 
-                            borderRadius: 2,
-                            fontSize: '1.1rem'
-                          }}
-                        >
-                          {jobStatuses.map(status => (
-                            <MenuItem key={status.value} value={status.value}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Box sx={{ 
-                                  width: 12, 
-                                  height: 12, 
-                                  borderRadius: '50%', 
-                                  bgcolor: status.color 
-                                }} />
-                                <Typography sx={{ fontSize: '1rem', fontWeight: 'medium' }}>
-                                  {status.label}
-                                </Typography>
-                              </Box>
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                  </Grid>
-
-                  <Box sx={{ mt: 4, display: 'flex', gap: 2, justifyContent: 'center' }}>
-                    <Button
-                      variant="contained"
-                      startIcon={<AddIcon />}
-                      onClick={handleCreateManualJob}
-                      disabled={!manualJobForm.jobTitle.trim()}
-                      sx={{
-                        borderRadius: 2,
-                        px: 4,
-                        py: 1.2,
-                        fontSize: '1rem',
-                        fontWeight: 'bold',
-                        background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
-                        '&:hover': {
-                          background: 'linear-gradient(45deg, #1976D2 30%, #1CB5E0 90%)',
-                          transform: 'translateY(-1px)',
-                          boxShadow: '0 6px 20px rgba(33, 150, 243, 0.4)'
-                        },
-                        '&:disabled': {
-                          background: 'rgba(0,0,0,0.12)'
-                        },
-                        transition: 'all 0.3s ease'
-                      }}
-                    >
-                      Create Custom Job
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      onClick={() => {
-                        setManualJobForm({
-                          jobTitle: '',
-                          status: 'pending'
-                        });
-                      }}
-                      sx={{
-                        borderRadius: 2,
-                        px: 3,
-                        py: 1.2,
-                        fontSize: '1rem',
-                        borderWidth: 2,
-                        '&:hover': {
-                          borderWidth: 2,
-                          transform: 'translateY(-1px)'
-                        },
-                        transition: 'all 0.3s ease'
-                      }}
-                    >
-                      Clear Form
-                    </Button>
-                  </Box>
-                </Paper>
-              </Collapse>
             </Box>
           </Paper>
 
@@ -2673,28 +2526,84 @@ const StructuralElementsList = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {elementJobs.map((job, index) => (
-                      <TableRow 
-                        key={job._id}
-                        sx={{
-                          '&:hover': { 
-                            bgcolor: 'action.hover',
-                            transform: 'scale(1.01)',
-                            transition: 'all 0.2s ease'
-                          },
-                          '&:nth-of-type(odd)': { bgcolor: 'grey.25' }
+                    {/* Insert Job at Beginning Button */}
+                    <TableRow sx={{ 
+                      backgroundColor: 'transparent',
+                      '&:hover .insert-job-btn': { opacity: 1 },
+                      height: '32px'
+                    }}>
+                      <TableCell 
+                        colSpan={4} 
+                        sx={{ 
+                          padding: 0, 
+                          borderBottom: 'none',
+                          textAlign: 'center',
+                          position: 'relative'
                         }}
                       >
+                        <Box 
+                          className="insert-job-btn"
+                          sx={{ 
+                            opacity: 0, 
+                            transition: 'opacity 0.2s ease',
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            zIndex: 1
+                          }}
+                        >
+                          <Tooltip title="Insert custom job at the beginning" arrow>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              onClick={() => handleInsertJobAt(0)}
+                              sx={{
+                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                color: 'white',
+                                minWidth: 140,
+                                height: 28,
+                                fontSize: '0.75rem',
+                                borderRadius: 2,
+                                fontWeight: 'bold',
+                                '&:hover': { 
+                                  background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
+                                  transform: 'translateY(-1px)',
+                                  boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+                                },
+                                transition: 'all 0.3s ease'
+                              }}
+                            >
+                              Insert Job Here
+                            </Button>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+
+                    {elementJobs.map((job, index) => (
+                      <React.Fragment key={job._id}>
+                        {/* Main Job Row */}
+                        <TableRow 
+                          sx={{
+                            '&:hover': { 
+                              bgcolor: 'action.hover',
+                              transform: 'scale(1.005)',
+                              transition: 'all 0.2s ease'
+                            },
+                            '&:nth-of-type(even)': { bgcolor: 'grey.50' },
+                            position: 'relative'
+                          }}
+                        >
                         <TableCell sx={{ py: 3 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             {job.stepNumber && (
                               <Chip 
                                 label={`${job.stepNumber}/${job.totalSteps || '?'}`}
                                 size="small"
+                                variant="outlined"
                                 sx={{ 
                                   minWidth: 50,
-                                  bgcolor: 'primary.main',
-                                  color: 'white',
                                   fontWeight: 'bold',
                                   fontSize: '0.8rem'
                                 }}
@@ -2732,7 +2641,7 @@ const StructuralElementsList = () => {
                           <Chip 
                             label={job.status === 'pending' ? 'Pending' : 
                                   job.status === 'completed' ? 'Completed' : 
-                                  job.status === 'not_applicable' ? 'Not Applicable' :
+                                  job.status === 'not_applicable' ? 'Non clearance' :
                                   job.status.replace('_', ' ')} 
                             size="medium"
                             sx={{ 
@@ -2808,7 +2717,59 @@ const StructuralElementsList = () => {
                             </Tooltip>
                           </Box>
                         </TableCell>
-                      </TableRow>
+                        </TableRow>
+
+                        {/* Insert Job After Button */}
+                        <TableRow sx={{ 
+                          backgroundColor: 'transparent',
+                          '&:hover .insert-job-after': { opacity: 1 },
+                          height: '32px'
+                        }}>
+                          <TableCell 
+                            colSpan={4} 
+                            sx={{ 
+                              padding: 0, 
+                              borderBottom: 'none',
+                              textAlign: 'center',
+                              position: 'relative'
+                            }}
+                          >
+                            <Box 
+                              className="insert-job-after"
+                              sx={{ 
+                                opacity: 0, 
+                                transition: 'opacity 0.2s ease',
+                                position: 'absolute',
+                                top: '50%',
+                                left: '50%',
+                                transform: 'translate(-50%, -50%)',
+                                zIndex: 1
+                              }}
+                            >
+                              <Tooltip title={`Insert custom job after ${job.jobTitle}`} arrow>
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  onClick={() => handleInsertJobAt(index + 1)}
+                                  sx={{
+                                    backgroundColor: 'success.main',
+                                    color: 'white',
+                                    minWidth: 140,
+                                    height: 28,
+                                    fontSize: '0.75rem',
+                                    '&:hover': { 
+                                      backgroundColor: 'success.dark',
+                                      transform: 'scale(1.05)'
+                                    }
+                                  }}
+                                >
+                                  + Insert Job Here
+                                </Button>
+                              </Tooltip>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      </React.Fragment>
                     ))}
                   </TableBody>
                 </Table>
@@ -2984,19 +2945,13 @@ const StructuralElementsList = () => {
                 Mark Complete
               </MenuItem>
             )}
-            {selectedJobForMenu.status === 'pending' && (
-              <MenuItem onClick={() => handleJobMenuAction('start')}>
-                <PlayArrowIcon sx={{ mr: 1 }} />
-                Start Job
+            {selectedJobForMenu.status !== 'not_applicable' && (
+              <MenuItem onClick={() => handleJobMenuAction('not_applicable')}>
+                <CheckCircleIcon sx={{ mr: 1 }} />
+                Non clearance
               </MenuItem>
             )}
-            {selectedJobForMenu.status === 'in_progress' && (
-              <MenuItem onClick={() => handleJobMenuAction('pause')}>
-                <PauseIcon sx={{ mr: 1 }} />
-                Put On Hold
-              </MenuItem>
-            )}
-            {(selectedJobForMenu.status === 'on_hold' || selectedJobForMenu.status === 'completed') && (
+            {(selectedJobForMenu.status === 'completed' || selectedJobForMenu.status === 'not_applicable') && (
               <MenuItem onClick={() => handleJobMenuAction('pending')}>
                 <PlayArrowIcon sx={{ mr: 1 }} />
                 Mark Pending
@@ -3069,6 +3024,339 @@ const StructuralElementsList = () => {
             disabled={!bulkJobForm.jobType}
           >
             Create Jobs for {selectedElements.length} Element{selectedElements.length > 1 ? 's' : ''}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Job Creation Dialog */}
+      <Dialog
+        open={showJobCreationDialog}
+        onClose={() => {
+          setShowJobCreationDialog(false);
+          setInsertionIndex(null);
+          setManualJobForm({
+            jobTitle: '',
+            fireproofingType: '',
+            status: 'pending'
+          });
+        }}
+        maxWidth="md"
+        fullWidth
+        sx={{
+          '& .MuiDialog-paper': {
+            borderRadius: 3,
+            boxShadow: '0 24px 48px rgba(0,0,0,0.15)',
+            background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
+          textAlign: 'center',
+          py: 3
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+            <AddIcon sx={{ fontSize: 32 }} />
+            <Typography variant="h5" fontWeight="bold">
+              Create Custom Job
+            </Typography>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 4 }}>
+          {insertionIndex !== null && (
+            <Box sx={{ 
+              mb: 3, 
+              p: 2, 
+              bgcolor: 'rgba(33, 150, 243, 0.1)', 
+              borderRadius: 2,
+              border: '1px solid rgba(33, 150, 243, 0.3)'
+            }}>
+              <Typography variant="body1" color="primary" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                🎯 <span>Insertion Position: {insertionIndex + 1}</span>
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                This job will be inserted at step {insertionIndex + 1} in the workflow
+              </Typography>
+            </Box>
+          )}
+
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Job Title *"
+                value={manualJobForm.jobTitle}
+                onChange={(e) => setManualJobForm({ ...manualJobForm, jobTitle: e.target.value })}
+                placeholder="Enter job title (e.g., 'Custom Inspection' or 'Step 6: Quality Check')"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    fontSize: '1.1rem',
+                    bgcolor: 'rgba(255,255,255,0.7)',
+                    '&:hover fieldset': { borderColor: 'primary.main' },
+                    '&.Mui-focused fieldset': { borderWidth: 2 }
+                  }
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel sx={{ fontSize: '1.1rem' }}>Fireproofing Type</InputLabel>
+                <Select
+                  value={manualJobForm.fireproofingType || ''}
+                  onChange={(e) => setManualJobForm({ ...manualJobForm, fireproofingType: e.target.value })}
+                  label="Fireproofing Type"
+                  sx={{ 
+                    borderRadius: 2,
+                    fontSize: '1.1rem',
+                    bgcolor: 'rgba(255,255,255,0.7)'
+                  }}
+                >
+                  {jobTypes.map(type => (
+                    <MenuItem key={type.value} value={type.value}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <WorkIcon sx={{ fontSize: 18 }} />
+                        {type.label}
+                      </Box>
+                    </MenuItem>
+                  ))}
+                  <MenuItem value="custom">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <WorkIcon sx={{ fontSize: 18 }} />
+                      Custom
+                    </Box>
+                  </MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel sx={{ fontSize: '1.1rem' }}>Status</InputLabel>
+                <Select
+                  value={manualJobForm.status}
+                  onChange={(e) => setManualJobForm({ ...manualJobForm, status: e.target.value })}
+                  label="Status"
+                  sx={{ 
+                    borderRadius: 2,
+                    fontSize: '1.1rem',
+                    bgcolor: 'rgba(255,255,255,0.7)'
+                  }}
+                >
+                  {jobStatuses.map(status => (
+                    <MenuItem key={status.value} value={status.value}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ 
+                          width: 12, 
+                          height: 12, 
+                          borderRadius: '50%', 
+                          bgcolor: status.color 
+                        }} />
+                        <Typography sx={{ fontSize: '1rem', fontWeight: 'medium' }}>
+                          {status.label}
+                        </Typography>
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </DialogContent>
+
+        <DialogActions sx={{ p: 3, bgcolor: 'rgba(255,255,255,0.5)' }}>
+          <Button
+            onClick={() => {
+              setShowJobCreationDialog(false);
+              setInsertionIndex(null);
+              setManualJobForm({
+                jobTitle: '',
+                fireproofingType: '',
+                status: 'pending'
+              });
+              toast('❌ Job creation cancelled');
+            }}
+            variant="outlined"
+            sx={{
+              borderRadius: 2,
+              px: 3,
+              py: 1,
+              borderWidth: 2,
+              '&:hover': { borderWidth: 2 }
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              handleCreateManualJob();
+              setShowJobCreationDialog(false);
+            }}
+            variant="contained"
+            disabled={!manualJobForm.jobTitle.trim()}
+            startIcon={<AddIcon />}
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              py: 1,
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
+                transform: 'translateY(-1px)',
+                boxShadow: '0 6px 20px rgba(102, 126, 234, 0.4)'
+              }
+            }}
+          >
+            Create Job
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={showDeleteDialog}
+        onClose={() => {
+          setShowDeleteDialog(false);
+          setJobToDelete(null);
+        }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, #ffebee 0%, #fce4ec 100%)',
+            border: '2px solid rgba(244, 67, 54, 0.1)',
+            boxShadow: '0 20px 40px rgba(244, 67, 54, 0.15)',
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          textAlign: 'center',
+          pt: 4,
+          pb: 2,
+          color: '#d32f2f'
+        }}>
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            gap: 2 
+          }}>
+            <Box sx={{
+              width: 80,
+              height: 80,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #ff5252 0%, #f44336 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              animation: 'pulse 2s infinite',
+              '@keyframes pulse': {
+                '0%': { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(244, 67, 54, 0.4)' },
+                '50%': { transform: 'scale(1.05)', boxShadow: '0 0 0 20px rgba(244, 67, 54, 0)' },
+                '100%': { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(244, 67, 54, 0)' }
+              }
+            }}>
+              <WarningIcon sx={{ fontSize: 40, color: 'white' }} />
+            </Box>
+            <Typography variant="h5" fontWeight="bold" color="#d32f2f">
+              Confirm Deletion
+            </Typography>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent sx={{ textAlign: 'center', px: 4, pb: 2 }}>
+          <Typography variant="body1" sx={{ mb: 2, color: '#424242', fontSize: '1.1rem' }}>
+            Are you absolutely sure you want to delete this job?
+          </Typography>
+          
+          {jobToDelete && (
+            <Box sx={{ 
+              p: 3, 
+              mt: 2,
+              borderRadius: 2,
+              background: 'rgba(244, 67, 54, 0.08)',
+              border: '1px solid rgba(244, 67, 54, 0.2)'
+            }}>
+              <Typography variant="h6" fontWeight="bold" sx={{ mb: 1, color: '#d32f2f' }}>
+                📋 {jobToDelete.jobTitle}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Job Type: {jobToDelete.jobType ? jobToDelete.jobType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Custom'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Status: {jobToDelete.status}
+              </Typography>
+            </Box>
+          )}
+
+          <Box sx={{ 
+            mt: 3, 
+            p: 2, 
+            borderRadius: 2,
+            background: 'rgba(255, 193, 7, 0.1)',
+            border: '1px solid rgba(255, 193, 7, 0.3)'
+          }}>
+            <Typography variant="body2" fontWeight="bold" color="#f57c00" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+              ⚠️ <span>This action cannot be undone!</span>
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+              Once deleted, this job and all its associated data will be permanently removed from the system.
+            </Typography>
+          </Box>
+        </DialogContent>
+
+        <DialogActions sx={{ 
+          p: 3, 
+          gap: 2,
+          justifyContent: 'center',
+          background: 'rgba(255, 255, 255, 0.7)'
+        }}>
+          <Button
+            onClick={() => {
+              setShowDeleteDialog(false);
+              setJobToDelete(null);
+            }}
+            variant="outlined"
+            size="large"
+            sx={{
+              minWidth: 120,
+              borderRadius: 3,
+              borderWidth: 2,
+              borderColor: '#757575',
+              color: '#424242',
+              '&:hover': { 
+                borderWidth: 2,
+                borderColor: '#424242',
+                transform: 'translateY(-1px)',
+                boxShadow: '0 4px 12px rgba(117, 117, 117, 0.3)'
+              },
+              transition: 'all 0.3s ease'
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmDeleteJob}
+            variant="contained"
+            size="large"
+            startIcon={<DeleteIcon />}
+            sx={{
+              minWidth: 120,
+              borderRadius: 3,
+              background: 'linear-gradient(45deg, #f44336 30%, #d32f2f 90%)',
+              color: 'white',
+              fontWeight: 'bold',
+              '&:hover': {
+                background: 'linear-gradient(45deg, #d32f2f 30%, #b71c1c 90%)',
+                transform: 'translateY(-1px)',
+                boxShadow: '0 6px 20px rgba(244, 67, 54, 0.4)'
+              },
+              transition: 'all 0.3s ease'
+            }}
+          >
+            Delete Job
           </Button>
         </DialogActions>
       </Dialog>
