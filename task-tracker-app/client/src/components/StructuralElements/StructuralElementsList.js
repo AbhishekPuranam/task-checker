@@ -1001,6 +1001,16 @@ const StructuralElementsList = () => {
   // Helper function to get unique values for column filters
   const getUniqueColumnValues = (elements, columnKey) => {
     const values = new Set();
+    
+    // Debug logging for currentPendingJob
+    if (columnKey === 'currentPendingJob') {
+      console.log(`[DEBUG] Getting unique values for currentPendingJob:`, {
+        elementsCount: elements.length,
+        elementStatuses: elements.map(el => el.status),
+        elementIds: elements.slice(0, 3).map(el => el._id)
+      });
+    }
+    
     elements.forEach(element => {
       let value;
       switch (columnKey) {
@@ -1020,13 +1030,22 @@ const StructuralElementsList = () => {
           value = element.status;
           break;
         case 'currentPendingJob':
-          // Get current pending job
+          // Get the actual current pending job value for this element
           const jobs = element.jobs || jobsByElement[element._id] || [];
           if (jobs.length === 0) {
             value = 'No jobs';
           } else {
             const pendingJob = jobs.find(job => job.status === 'pending' || job.status === 'in_progress');
             value = pendingJob ? pendingJob.jobTitle : 'All jobs complete';
+          }
+          
+          // Debug logging for currentPendingJob
+          if (columnKey === 'currentPendingJob') {
+            console.log(`[DEBUG] Element ${element.structureNumber} (${element.status}):`, {
+              jobsCount: jobs.length,
+              pendingJobTitle: value,
+              allJobTitles: jobs.map(j => j.jobTitle)
+            });
           }
           break;
         default:
@@ -1036,7 +1055,15 @@ const StructuralElementsList = () => {
         values.add(String(value));
       }
     });
-    return Array.from(values).sort();
+    
+    const result = Array.from(values).sort();
+    
+    // Debug logging for currentPendingJob
+    if (columnKey === 'currentPendingJob') {
+      console.log(`[DEBUG] Final unique currentPendingJob values:`, result);
+    }
+    
+    return result;
   };
 
   // Function to apply column filters
@@ -1046,6 +1073,26 @@ const StructuralElementsList = () => {
         if (!filterValue || (Array.isArray(filterValue) && filterValue.length === 0) || 
             (typeof filterValue === 'object' && filterValue.min === '' && filterValue.max === '')) {
           return true; // No filter applied
+        }
+
+        // Special handling for currentPendingJob column
+        if (columnKey === 'currentPendingJob' && Array.isArray(filterValue)) {
+          const elementJobs = element.jobs || jobsByElement[element._id] || [];
+          
+          if (elementJobs.length === 0) {
+            return filterValue.includes('No jobs');
+          }
+          
+          // Check if any job title in this element matches the filter
+          const hasMatchingJobTitle = elementJobs.some(job => filterValue.includes(job.jobTitle));
+          
+          // Check if "All jobs complete" is selected and element has all jobs completed
+          const pendingJob = elementJobs.find(job => 
+            job.status === 'pending' || job.status === 'in_progress' || job.status === 'not_applicable'
+          );
+          const isAllComplete = !pendingJob && filterValue.includes('All jobs complete');
+          
+          return hasMatchingJobTitle || isAllComplete;
         }
 
         let elementValue;
@@ -1079,6 +1126,7 @@ const StructuralElementsList = () => {
             }
             break;
           case 'currentPendingJob':
+            // This case is handled above for better logic
             const elementJobs = element.jobs || jobsByElement[element._id] || [];
             if (elementJobs.length === 0) {
               elementValue = 'No jobs';
@@ -1905,16 +1953,48 @@ const StructuralElementsList = () => {
                     filteredSectionElements = applyColumnFilters(filteredSectionElements, sectionFilter.columnFilters);
                   }
                   
+                  // Helper function to get current pending job for grouping
+                  const getCurrentPendingJobTitle = (element) => {
+                    const jobs = element.jobs || jobsByElement[element._id] || [];
+                    
+                    if (jobs.length === 0) {
+                      return 'No jobs';
+                    }
+                    
+                    const sortedJobs = [...jobs].sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+                    const pendingJob = sortedJobs.find(job => 
+                      job.status === 'pending' || job.status === 'in_progress' || job.status === 'not_applicable'
+                    );
+                    
+                    if (!pendingJob) {
+                      return 'All jobs complete';
+                    }
+                    
+                    return pendingJob.jobTitle || 'Unknown job';
+                  };
+
                   // Group elements if groupBy is selected
                   const groupedSectionElements = (() => {
                     if (!sectionFilter.groupBy) return { 'All Elements': filteredSectionElements };
                     
-                    return filteredSectionElements.reduce((acc, element) => {
-                      const groupKey = element[sectionFilter.groupBy] || 'Unknown';
+                    const grouped = filteredSectionElements.reduce((acc, element) => {
+                      let groupKey;
+                      
+                      if (sectionFilter.groupBy === 'currentPendingJob') {
+                        groupKey = getCurrentPendingJobTitle(element);
+                      } else {
+                        groupKey = element[sectionFilter.groupBy] || 'Unknown';
+                      }
+                      
                       if (!acc[groupKey]) acc[groupKey] = [];
                       acc[groupKey].push(element);
                       return acc;
                     }, {});
+                    
+                    // Filter out groups with 0 elements (this shouldn't happen but just in case)
+                    return Object.fromEntries(
+                      Object.entries(grouped).filter(([groupKey, groupElements]) => groupElements.length > 0)
+                    );
                   })();
                   
                   // Pagination for non-grouped view
@@ -2095,6 +2175,7 @@ const StructuralElementsList = () => {
                                   <MenuItem value="gridNo">Grid No</MenuItem>
                                   <MenuItem value="sectionSizes">Section Size</MenuItem>
                                   <MenuItem value="drawingNo">Drawing No</MenuItem>
+                                  <MenuItem value="currentPendingJob">Current Pending Job</MenuItem>
                                 </Select>
                               </FormControl>
                               <Button
