@@ -49,7 +49,10 @@ const Navbar = () => {
 
 
   return (
-    <AppBar position="static">
+    <AppBar position="static" sx={{ 
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      boxShadow: '0 4px 20px rgba(102, 126, 234, 0.3)'
+    }}>
       <Toolbar>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
           Project Tracker

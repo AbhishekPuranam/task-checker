@@ -409,7 +409,7 @@ const ProjectList = () => {
                 variant="h3" 
                 fontWeight="bold"
                 sx={{ 
-                  background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   backgroundClip: 'text',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',

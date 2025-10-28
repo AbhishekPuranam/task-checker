@@ -48,7 +48,7 @@ const jobSchema = new mongoose.Schema({
   // Status tracking
   status: {
     type: String,
-    enum: ['pending', 'in_progress', 'completed', 'on_hold', 'cancelled'],
+    enum: ['pending', 'in_progress', 'completed', 'on_hold', 'cancelled', 'not_applicable'],
     default: 'pending'
   },
   priority: {

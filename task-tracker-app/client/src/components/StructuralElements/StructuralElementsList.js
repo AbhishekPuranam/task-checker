@@ -74,6 +74,7 @@ const StructuralElementsList = () => {
   const { projectName } = useParams();
   const { user, token } = useAuth();
   const [elements, setElements] = useState([]);
+  const [jobsByElement, setJobsByElement] = useState({});
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
@@ -88,16 +89,47 @@ const StructuralElementsList = () => {
   const [projectId, setProjectId] = useState(null); // Store the actual project ID
   const [elementJobs, setElementJobs] = useState([]);
   
-  // Search, filter, and group state
-  const [searchTerm, setSearchTerm] = useState('');
-  const [memberTypeFilter, setMemberTypeFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [surfaceAreaRange, setSurfaceAreaRange] = useState([0, 1000]);
-  const [quantityRange, setQuantityRange] = useState([1, 100]);
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
-  const [groupBy, setGroupBy] = useState('');
-  const [expandedGroups, setExpandedGroups] = useState({});
-  const [showGroupedView, setShowGroupedView] = useState(false);
+  // Global filter state removed - now using individual section filters only
+  
+  // Individual section filters for status-based sections
+  const [sectionFilters, setSectionFilters] = useState({
+    'non clearance': {
+      searchTerm: '',
+      memberTypeFilter: '',
+      expanded: true,
+      groupBy: '',
+      page: 0,
+      rowsPerPage: 10,
+      expandedGroups: {}
+    },
+    'no jobs': {
+      searchTerm: '',
+      memberTypeFilter: '',
+      expanded: true,
+      groupBy: '',
+      page: 0,
+      rowsPerPage: 10,
+      expandedGroups: {}
+    },
+    'active': {
+      searchTerm: '',
+      memberTypeFilter: '',
+      expanded: true,
+      groupBy: '',
+      page: 0,
+      rowsPerPage: 10,
+      expandedGroups: {}
+    },
+    'complete': {
+      searchTerm: '',
+      memberTypeFilter: '',
+      expanded: true,
+      groupBy: '',
+      page: 0,
+      rowsPerPage: 10,
+      expandedGroups: {}
+    }
+  });
   
   // Column visibility state - Default visible columns
   const [visibleColumns, setVisibleColumns] = useState({
@@ -200,7 +232,7 @@ const StructuralElementsList = () => {
   const jobStatuses = [
     { value: 'pending', label: 'Pending', color: '#ff9800' },
     { value: 'completed', label: 'Completed', color: '#4caf50' },
-    { value: 'not_applicable', label: 'Non clearance', color: '#4caf50' }
+    { value: 'not_applicable', label: 'Non clearance', color: '#f44336' }
   ];
 
 
@@ -435,28 +467,57 @@ const StructuralElementsList = () => {
       // Calculate status for each element based on its jobs
       const elementsWithStatus = response.data.elements.map((element) => {
         try {
-          // Get jobs for this specific element from the pre-fetched data
-          const jobs = jobsByElement[element._id] || [];
+          // Get jobs for this specific element - use element.jobs if available, otherwise fallback to lookup
+          const jobs = element.jobs || jobsByElement[element._id] || [];
+          
+
           
           let calculatedStatus;
+          
           if (jobs.length === 0) {
             calculatedStatus = 'no jobs';
           } else {
-            // Calculate completion percentage based on jobs
-            const completedJobs = jobs.filter(job => job.status === 'completed').length;
-            const totalJobs = jobs.length;
-            const completionPercentage = (completedJobs / totalJobs) * 100;
+            // Check if any jobs are marked as not_applicable (non clearance) - this always takes priority
+            const hasNonClearanceJobs = jobs.some(job => job.status === 'not_applicable');
             
-            // Calculate average progress percentage
-            const avgProgress = jobs.reduce((sum, job) => sum + (job.progressPercentage || 0), 0) / jobs.length;
-            
-            // Calculate status based on job completion
-            if (completionPercentage === 100 && avgProgress === 100) {
-              calculatedStatus = 'complete'; // Mark complete when all jobs done
-            } else if (completionPercentage > 0 || avgProgress > 0) {
-              calculatedStatus = 'active'; // Some work done but not complete
+            if (hasNonClearanceJobs) {
+              calculatedStatus = 'non clearance'; // Always override with non clearance if any job is not_applicable
             } else {
-              calculatedStatus = 'pending'; // No work started
+              // Calculate status from jobs first - this is more reliable than backend status
+              const completedJobs = jobs.filter(job => job.status === 'completed').length;
+              const totalJobs = jobs.length;
+              const completionPercentage = (completedJobs / totalJobs) * 100;
+              
+              // Calculate average progress percentage
+              const avgProgress = jobs.reduce((sum, job) => sum + (job.progressPercentage || 0), 0) / jobs.length;
+              
+              // Debug logging for E00097 elements
+              if (element.structureNumber === 'E00097' && element.gridNo === 'B-A TO 1-2') {
+                console.log('DEBUG E00097 B-A TO 1-2 STATUS CALCULATION:');
+                console.log('- Jobs:', jobs.length);
+                console.log('- Completed jobs:', completedJobs);
+                console.log('- Completion percentage:', completionPercentage);
+                console.log('- Average progress:', avgProgress);
+                console.log('- Backend status:', element.status);
+                console.log('- Jobs detail:', jobs.map(j => ({ title: j.jobTitle, status: j.status, progress: j.progressPercentage })));
+              }
+              
+              // Calculate status based on job completion - prioritize actual completion over backend status
+              if (completionPercentage === 100) {
+                calculatedStatus = 'complete'; // Mark complete when all jobs are done (removed avgProgress requirement)
+              } else if (completionPercentage > 0 || avgProgress > 0) {
+                calculatedStatus = 'active'; // Some work done but not complete
+              } else if (element.status && ['completed', 'active', 'pending', 'no jobs'].includes(element.status)) {
+                // Only use backend status if jobs show no progress at all
+                calculatedStatus = element.status;
+              } else {
+                calculatedStatus = 'no jobs'; // No work started - treat same as no jobs
+              }
+              
+              // Debug final status for E00097 elements
+              if (element.structureNumber === 'E00097' && element.gridNo === 'B-A TO 1-2') {
+                console.log('- Final calculated status:', calculatedStatus);
+              }
             }
           }
           
@@ -485,13 +546,10 @@ const StructuralElementsList = () => {
       });
       
       setElements(elementsWithStatus);
+      setJobsByElement(jobsByElement); // Store jobsByElement in state
       setTotalElements(elementsWithStatus.length);
       
-      // Update ranges based on actual data
-      const maxArea = Math.max(...elementsWithStatus.map(e => e.surfaceAreaSqm || 0), 1000);
-      const maxQty = Math.max(...elementsWithStatus.map(e => e.qty || 0), 100);
-      setSurfaceAreaRange([0, maxArea]);
-      setQuantityRange([1, maxQty]);
+      // Range calculations removed - no longer needed without global filters
       
       // Auto-correct project status if needed (after elements are loaded)
       setTimeout(() => {
@@ -559,6 +617,8 @@ const StructuralElementsList = () => {
       fetchJobTypesData();
     }
   }, [projectId, token]);
+
+  // Debug useEffect removed - global filters no longer needed
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -872,7 +932,8 @@ const StructuralElementsList = () => {
       case 'complete': return 'success';
       case 'active': return 'primary';
       case 'pending': return 'warning';
-      case 'no jobs': return 'secondary';
+      case 'no jobs': return 'purple';
+      case 'non clearance': return 'error';
       case 'completed': return 'success'; // fallback
       case 'on_hold': return 'warning'; // fallback
       case 'cancelled': return 'error'; // fallback
@@ -883,7 +944,7 @@ const StructuralElementsList = () => {
   const getJobStatusColor = (status) => {
     switch (status) {
       case 'completed': return 'success';
-      case 'not_applicable': return 'success';
+      case 'not_applicable': return 'error';
       case 'pending': return 'warning';
       case 'in_progress': return 'primary';
       case 'on_hold': return 'info';
@@ -892,40 +953,7 @@ const StructuralElementsList = () => {
     }
   };
 
-  // Filter and search logic
-  const filteredElements = useMemo(() => {
-    return elements.filter(element => {
-      // Search term filter
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        const structureMatch = element.structureNumber?.toLowerCase().includes(searchLower);
-        const drawingMatch = element.drawingNo?.toLowerCase().includes(searchLower);
-        const memberTypeMatch = element.memberType?.toLowerCase().includes(searchLower);
-        const sectionMatch = element.sectionSizes?.toLowerCase().includes(searchLower);
-        if (!structureMatch && !drawingMatch && !memberTypeMatch && !sectionMatch) return false;
-      }
-
-      // Member type filter
-      if (memberTypeFilter && element.memberType !== memberTypeFilter) return false;
-
-      // Status filter
-      if (statusFilter && element.status !== statusFilter) return false;
-
-      // Surface area filter
-      const elementSurfaceArea = element.surfaceAreaSqm || 0;
-      if (elementSurfaceArea < surfaceAreaRange[0] || elementSurfaceArea > surfaceAreaRange[1]) {
-        return false;
-      }
-
-      // Quantity filter
-      const elementQty = element.qty || 0;
-      if (elementQty < quantityRange[0] || elementQty > quantityRange[1]) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [elements, searchTerm, memberTypeFilter, statusFilter, surfaceAreaRange, quantityRange]);
+  // Global filtering logic moved to individual sections
 
   // Available columns configuration - All structural element fields
   const availableColumns = [
@@ -954,230 +982,54 @@ const StructuralElementsList = () => {
     { key: 'actions', label: 'Actions', sortable: false }
   ];
 
-  // Available grouping options - All structural element fields
-  const groupingOptions = [
-    { value: 'memberType', label: 'Member Type' },
-    { value: 'status', label: 'Status' },
-    { value: 'serialNo', label: 'Serial No.' },
-    { value: 'structureNumber', label: 'Structure Number' },
-    { value: 'drawingNo', label: 'Drawing Number' },
-    { value: 'level', label: 'Level' },
-    { value: 'gridNo', label: 'Grid No.' },
-    { value: 'partMarkNo', label: 'Part Mark No.' },
-    { value: 'sectionSizes', label: 'Section Sizes' },
-    { value: 'projectName', label: 'Project Name' },
-    { value: 'siteLocation', label: 'Site Location' },
-    { value: 'lengthRange', label: 'Length Range' },
-    { value: 'quantityRange', label: 'Quantity Range' },
-    { value: 'surfaceAreaRange', label: 'Surface Area Range' },
-    { value: 'sectionDepthRange', label: 'Section Depth Range' },
-    { value: 'flangeWidthRange', label: 'Flange Width Range' },
-    { value: 'structurePrefix', label: 'Structure Prefix (First 3 chars)' },
-    { value: 'memberTypeAndStatus', label: 'Member Type + Status' },
-    { value: 'gridAndLevel', label: 'Grid No. + Level' },
-    { value: 'projectAndSite', label: 'Project + Site Location' }
-  ];
+  // Old grouping options removed - now using individual section grouping
 
-  // Dynamic grouping logic
-  const groupedElements = useMemo(() => {
-    if (!groupBy || !showGroupedView) return { 'All Elements': filteredElements };
+  // Old grouping logic removed - now using status-based sections with individual grouping
 
-    const groups = {};
-    filteredElements.forEach(element => {
-      let groupKey;
-      
-      switch (groupBy) {
-        // Basic field groupings
-        case 'memberType':
-          groupKey = element.memberType || 'Unknown Type';
-          break;
-        case 'status':
-          groupKey = element.status || 'Unknown Status';
-          break;
-        case 'serialNo':
-          groupKey = element.serialNo || 'Unknown Serial';
-          break;
-        case 'structureNumber':
-          groupKey = element.structureNumber || 'Unknown Structure';
-          break;
-        case 'drawingNo':
-          groupKey = element.drawingNo || 'Unknown Drawing';
-          break;
-        case 'level':
-          groupKey = element.level || 'Unknown Level';
-          break;
-        case 'gridNo':
-          groupKey = element.gridNo || 'Unknown Grid';
-          break;
-        case 'partMarkNo':
-          groupKey = element.partMarkNo || 'Unknown Part Mark';
-          break;
-        case 'sectionSizes':
-          groupKey = element.sectionSizes || 'Unknown Section';
-          break;
-        case 'projectName':
-          groupKey = element.projectName || 'Unknown Project';
-          break;
-        case 'siteLocation':
-          groupKey = element.siteLocation || 'Unknown Site';
-          break;
-        
-        // Range-based groupings
-        case 'lengthRange':
-          const length = element.lengthMm || 0;
-          if (length <= 1000) groupKey = '≤ 1m';
-          else if (length <= 3000) groupKey = '1-3m';
-          else if (length <= 6000) groupKey = '3-6m';
-          else if (length <= 12000) groupKey = '6-12m';
-          else groupKey = '> 12m';
-          break;
-        case 'quantityRange':
-          const qty = element.qty || 0;
-          if (qty === 1) groupKey = '1 piece';
-          else if (qty <= 5) groupKey = '2-5 pieces';
-          else if (qty <= 10) groupKey = '6-10 pieces';
-          else groupKey = '> 10 pieces';
-          break;
-        case 'surfaceAreaRange':
-          const area = element.surfaceAreaSqm || 0;
-          if (area <= 1) groupKey = '≤ 1 sqm';
-          else if (area <= 5) groupKey = '1-5 sqm';
-          else if (area <= 10) groupKey = '5-10 sqm';
-          else groupKey = '> 10 sqm';
-          break;
-        case 'sectionDepthRange':
-          const depth = element.sectionDepthMm || 0;
-          if (depth <= 100) groupKey = '≤ 100mm';
-          else if (depth <= 200) groupKey = '100-200mm';
-          else if (depth <= 300) groupKey = '200-300mm';
-          else if (depth <= 500) groupKey = '300-500mm';
-          else groupKey = '> 500mm';
-          break;
-        case 'flangeWidthRange':
-          const flange = element.flangeWidthMm || 0;
-          if (flange <= 100) groupKey = '≤ 100mm';
-          else if (flange <= 150) groupKey = '100-150mm';
-          else if (flange <= 200) groupKey = '150-200mm';
-          else if (flange <= 300) groupKey = '200-300mm';
-          else groupKey = '> 300mm';
-          break;
-        
-        // Custom combination groupings
-        case 'structurePrefix':
-          groupKey = element.structureNumber?.substring(0, 3) || 'Unknown';
-          break;
-        case 'memberTypeAndStatus':
-          groupKey = `${element.memberType || 'Unknown'} - ${element.status || 'Unknown'}`;
-          break;
-        case 'gridAndLevel':
-          groupKey = `Grid ${element.gridNo || 'Unknown'} - Level ${element.level || 'Unknown'}`;
-          break;
-        case 'projectAndSite':
-          groupKey = `${element.projectName || 'Unknown Project'} - ${element.siteLocation || 'Unknown Site'}`;
-          break;
-        
-        default:
-          // For any other field, use the field value directly
-          groupKey = element[groupBy] || `Unknown ${groupBy}`;
-      }
-      
-      if (!groups[groupKey]) groups[groupKey] = [];
-      groups[groupKey].push(element);
-    });
-
-    // Sort groups by key
-    const sortedGroups = {};
-    Object.keys(groups).sort().forEach(key => {
-      sortedGroups[key] = groups[key];
-    });
-
-    return sortedGroups;
-  }, [filteredElements, groupBy, showGroupedView]);
-
-  // Calculate if all visible elements are selected
-  const isSelectAll = useMemo(() => {
-    let visibleElements;
-    
-    if (showGroupedView && groupBy) {
-      // In grouped view, get all visible elements from expanded groups
-      visibleElements = Object.entries(groupedElements)
-        .filter(([groupKey, groupElements]) => expandedGroups[groupKey])
-        .flatMap(([groupKey, groupElements]) => groupElements);
-    } else {
-      // In regular view, use current page elements
-      visibleElements = filteredElements.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-    }
-    
-    return visibleElements.length > 0 && visibleElements.every(el => selectedElements.includes(el._id));
-  }, [selectedElements, groupedElements, expandedGroups, showGroupedView, groupBy, filteredElements, page, rowsPerPage]);
-
-  const handleSelectAll = () => {
-    let currentPageElements;
-    
-    if (showGroupedView && groupBy) {
-      // In grouped view, get all visible elements from expanded groups
-      currentPageElements = Object.entries(groupedElements)
-        .filter(([groupKey, groupElements]) => expandedGroups[groupKey])
-        .flatMap(([groupKey, groupElements]) => groupElements);
-    } else {
-      // In regular view, use pagination
-      currentPageElements = filteredElements.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-    }
-    
-    if (isSelectAll) {
-      setSelectedElements(prev => prev.filter(id => !currentPageElements.some(el => el._id === id)));
-    } else {
-      const newSelections = currentPageElements.map(el => el._id).filter(id => !selectedElements.includes(id));
-      setSelectedElements(prev => [...prev, ...newSelections]);
-    }
-  };
+  // Selection logic now handled per section - old global selection logic removed
 
   // Handle selecting all elements within a specific group
-  const handleSelectGroup = (groupElements) => {
-    const groupElementIds = groupElements.map(el => el._id);
-    const allSelected = groupElementIds.every(id => selectedElements.includes(id));
-    
-    if (allSelected) {
-      // Deselect all elements in this group
-      setSelectedElements(prev => prev.filter(id => !groupElementIds.includes(id)));
-    } else {
-      // Select all elements in this group that aren't already selected
-      const newSelections = groupElementIds.filter(id => !selectedElements.includes(id));
-      setSelectedElements(prev => [...prev, ...newSelections]);
-    }
-  };
+  // Removed old handleSelectGroup function - no longer needed with new status-based sections
 
   // Get unique values for filter dropdowns
   const uniqueMemberTypes = [...new Set(elements.map(e => e.memberType))].filter(Boolean);
   const uniqueStatuses = [...new Set(elements.map(e => e.status))].filter(Boolean);
   
-  // Calculate ranges for sliders
-  const maxSurfaceArea = Math.max(...elements.map(e => e.surfaceAreaSqm || 0), 1000);
-  const maxQuantity = Math.max(...elements.map(e => e.qty || 0), 100);
+  // Get unique current pending jobs
+  const uniqueCurrentJobs = useMemo(() => {
+    const jobTitles = new Set();
+    let hasNoJobsElements = false;
+    let hasAllCompleteElements = false;
+    
+    elements.forEach(element => {
+      if (!element.jobs || element.jobs.length === 0) {
+        hasNoJobsElements = true;
+      } else {
+        const sortedJobs = [...element.jobs].sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+        const pendingJob = sortedJobs.find(job => 
+          job.status === 'pending' || job.status === 'in_progress' || job.status === 'not_applicable'
+        );
+        
+        if (pendingJob) {
+          jobTitles.add(pendingJob.jobTitle);
+        } else {
+          hasAllCompleteElements = true;
+        }
+      }
+    });
+    
+    const result = [...jobTitles].sort();
+    if (hasAllCompleteElements) result.unshift('all-complete');
+    if (hasNoJobsElements) result.unshift('no-jobs');
+    
+    return result;
+  }, [elements]);
   
-  // Clear all filters
-  const clearAllFilters = () => {
-    setSearchTerm('');
-    setMemberTypeFilter('');
-    setStatusFilter('');
-    setSurfaceAreaRange([0, maxSurfaceArea]);
-    setQuantityRange([1, maxQuantity]);
-    setGroupBy('');
-    setShowGroupedView(false);
-  };
+  // Range calculations removed - no longer needed without global filters
+  
+  // Global filter functions removed - now using individual section filters
 
-  // Check if any filters are active
-  const hasActiveFilters = searchTerm || memberTypeFilter || statusFilter || 
-    surfaceAreaRange[0] > 0 || surfaceAreaRange[1] < maxSurfaceArea || 
-    quantityRange[0] > 1 || quantityRange[1] < maxQuantity || groupBy;
-
-  // Toggle group expansion
-  const toggleGroupExpansion = (groupKey) => {
-    setExpandedGroups(prev => ({
-      ...prev,
-      [groupKey]: !prev[groupKey]
-    }));
-  };
+  // Old toggleGroupExpansion function removed - now handled per section
 
   // Column visibility functions
   const toggleColumnVisibility = (columnKey) => {
@@ -1271,14 +1123,33 @@ const StructuralElementsList = () => {
           <Chip 
             label={element.status} 
             size="small" 
-            color={getStatusColor(element.status) === 'warning' ? undefined : getStatusColor(element.status)}
+            color={['warning', 'purple', 'error'].includes(getStatusColor(element.status)) ? undefined : getStatusColor(element.status)}
             sx={{ 
               borderRadius: 1,
               fontWeight: 500,
               textTransform: 'capitalize',
-              // Custom styling for warning/orange status without using Material-UI color prop
+              // Custom styling for warning/orange status
               ...(getStatusColor(element.status) === 'warning' && {
                 backgroundColor: '#ff9800',
+                color: '#ffffff',
+                border: 'none',
+                '& .MuiChip-label': {
+                  color: '#ffffff'
+                }
+              }),
+              // Improved styling for purple status (no jobs) for better readability
+              ...(getStatusColor(element.status) === 'purple' && {
+                backgroundColor: '#ede7f6', // lighter purple
+                color: '#4a148c', // dark purple text
+                border: 'none',
+                '& .MuiChip-label': {
+                  color: '#4a148c',
+                  fontWeight: 700
+                }
+              }),
+              // Custom styling for error status (non clearance) - red
+              ...(getStatusColor(element.status) === 'error' && {
+                backgroundColor: '#f44336',
                 color: '#ffffff',
                 border: 'none',
                 '& .MuiChip-label': {
@@ -1290,7 +1161,10 @@ const StructuralElementsList = () => {
         );
       case 'currentPendingJob':
         return (() => {
-          if (!element.jobs || element.jobs.length === 0) {
+          // Use the same fallback logic as status calculation - get jobs from element or lookup
+          const jobs = element.jobs || jobsByElement[element._id] || [];
+          
+          if (jobs.length === 0) {
             return (
               <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
                 No jobs
@@ -1299,8 +1173,11 @@ const StructuralElementsList = () => {
           }
           
           // Sort jobs by orderIndex and find the first pending job in the correct sequence
-          const sortedJobs = [...element.jobs].sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
-          const pendingJob = sortedJobs.find(job => job.status === 'pending');
+          // Include not_applicable jobs as they are similar to pending
+          const sortedJobs = [...jobs].sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+          const pendingJob = sortedJobs.find(job => 
+            job.status === 'pending' || job.status === 'in_progress' || job.status === 'not_applicable'
+          );
           
           if (!pendingJob) {
             return (
@@ -1326,16 +1203,34 @@ const StructuralElementsList = () => {
           );
         })();
       case 'progress':
-        return (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2" fontWeight="600">
-              {element.completionPercentage || 0}%
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              ({element.jobsCompleted || 0}/{element.totalJobs || 0})
-            </Typography>
-          </Box>
-        );
+        return (() => {
+          // Use the same fallback logic as status calculation - get jobs from element or lookup
+          const jobs = element.jobs || jobsByElement[element._id] || [];
+          
+          if (jobs.length === 0) {
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" fontWeight="600">0%</Typography>
+                <Typography variant="caption" color="text.secondary">(0/0)</Typography>
+              </Box>
+            );
+          }
+          
+          const totalJobs = jobs.length;
+          const completedJobs = jobs.filter(job => job.status === 'completed').length;
+          const completionPercentage = totalJobs > 0 ? Math.round((completedJobs / totalJobs) * 100) : 0;
+          
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" fontWeight="600">
+                {completionPercentage}%
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                ({completedJobs}/{totalJobs})
+              </Typography>
+            </Box>
+          );
+        })();
       // New field cases for better formatting
       case 'serialNo':
         return (
@@ -1430,16 +1325,7 @@ const StructuralElementsList = () => {
     }
   };
 
-  // Initialize expanded groups when groupBy changes
-  useEffect(() => {
-    if (showGroupedView && groupBy) {
-      const newExpandedGroups = {};
-      Object.keys(groupedElements).forEach(key => {
-        newExpandedGroups[key] = true; // Expand all groups by default
-      });
-      setExpandedGroups(newExpandedGroups);
-    }
-  }, [groupBy, showGroupedView, groupedElements]);
+  // Old useEffect for expanding groups removed - now handled per section
 
   if (!token) {
     return (
@@ -1638,67 +1524,7 @@ const StructuralElementsList = () => {
           boxShadow: '0 4px 20px rgba(102, 126, 234, 0.3)'
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-            {/* Group By Toggle */}
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={showGroupedView}
-                  onChange={(e) => {
-                    setShowGroupedView(e.target.checked);
-                    if (!e.target.checked) setGroupBy('');
-                  }}
-                />
-              }
-              label={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <ViewModuleIcon />
-                  <Typography variant="body2">Grouped View</Typography>
-                </Box>
-              }
-            />
-            
-            {/* Group By Selector */}
-            {showGroupedView && (
-              <FormControl size="small" sx={{ minWidth: 200 }}>
-                <InputLabel sx={{ color: 'white', '&.Mui-focused': { color: 'white' } }}>Group By</InputLabel>
-                <Select
-                  value={groupBy}
-                  onChange={(e) => setGroupBy(e.target.value)}
-                  label="Group By"
-                  sx={{
-                    color: 'white',
-                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
-                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
-                    '& .MuiSvgIcon-root': { color: 'white' }
-                  }}
-                >
-                  {groupingOptions.map(option => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
-            
-            {/* Column Settings Button */}
-            <Button
-              variant="outlined"
-              startIcon={<ViewModuleIcon />}
-              onClick={() => setShowColumnSettings(true)}
-              sx={{
-                borderColor: 'rgba(255,255,255,0.5)',
-                color: 'white',
-                '&:hover': {
-                  borderColor: 'white',
-                  backgroundColor: 'rgba(255,255,255,0.1)',
-                  color: 'white'
-                }
-              }}
-            >
-              Columns
-            </Button>
+            {/* Old grouped view controls removed - now using status-based sections */}
             
             {/* Add Element Button */}
             <Button
@@ -1748,14 +1574,13 @@ const StructuralElementsList = () => {
               border: '1px solid rgba(255,255,255,0.3)'
             }}>
               <Typography variant="body2" fontWeight="bold">
-                {showGroupedView 
-                  ? `${Object.keys(groupedElements).length} Groups`
-                  : `${filteredElements.length} Elements`
-                }
+                {elements.length} Elements
               </Typography>
             </Box>
           </Box>
         </Paper>
+
+        {/* Global filter panel removed - now using individual section filters */}
 
         {elements.length === 0 && !loading ? (
           <Alert severity="info" sx={{ mb: 3 }}>
@@ -1763,278 +1588,503 @@ const StructuralElementsList = () => {
           </Alert>
         ) : (
           <>
-            {/* Render Table - Regular or Grouped View */}
-            {showGroupedView && groupBy ? (
-              // Grouped View - ArmorCode Style
-              <Box sx={{ backgroundColor: '#f8fafc' }}>
-                {Object.entries(groupedElements).map(([groupKey, groupElements]) => {
-                  const totalSurfaceArea = groupElements.reduce((sum, el) => sum + (el.surfaceAreaSqm || 0), 0);
-                  const statusCounts = groupElements.reduce((acc, el) => {
-                    acc[el.status] = (acc[el.status] || 0) + 1;
-                    return acc;
-                  }, {});
+            {/* Status-Based Sections */}
+            <Box sx={{ backgroundColor: '#f8fafc' }}>
+              {/* Helper function to render status section */}
+              {(() => {
+                const renderStatusSection = (statusName, statusTitle, statusColor, iconColor) => {
+                  const sectionElements = elements.filter(el => el.status === statusName);
+                  const sectionFilter = sectionFilters[statusName];
                   
-                  return (
+                  // Filter elements within this section (only section-specific filters)
+                  const filteredSectionElements = sectionElements.filter(element => {
+                    // Section-specific search term filter
+                    if (sectionFilter.searchTerm && !Object.values(element).some(value => 
+                      value?.toString().toLowerCase().includes(sectionFilter.searchTerm.toLowerCase())
+                    )) {
+                      return false;
+                    }
+                    
+                    // Section-specific member type filter
+                    if (sectionFilter.memberTypeFilter && element.memberType !== sectionFilter.memberTypeFilter) {
+                      return false;
+                    }
+                    
+                    return true;
+                  });
+                  
+                  // Group elements if groupBy is selected
+                  const groupedSectionElements = (() => {
+                    if (!sectionFilter.groupBy) return { 'All Elements': filteredSectionElements };
+                    
+                    return filteredSectionElements.reduce((acc, element) => {
+                      const groupKey = element[sectionFilter.groupBy] || 'Unknown';
+                      if (!acc[groupKey]) acc[groupKey] = [];
+                      acc[groupKey].push(element);
+                      return acc;
+                    }, {});
+                  })();
+                  
+                  // Pagination for non-grouped view
+                  const paginatedElements = sectionFilter.groupBy ? 
+                    filteredSectionElements : 
+                    filteredSectionElements.slice(
+                      sectionFilter.page * sectionFilter.rowsPerPage, 
+                      sectionFilter.page * sectionFilter.rowsPerPage + sectionFilter.rowsPerPage
+                    );
+                  
+                  const totalSurfaceArea = filteredSectionElements.reduce((sum, el) => sum + (el.surfaceAreaSqm || 0), 0);
+                  
+                  // Helper functions for section state management
+                  const updateSectionFilter = (updates) => {
+                    setSectionFilters(prev => ({
+                      ...prev,
+                      [statusName]: { ...prev[statusName], ...updates }
+                    }));
+                  };
+                  
+                  const handlePageChange = (event, newPage) => {
+                    updateSectionFilter({ page: newPage });
+                  };
+                  
+                  const handleRowsPerPageChange = (event) => {
+                    updateSectionFilter({ 
+                      page: 0, 
+                      rowsPerPage: parseInt(event.target.value, 10) 
+                    });
+                  };
+                  
+                  const toggleSectionGroupExpansion = (groupKey) => {
+                    updateSectionFilter({
+                      expandedGroups: {
+                        ...sectionFilter.expandedGroups,
+                        [groupKey]: !sectionFilter.expandedGroups[groupKey]
+                      }
+                    });
+                  };
+                  
+                  return sectionElements.length > 0 ? (
                     <Paper 
-                      key={groupKey} 
+                      key={statusName}
                       sx={{ 
                         mb: 3,
                         borderRadius: 2,
-                        border: '1px solid',
-                        borderColor: expandedGroups[groupKey] ? 'primary.main' : 'divider',
+                        border: '2px solid',
+                        borderColor: sectionFilters[statusName].expanded ? statusColor : 'divider',
                         overflow: 'hidden',
                         '&:hover': {
-                          borderColor: 'primary.main',
-                          boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
+                          borderColor: statusColor,
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
                         }
                       }}
                     >
-                      {/* Group Header - ArmorCode Style */}
+                      {/* Section Header */}
                       <Box
                         sx={{
-                          p: 2.5,
-                          background: expandedGroups[groupKey] 
-                            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                          p: 3,
+                          background: sectionFilters[statusName].expanded 
+                            ? `linear-gradient(135deg, ${statusColor}22 0%, ${statusColor}44 100%)`
                             : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                          color: 'white',
+                          borderBottom: `3px solid ${statusColor}`,
                           cursor: 'pointer',
                           transition: 'all 0.3s ease',
                           '&:hover': {
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            background: `linear-gradient(135deg, ${statusColor}33 0%, ${statusColor}55 100%)`,
                             transform: 'translateY(-1px)'
                           }
                         }}
-                        onClick={() => toggleGroupExpansion(groupKey)}
+                        onClick={() => setSectionFilters(prev => ({
+                          ...prev,
+                          [statusName]: {
+                            ...prev[statusName],
+                            expanded: !prev[statusName].expanded
+                          }
+                        }))}
                       >
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          {/* Left Side - Title and Stats */}
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            {/* Group Selection Checkbox */}
-                            <Checkbox
-                              checked={groupElements.every(el => selectedElements.includes(el._id))}
-                              indeterminate={
-                                groupElements.some(el => selectedElements.includes(el._id)) && 
-                                !groupElements.every(el => selectedElements.includes(el._id))
-                              }
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                handleSelectGroup(groupElements);
-                              }}
-                              size="small"
-                              sx={{
-                                color: 'rgba(255,255,255,0.7)',
-                                '&.Mui-checked': {
-                                  color: 'white',
-                                },
-                                '&.MuiCheckbox-indeterminate': {
-                                  color: 'white',
-                                }
-                              }}
-                            />
-                            
                             <Box sx={{ 
                               display: 'flex', 
                               alignItems: 'center', 
-                              backgroundColor: 'rgba(255,255,255,0.15)',
+                              backgroundColor: statusColor,
                               borderRadius: '50%',
-                              p: 0.5,
-                              transition: 'transform 0.2s ease'
+                              p: 1,
+                              color: 'white'
                             }}>
-                              {expandedGroups[groupKey] ? 
-                                <KeyboardArrowDownIcon sx={{ fontSize: 20 }} /> : 
-                                <KeyboardArrowRightIcon sx={{ fontSize: 20 }} />
+                              {sectionFilters[statusName].expanded ? 
+                                <KeyboardArrowDownIcon sx={{ fontSize: 24 }} /> : 
+                                <KeyboardArrowRightIcon sx={{ fontSize: 24 }} />
                               }
                             </Box>
                             
                             <Box>
-                              <Typography variant="h6" fontWeight="600" sx={{ mb: 0.5 }}>
-                                {groupKey}
+                              <Typography variant="h5" fontWeight="700" sx={{ mb: 0.5, color: statusColor }}>
+                                {statusTitle}
                               </Typography>
-                              <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                                <Chip
-                                  label={`${groupElements.length} elements`}
-                                  size="small"
-                                  sx={{ 
-                                    backgroundColor: 'rgba(255,255,255,0.2)',
-                                    color: 'white',
-                                    fontWeight: 500,
-                                    '& .MuiChip-label': { px: 1 }
-                                  }}
-                                />
-                                <Box sx={{ display: 'flex', gap: 1 }}>
-                                  {Object.entries(statusCounts).map(([status, count]) => (
-                                    <Chip
-                                      key={status}
-                                      label={`${status}: ${count}`}
-                                      size="small"
-                                      sx={{ 
-                                        backgroundColor: 'rgba(255,255,255,0.1)',
-                                        color: 'white',
-                                        fontSize: '0.75rem',
-                                        height: 20,
-                                        '& .MuiChip-label': { px: 0.8 }
-                                      }}
-                                    />
-                                  ))}
-                                </Box>
-                              </Box>
+                              <Typography variant="body1" color="text.secondary">
+                                {filteredSectionElements.length} elements • {totalSurfaceArea.toFixed(1)} sqm
+                              </Typography>
                             </Box>
                           </Box>
-
-                          {/* Right Side - Summary Metrics */}
-                          <Box sx={{ textAlign: 'right' }}>
-                            <Typography variant="h6" fontWeight="600" sx={{ mb: 0.5 }}>
-                              {totalSurfaceArea.toFixed(2)} sqm
-                            </Typography>
-                            <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                              Total Surface Area
-                            </Typography>
+                          
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Chip
+                              label={`${filteredSectionElements.length} / ${sectionElements.length}`}
+                              size="medium"
+                              sx={{ 
+                                backgroundColor: statusColor,
+                                color: 'white',
+                                fontWeight: 600,
+                                fontSize: '0.875rem'
+                              }}
+                            />
                           </Box>
                         </Box>
                       </Box>
-                      
-                      {/* Group Content */}
-                      <Collapse in={expandedGroups[groupKey]} timeout={300}>
-                        <Box sx={{ backgroundColor: 'white' }}>
-                          {/* Mini Summary Bar */}
+
+                      {/* Section Content */}
+                      <Collapse in={sectionFilters[statusName].expanded} timeout={300}>
+                        <Box sx={{ p: 2, backgroundColor: 'white' }}>
+                          {/* Section Filters */}
                           <Box sx={{ 
-                            p: 1.5, 
+                            mb: 2, 
+                            p: 2, 
                             backgroundColor: 'grey.50',
-                            borderBottom: '1px solid',
-                            borderColor: 'divider',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
+                            borderRadius: 1,
+                            border: '1px solid',
+                            borderColor: 'divider'
                           }}>
-                            <Typography variant="body2" color="text.secondary" fontWeight="500">
-                              Showing {groupElements.length} elements in {groupKey}
+                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: statusColor }}>
+                              Filter & Group {statusTitle}
                             </Typography>
-                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                              <Typography variant="body2" color="text.secondary">
-                                Avg Surface Area: {(totalSurfaceArea / groupElements.length).toFixed(2)} sqm
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                Total Quantity: {groupElements.reduce((sum, el) => sum + (el.qty || 0), 0)}
-                              </Typography>
+                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                              <TextField
+                                label="Search"
+                                value={sectionFilter.searchTerm}
+                                onChange={(e) => updateSectionFilter({ searchTerm: e.target.value, page: 0 })}
+                                variant="outlined"
+                                size="small"
+                                sx={{ minWidth: 200 }}
+                                InputProps={{
+                                  startAdornment: (
+                                    <InputAdornment position="start">
+                                      <SearchIcon sx={{ color: statusColor }} />
+                                    </InputAdornment>
+                                  ),
+                                }}
+                              />
+                              <FormControl variant="outlined" size="small" sx={{ minWidth: 150 }}>
+                                <InputLabel>Member Type</InputLabel>
+                                <Select
+                                  value={sectionFilter.memberTypeFilter}
+                                  onChange={(e) => updateSectionFilter({ memberTypeFilter: e.target.value, page: 0 })}
+                                  label="Member Type"
+                                >
+                                  <MenuItem value="">All Types</MenuItem>
+                                  {[...new Set(sectionElements.map(el => el.memberType))].map(type => (
+                                    <MenuItem key={type} value={type}>{type}</MenuItem>
+                                  ))}
+                                </Select>
+                              </FormControl>
+                              <FormControl variant="outlined" size="small" sx={{ minWidth: 150 }}>
+                                <InputLabel>Group By</InputLabel>
+                                <Select
+                                  value={sectionFilter.groupBy}
+                                  onChange={(e) => updateSectionFilter({ 
+                                    groupBy: e.target.value, 
+                                    page: 0,
+                                    expandedGroups: {} 
+                                  })}
+                                  label="Group By"
+                                >
+                                  <MenuItem value="">No Grouping</MenuItem>
+                                  <MenuItem value="memberType">Member Type</MenuItem>
+                                  <MenuItem value="level">Level</MenuItem>
+                                  <MenuItem value="gridNo">Grid No</MenuItem>
+                                  <MenuItem value="sectionSizes">Section Size</MenuItem>
+                                  <MenuItem value="drawingNo">Drawing No</MenuItem>
+                                </Select>
+                              </FormControl>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<ViewModuleIcon />}
+                                onClick={() => setShowColumnSettings(true)}
+                                sx={{ 
+                                  borderColor: statusColor,
+                                  color: statusColor,
+                                  '&:hover': {
+                                    backgroundColor: `${statusColor}11`,
+                                    borderColor: statusColor
+                                  }
+                                }}
+                              >
+                                Columns
+                              </Button>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={() => updateSectionFilter({
+                                  searchTerm: '',
+                                  memberTypeFilter: '',
+                                  groupBy: '',
+                                  page: 0,
+                                  expandedGroups: {}
+                                })}
+                                sx={{ 
+                                  borderColor: statusColor,
+                                  color: statusColor,
+                                  '&:hover': {
+                                    backgroundColor: `${statusColor}11`,
+                                    borderColor: statusColor
+                                  }
+                                }}
+                              >
+                                Clear All
+                              </Button>
                             </Box>
                           </Box>
 
-                          {/* Elements Table */}
-                          <TableContainer>
-                            <Table size="small">
-                              <TableHead sx={{ backgroundColor: 'grey.50' }}>
-                                <TableRow>
-                                  {getVisibleColumns().map(column => (
-                                    <TableCell 
-                                      key={column.key} 
-                                      sx={{ fontWeight: 600, color: 'text.primary' }}
-                                    >
-                                      {column.key === 'select' ? (
-                                        <Checkbox
-                                          checked={isSelectAll}
-                                          onChange={handleSelectAll}
-                                          size="small"
-                                          color="primary"
-                                        />
-                                      ) : (
-                                        column.label
-                                      )}
-                                    </TableCell>
-                                  ))}
-                                </TableRow>
-                              </TableHead>
-                              <TableBody>
-                                {groupElements.map((element, index) => (
-                                  <TableRow 
-                                    key={element._id} 
-                                    hover
+                          {/* Elements Table - Grouped or Regular View */}
+                          {sectionFilter.groupBy ? (
+                            // Grouped View
+                            <Box>
+                              {Object.entries(groupedSectionElements).map(([groupKey, groupElements]) => (
+                                <Paper 
+                                  key={groupKey}
+                                  sx={{ 
+                                    mb: 2,
+                                    borderRadius: 1,
+                                    border: '1px solid',
+                                    borderColor: sectionFilter.expandedGroups[groupKey] ? statusColor : 'divider',
+                                    overflow: 'hidden'
+                                  }}
+                                >
+                                  {/* Group Header */}
+                                  <Box
                                     sx={{
+                                      p: 1.5,
+                                      background: sectionFilter.expandedGroups[groupKey] 
+                                        ? `${statusColor}22` 
+                                        : 'grey.100',
+                                      cursor: 'pointer',
+                                      borderBottom: '1px solid',
+                                      borderColor: 'divider',
                                       '&:hover': {
-                                        backgroundColor: 'primary.50',
-                                      },
-                                      '&:nth-of-type(even)': {
-                                        backgroundColor: 'grey.25'
+                                        background: `${statusColor}33`
                                       }
                                     }}
+                                    onClick={() => toggleSectionGroupExpansion(groupKey)}
                                   >
-                                    {getVisibleColumns().map(column => (
-                                      <TableCell key={column.key}>
-                                        {renderCellContent(element, column.key)}
-                                      </TableCell>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        {sectionFilter.expandedGroups[groupKey] ? 
+                                          <KeyboardArrowDownIcon sx={{ fontSize: 20, color: statusColor }} /> : 
+                                          <KeyboardArrowRightIcon sx={{ fontSize: 20, color: statusColor }} />
+                                        }
+                                        <Typography variant="subtitle1" fontWeight="600" sx={{ color: statusColor }}>
+                                          {groupKey}
+                                        </Typography>
+                                        <Chip
+                                          label={`${groupElements.length} elements`}
+                                          size="small"
+                                          sx={{ 
+                                            backgroundColor: statusColor,
+                                            color: 'white',
+                                            fontSize: '0.75rem'
+                                          }}
+                                        />
+                                      </Box>
+                                      <Typography variant="body2" color="text.secondary">
+                                        {groupElements.reduce((sum, el) => sum + (el.surfaceAreaSqm || 0), 0).toFixed(1)} sqm
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+
+                                  {/* Group Content */}
+                                  <Collapse in={sectionFilter.expandedGroups[groupKey]} timeout={200}>
+                                    <TableContainer>
+                                      <Table size="small">
+                                        <TableHead sx={{ backgroundColor: 'grey.50' }}>
+                                          <TableRow>
+                                            {getVisibleColumns().map(column => (
+                                              <TableCell 
+                                                key={column.key} 
+                                                sx={{ fontWeight: 600, color: 'text.primary' }}
+                                              >
+                                                {column.key === 'select' ? (
+                                                  <Checkbox
+                                                    checked={groupElements.every(el => selectedElements.includes(el._id))}
+                                                    indeterminate={
+                                                      groupElements.some(el => selectedElements.includes(el._id)) && 
+                                                      !groupElements.every(el => selectedElements.includes(el._id))
+                                                    }
+                                                    onChange={(e) => {
+                                                      if (e.target.checked) {
+                                                        const newSelected = [...selectedElements];
+                                                        groupElements.forEach(el => {
+                                                          if (!newSelected.includes(el._id)) {
+                                                            newSelected.push(el._id);
+                                                          }
+                                                        });
+                                                        setSelectedElements(newSelected);
+                                                      } else {
+                                                        setSelectedElements(prev => 
+                                                          prev.filter(id => !groupElements.map(el => el._id).includes(id))
+                                                        );
+                                                      }
+                                                    }}
+                                                    size="small"
+                                                    color="primary"
+                                                  />
+                                                ) : (
+                                                  column.label
+                                                )}
+                                              </TableCell>
+                                            ))}
+                                          </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                          {groupElements.map((element) => (
+                                            <TableRow 
+                                              key={element._id} 
+                                              hover
+                                              sx={{
+                                                '&:hover': {
+                                                  backgroundColor: `${statusColor}08`,
+                                                },
+                                                '&:nth-of-type(even)': {
+                                                  backgroundColor: 'grey.25'
+                                                }
+                                              }}
+                                            >
+                                              {getVisibleColumns().map(column => (
+                                                <TableCell key={column.key}>
+                                                  {renderCellContent(element, column.key)}
+                                                </TableCell>
+                                              ))}
+                                            </TableRow>
+                                          ))}
+                                        </TableBody>
+                                      </Table>
+                                    </TableContainer>
+                                  </Collapse>
+                                </Paper>
+                              ))}
+                            </Box>
+                          ) : (
+                            // Regular Paginated View
+                            <>
+                              <TableContainer>
+                                <Table>
+                                  <TableHead sx={{ backgroundColor: 'grey.50' }}>
+                                    <TableRow>
+                                      {getVisibleColumns().map(column => (
+                                        <TableCell 
+                                          key={column.key} 
+                                          sx={{ fontWeight: 600, color: 'text.primary' }}
+                                        >
+                                          {column.key === 'select' ? (
+                                            <Checkbox
+                                              checked={paginatedElements.every(el => selectedElements.includes(el._id))}
+                                              indeterminate={
+                                                paginatedElements.some(el => selectedElements.includes(el._id)) && 
+                                                !paginatedElements.every(el => selectedElements.includes(el._id))
+                                              }
+                                              onChange={(e) => {
+                                                if (e.target.checked) {
+                                                  const newSelected = [...selectedElements];
+                                                  paginatedElements.forEach(el => {
+                                                    if (!newSelected.includes(el._id)) {
+                                                      newSelected.push(el._id);
+                                                    }
+                                                  });
+                                                  setSelectedElements(newSelected);
+                                                } else {
+                                                  setSelectedElements(prev => 
+                                                    prev.filter(id => !paginatedElements.map(el => el._id).includes(id))
+                                                  );
+                                                }
+                                              }}
+                                              size="small"
+                                              color="primary"
+                                            />
+                                          ) : (
+                                            column.label
+                                          )}
+                                        </TableCell>
+                                      ))}
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {paginatedElements.map((element) => (
+                                      <TableRow 
+                                        key={element._id} 
+                                        hover
+                                        sx={{
+                                          '&:hover': {
+                                            backgroundColor: `${statusColor}08`,
+                                          },
+                                          '&:nth-of-type(even)': {
+                                            backgroundColor: 'grey.25'
+                                          }
+                                        }}
+                                      >
+                                        {getVisibleColumns().map(column => (
+                                          <TableCell key={column.key}>
+                                            {renderCellContent(element, column.key)}
+                                          </TableCell>
+                                        ))}
+                                      </TableRow>
                                     ))}
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </TableContainer>
+                                  </TableBody>
+                                </Table>
+                              </TableContainer>
+                              
+                              {/* Pagination */}
+                              <TablePagination
+                                rowsPerPageOptions={[5, 10, 25, 50]}
+                                component="div"
+                                count={filteredSectionElements.length}
+                                rowsPerPage={sectionFilter.rowsPerPage}
+                                page={sectionFilter.page}
+                                onPageChange={handlePageChange}
+                                onRowsPerPageChange={handleRowsPerPageChange}
+                                sx={{
+                                  borderTop: '1px solid',
+                                  borderColor: 'divider',
+                                  '& .MuiTablePagination-actions': {
+                                    color: statusColor
+                                  }
+                                }}
+                              />
+                            </>
+                          )}
+                          
+                          {filteredSectionElements.length === 0 && (
+                            <Box sx={{ textAlign: 'center', py: 4 }}>
+                              <Typography variant="body2" color="text.secondary">
+                                No elements match the current filters
+                              </Typography>
+                            </Box>
+                          )}
                         </Box>
                       </Collapse>
                     </Paper>
-                  );
-                })}
-              </Box>
-            ) : (
-              // Regular Table View
-              <TableContainer>
-                <Table>
-                  <TableHead sx={{ backgroundColor: 'grey.50' }}>
-                    <TableRow>
-                      {getVisibleColumns().map(column => (
-                        <TableCell 
-                          key={column.key} 
-                          sx={{ fontWeight: 600, color: 'text.primary' }}
-                        >
-                          {column.key === 'select' ? (
-                            <Checkbox
-                              checked={isSelectAll}
-                              onChange={handleSelectAll}
-                              size="small"
-                              color="primary"
-                            />
-                          ) : (
-                            column.label
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {filteredElements.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((element) => (
-                      <TableRow 
-                        key={element._id} 
-                        hover
-                        sx={{
-                          '&:hover': {
-                            backgroundColor: 'primary.50',
-                          },
-                          '&:nth-of-type(even)': {
-                            backgroundColor: 'grey.25'
-                          }
-                        }}
-                      >
-                        {getVisibleColumns().map(column => (
-                          <TableCell key={column.key}>
-                            {renderCellContent(element, column.key)}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            )}
+                  ) : null;
+                };
 
-            {!showGroupedView && (
-              <TablePagination
-                rowsPerPageOptions={[10, 25, 50, 100]}
-                component="div"
-                count={filteredElements.length}
-                rowsPerPage={rowsPerPage}
-                page={page}
-                onPageChange={handleChangePage}
-                onRowsPerPageChange={handleChangeRowsPerPage}
-              />
-            )}
+                // Render all status sections
+                return (
+                  <>
+                    {renderStatusSection('non clearance', '🔴 Non Clearance', '#f44336', '#d32f2f')}
+                    {renderStatusSection('no jobs', '🟣 No Jobs', '#9c27b0', '#7b1fa2')}
+                    {renderStatusSection('active', '🔵 Active Work', '#2196f3', '#1976d2')}
+                    {renderStatusSection('complete', '🟢 Complete', '#4caf50', '#388e3c')}
+                  </>
+                );
+              })()}
+            </Box>
           </>
         )}
       </Paper>
@@ -2652,11 +2702,13 @@ const StructuralElementsList = () => {
                               py: 1,
                               minWidth: 120,
                               bgcolor: job.status === 'pending' ? '#ff9800' : 
-                                      (job.status === 'completed' || job.status === 'not_applicable') ? '#4caf50' : '#ff9800',
+                                      job.status === 'completed' ? '#4caf50' : 
+                                      job.status === 'not_applicable' ? '#f44336' : '#ff9800',
                               color: 'white',
                               '&:hover': {
                                 bgcolor: job.status === 'pending' ? '#f57c00' : 
-                                        (job.status === 'completed' || job.status === 'not_applicable') ? '#388e3c' : '#f57c00',
+                                        job.status === 'completed' ? '#388e3c' : 
+                                        job.status === 'not_applicable' ? '#d32f2f' : '#f57c00',
                                 transform: 'scale(1.05)'
                               },
                               transition: 'all 0.2s ease'
