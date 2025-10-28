@@ -2054,14 +2054,18 @@ const StructuralElementsList = () => {
                       <Box
                         sx={{
                           p: 3,
-                          background: sectionFilters[statusName].expanded 
-                            ? `linear-gradient(135deg, ${statusColor}22 0%, ${statusColor}44 100%)`
-                            : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                          background: statusName === 'non clearance' 
+                            ? 'linear-gradient(135deg, #fef7f7 0%, #fdf2f2 100%)'
+                            : sectionFilters[statusName].expanded 
+                              ? `linear-gradient(135deg, ${statusColor}22 0%, ${statusColor}44 100%)`
+                              : `linear-gradient(135deg, ${statusColor}22 0%, ${statusColor}44 100%)`,
                           borderBottom: `3px solid ${statusColor}`,
                           cursor: 'pointer',
                           transition: 'all 0.3s ease',
                           '&:hover': {
-                            background: `linear-gradient(135deg, ${statusColor}33 0%, ${statusColor}55 100%)`,
+                            background: statusName === 'non clearance'
+                              ? 'linear-gradient(135deg, #fdecec 0%, #fce6e6 100%)'
+                              : `linear-gradient(135deg, ${statusColor}33 0%, ${statusColor}55 100%)`,
                             transform: 'translateY(-1px)'
                           }
                         }}
