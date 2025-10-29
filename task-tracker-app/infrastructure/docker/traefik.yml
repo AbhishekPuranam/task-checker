@@ -1,0 +1,23 @@
+# Traefik Static Configuration
+api:
+  dashboard: true
+  insecure: true  # Enable dashboard on :8080 (disable in production)
+
+entryPoints:
+  web:
+    address: ":80"
+  
+  # Uncomment for HTTPS in production
+  # websecure:
+  #   address: ":443"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false  # Only expose services with traefik.enable=true
+    network: "task-tracker-app_tasktracker-dev-network"  # Use specific network
+
+log:
+  level: INFO  # DEBUG, INFO, WARN, ERROR
+
+accessLog: {}

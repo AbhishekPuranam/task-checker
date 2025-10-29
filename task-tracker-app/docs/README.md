@@ -2,15 +2,6 @@
 
 A comprehensive web-based task tracking system designed for **Office Admins** and **Site Engineers** to manage structural engineering projects and work orders.
 
-📖 **Full documentation is available in [docs/README.md](docs/README.md)**
-
-## Quick Links
-- [Architecture Documentation](docs/ARCHITECTURE.md)
-- [Docker Setup Guide](docs/DOCKER.md)
-- [Production Cleanup](docs/PRODUCTION_CLEANUP.md)
-
----
-
 ## Features
 
 ### For Office Admins (Blue Work) 📘
