@@ -102,9 +102,7 @@ const AddStructuralElementDialog = ({ open, onClose, projectId, onElementAdded, 
       setLoading(true);
       
       // Get project info first
-      try {
       const projectResponse = await api.get(`/projects/${projectId}`);
-      setProject(projectResponse.data);
       const project = projectResponse.data;
 
       // Convert numeric fields

@@ -144,11 +144,21 @@ services:
       - "traefik.http.routers.auth-login.service=auth"
       - "traefik.http.services.auth.loadbalancer.server.port=4000"
       
-      # Auth API endpoints (higher priority than backend /api)
-      - "traefik.http.routers.auth-api.rule=PathPrefix(`/api/auth`)"
-      - "traefik.http.routers.auth-api.entrypoints=web"
-      - "traefik.http.routers.auth-api.priority=10"
-      - "traefik.http.routers.auth-api.service=auth"
+      # Auth API endpoints - only specific routes (higher priority than backend /api)
+      - "traefik.http.routers.auth-api-login.rule=Path(`/api/auth/login`)"
+      - "traefik.http.routers.auth-api-login.entrypoints=web"
+      - "traefik.http.routers.auth-api-login.priority=15"
+      - "traefik.http.routers.auth-api-login.service=auth"
+      
+      - "traefik.http.routers.auth-api-me.rule=Path(`/api/auth/me`)"
+      - "traefik.http.routers.auth-api-me.entrypoints=web"
+      - "traefik.http.routers.auth-api-me.priority=15"
+      - "traefik.http.routers.auth-api-me.service=auth"
+      
+      - "traefik.http.routers.auth-api-forward.rule=Path(`/api/auth/forward-auth`)"
+      - "traefik.http.routers.auth-api-forward.entrypoints=web"
+      - "traefik.http.routers.auth-api-forward.priority=15"
+      - "traefik.http.routers.auth-api-forward.service=auth"
 
   # Traefik Reverse Proxy (Unified Gateway)
   traefik:

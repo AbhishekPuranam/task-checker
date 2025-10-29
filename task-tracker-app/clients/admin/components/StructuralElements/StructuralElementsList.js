@@ -66,14 +66,16 @@ import {
   Download as DownloadIcon,
   GetApp as GetAppIcon
 } from '@mui/icons-material';
-import { useParams } from 'next/router';
+import { useRouter } from 'next/router';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import AddStructuralElementDialog from './AddStructuralElementDialog';
 import ExcelUpload from '../Excel/ExcelUpload';
 
-const StructuralElementsList = () => {
-  const { projectName } = useParams();
+const StructuralElementsList = ({ projectSlug }) => {
+  const router = useRouter();
+  const { slug } = router.query;
+  const projectName = projectSlug || slug;
   const { user, token } = useAuth();
   const [elements, setElements] = useState([]);
   const [loading, setLoading] = useState(true);
