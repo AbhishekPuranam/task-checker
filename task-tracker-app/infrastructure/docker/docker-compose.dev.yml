@@ -43,6 +43,7 @@ services:
       JWT_SECRET: dev-jwt-secret-key
       CLIENT_URL: http://localhost:3000
       SESSION_SECRET: dev-session-secret
+      OTEL_ENABLED: "false"
     ports:
       - "5000:5000"
     volumes:
@@ -135,6 +136,7 @@ services:
       PORT: 4000
       MONGODB_URI: mongodb://mongodb:27017/tasktracker
       JWT_SECRET: dev-jwt-secret-key
+      OTEL_ENABLED: "false"
     volumes:
       - ../../services/auth-service:/app
       - /app/node_modules
