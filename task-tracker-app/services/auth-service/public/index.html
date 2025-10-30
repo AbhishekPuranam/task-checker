@@ -251,24 +251,23 @@
                     throw new Error(data.message || 'Login failed');
                 }
 
-                // Store token in localStorage for backward compatibility
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('user', JSON.stringify(data.user));
+                // Store token in sessionStorage (more secure than localStorage)
+                sessionStorage.setItem('auth_token', data.token);
+                sessionStorage.setItem('auth_user', JSON.stringify(data.user));
+                sessionStorage.setItem('auth_timestamp', Date.now().toString());
 
                 // Show success message
                 const roleName = data.user.role === 'admin' ? 'Admin Dashboard' : 'Jobs View';
                 showSuccess(`Welcome ${data.user.name}! Redirecting to ${roleName}...`);
 
-                // Cookie is already set by server, just redirect
+                // Cookie is already set by server, redirect securely WITHOUT token in URL
                 if (data.redirectUrl) {
-                    console.log('Cookie set, redirecting to:', data.redirectUrl);
+                    console.log('Cookie set, redirecting securely to:', data.redirectUrl);
                     
-                    // Append token and user data as URL hash for client-side apps to pick up
-                    const redirectWithHash = `${data.redirectUrl}#token=${encodeURIComponent(data.token)}&user=${encodeURIComponent(JSON.stringify(data.user))}`;
-                    
-                    // Simple redirect - cookie will be sent automatically
+                    // Open redirect page in same window
+                    // The application will read token from sessionStorage, not URL
                     setTimeout(() => {
-                        window.location.href = redirectWithHash;
+                        window.location.href = data.redirectUrl;
                     }, 800);
                 } else {
                     console.error('ERROR: No redirect URL in response');

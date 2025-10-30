@@ -2,7 +2,65 @@
 
 ## Critical Security Measures Implemented
 
-### 1. Authentication & Authorization
+### 1. JWT Token Storage - FIXED ✅
+
+**Previous Vulnerability (CRITICAL)**:
+- JWT tokens were passed in URL hash fragments (`#token=...`)
+- Exposed in browser history, address bar, referer headers
+- Could be shared accidentally via copy/paste
+- Accessible to browser extensions
+
+**Current Implementation**:
+- Auth service stores token in **sessionStorage** temporarily (5-minute window)
+- Client apps transfer token to **localStorage** immediately after redirect
+- **No tokens in URL** - clean URLs only
+- SessionStorage auto-clears when tab closes
+
+**Token Flow**:
+```
+1. User logs in at auth service
+2. Token stored in sessionStorage (temp, 5-min expiry)
+3. Redirect to application WITHOUT token in URL
+4. Application reads from sessionStorage within 5 minutes
+5. Token moved to localStorage for persistence
+6. SessionStorage cleared
+```
+
+**Why this is secure**:
+- ✅ Not visible in browser history
+- ✅ Not visible in address bar
+- ✅ Not logged on servers
+- ✅ Not sent in referer headers
+- ✅ Time-limited transfer window
+- ✅ Auto-cleanup after transfer
+
+**Token Storage Security Comparison**:
+
+| Storage Method | XSS Vulnerable | CSRF Vulnerable | Visible in URL | Persists on Refresh | Recommendation |
+|---|---|---|---|---|---|
+| URL Hash | ✅ Yes | ❌ No | ✅ **EXPOSED** | ❌ No | ❌ **NEVER USE** |
+| URL Query | ✅ Yes | ❌ No | ✅ **EXPOSED** | ❌ No | ❌ **NEVER USE** |
+| localStorage | ✅ Yes | ❌ No | ✅ No | ✅ Yes | ⚠️ Acceptable (current) |
+| sessionStorage | ✅ Yes | ❌ No | ✅ No | ❌ No | ✅ Good for temp storage |
+| HttpOnly Cookie | ❌ No | ✅ Yes* | ✅ No | ✅ Yes | ✅ **BEST** (future upgrade) |
+
+*CSRF protection needed with cookies (already implemented with CORS)
+
+**Future Recommendation - HttpOnly Cookies**:
+For maximum security, consider migrating to HttpOnly cookies:
+```javascript
+// Backend sets cookie
+res.cookie('auth_token', token, {
+  httpOnly: true,  // Not accessible to JavaScript
+  secure: true,    // HTTPS only
+  sameSite: 'strict', // CSRF protection
+  maxAge: 24 * 60 * 60 * 1000 // 24 hours
+});
+```
+
+This prevents XSS attacks from stealing tokens entirely.
+
+### 2. Authentication & Authorization
 
 #### JWT Security
 - **NEVER** use fallback JWT secrets in production

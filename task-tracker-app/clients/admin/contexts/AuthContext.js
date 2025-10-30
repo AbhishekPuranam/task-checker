@@ -82,63 +82,44 @@ export const AuthProvider = ({ children }) => {
     const initAuth = async () => {
       console.log('=== ADMIN AUTH CONTEXT INIT ===');
       
-      // Check if token is passed via URL hash (from auth service redirect)
-      const hash = window.location.hash;
-      if (hash && hash.includes('token=')) {
-        const tokenMatch = hash.match(/token=([^&]+)/);
-        const userMatch = hash.match(/user=([^&]+)/);
+      // Check if auth data is in sessionStorage (from auth service redirect)
+      const sessionToken = typeof window !== 'undefined' && sessionStorage.getItem('auth_token');
+      const sessionUser = typeof window !== 'undefined' && sessionStorage.getItem('auth_user');
+      const sessionTimestamp = typeof window !== 'undefined' && sessionStorage.getItem('auth_timestamp');
+      
+      if (sessionToken && sessionUser) {
+        // Check if session is recent (within last 5 minutes)
+        const timestamp = parseInt(sessionTimestamp || '0', 10);
+        const isRecent = Date.now() - timestamp < 5 * 60 * 1000;
         
-        if (tokenMatch) {
-          const token = decodeURIComponent(tokenMatch[1]);
-          console.log('📥 Token received via URL hash');
-          typeof window !== 'undefined' && localStorage.setItem('token', token);
+        if (isRecent) {
+          console.log('📥 Fresh auth session from auth service');
           
-          // Get user from hash if available
-          if (userMatch) {
-            const userStr = decodeURIComponent(userMatch[1]);
-            typeof window !== 'undefined' && localStorage.setItem('user', userStr);
-            console.log('📥 User data received via URL hash');
+          // Move to localStorage for persistence
+          typeof window !== 'undefined' && localStorage.setItem('token', sessionToken);
+          typeof window !== 'undefined' && localStorage.setItem('user', sessionUser);
+          
+          // Clear sessionStorage
+          sessionStorage.removeItem('auth_token');
+          sessionStorage.removeItem('auth_user');
+          sessionStorage.removeItem('auth_timestamp');
+          
+          try {
+            const user = JSON.parse(sessionUser);
+            console.log('✅ User authenticated securely:', user);
             
-            try {
-              const user = JSON.parse(userStr);
-              console.log('✅ User extracted from hash:', user);
-              
-              // Clear the hash from URL
-              window.history.replaceState(null, '', window.location.pathname);
-              
-              // Set user as authenticated immediately
-              dispatch({ type: 'USER_LOADED', payload: user });
-              console.log('=== ADMIN AUTH CONTEXT INIT COMPLETE ===');
-              return;
-            } catch (error) {
-              console.error('Error parsing user from hash:', error);
-            }
-          } else {
-            // Try to decode JWT to get user info
-            try {
-              const payload = JSON.parse(atob(token.split('.')[1]));
-              const user = {
-                id: payload.userId,
-                username: payload.username,
-                role: payload.role
-              };
-              typeof window !== 'undefined' && localStorage.setItem('user', JSON.stringify(user));
-              console.log('✅ User extracted from token:', user);
-              
-              // Clear the hash from URL
-              window.history.replaceState(null, '', window.location.pathname);
-              
-              // Set user as authenticated immediately
-              dispatch({ type: 'USER_LOADED', payload: user });
-              console.log('=== ADMIN AUTH CONTEXT INIT COMPLETE ===');
-              return;
-            } catch (error) {
-              console.error('Error decoding token:', error);
-            }
+            // Set user as authenticated immediately
+            dispatch({ type: 'USER_LOADED', payload: user });
+            console.log('=== ADMIN AUTH CONTEXT INIT COMPLETE ===');
+            return;
+          } catch (error) {
+            console.error('Error parsing user from session:', error);
           }
-          
-          // Clear the hash from URL
-          window.history.replaceState(null, '', window.location.pathname);
+        } else {
+          console.log('⚠️ Session expired, clearing sessionStorage');
+          sessionStorage.removeItem('auth_token');
+          sessionStorage.removeItem('auth_user');
+          sessionStorage.removeItem('auth_timestamp');
         }
       }
       
