@@ -1,3 +1,8 @@
+// Initialize OpenTelemetry tracing (must be first)
+if (process.env.OTEL_ENABLED !== 'false') {
+  require('./tracing');
+}
+
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
