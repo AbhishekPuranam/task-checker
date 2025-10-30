@@ -41,6 +41,7 @@ import {
   GridOn,
   LocalFireDepartment,
   ClearAll,
+  AccountCircle,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
@@ -466,7 +467,14 @@ export default function JobsPage() {
           <Typography variant="body1" sx={{ mr: 2 }}>
             {user?.name}
           </Typography>
-          <IconButton color="inherit" onClick={logout}>
+          <IconButton 
+            color="inherit" 
+            onClick={() => window.location.href = '/engineer/profile'}
+            title="Profile"
+          >
+            <AccountCircle />
+          </IconButton>
+          <IconButton color="inherit" onClick={logout} title="Logout">
             <LogoutOutlined />
           </IconButton>
         </Toolbar>

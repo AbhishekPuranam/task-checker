@@ -264,12 +264,50 @@ router.delete('/:id', adminAuth, async (req, res) => {
       return res.status(404).json({ message: 'Structural element not found' });
     }
 
+    // Delete associated jobs
+    const Job = require('../models/Job');
+    await Job.deleteMany({ structuralElement: req.params.id });
+
     await StructuralElement.findByIdAndDelete(req.params.id);
 
     // Emit socket event for real-time updates
     req.io.emit('structural-element-deleted', req.params.id);
 
-    res.json({ message: 'Structural element deleted successfully' });
+    res.json({ message: 'Structural element and associated jobs deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Bulk delete structural elements (admin only)
+router.post('/bulk-delete', adminAuth, async (req, res) => {
+  try {
+    const { elementIds } = req.body;
+    
+    if (!Array.isArray(elementIds) || elementIds.length === 0) {
+      return res.status(400).json({ message: 'No element IDs provided' });
+    }
+
+    // Delete associated jobs for all elements
+    const Job = require('../models/Job');
+    const jobDeleteResult = await Job.deleteMany({ 
+      structuralElement: { $in: elementIds } 
+    });
+
+    // Delete the structural elements
+    const deleteResult = await StructuralElement.deleteMany({
+      _id: { $in: elementIds }
+    });
+
+    // Emit socket event for real-time updates
+    req.io.emit('structural-elements-bulk-deleted', elementIds);
+
+    res.json({ 
+      message: `${deleteResult.deletedCount} structural elements and ${jobDeleteResult.deletedCount} associated jobs deleted successfully`,
+      deletedElements: deleteResult.deletedCount,
+      deletedJobs: jobDeleteResult.deletedCount
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });

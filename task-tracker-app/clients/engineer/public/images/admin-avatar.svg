@@ -1,0 +1,40 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="adminBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="adminAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7b2ff7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f107a3;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="100" fill="url(#adminBg)"/>
+  
+  <!-- Head -->
+  <circle cx="100" cy="75" r="35" fill="white" opacity="0.95"/>
+  
+  <!-- Body -->
+  <ellipse cx="100" cy="160" rx="55" ry="60" fill="white" opacity="0.95"/>
+  
+  <!-- Crown/Admin indicator -->
+  <g transform="translate(100, 35)">
+    <path d="M -20,5 L -15,-5 L -10,0 L -5,-8 L 0,-2 L 5,-8 L 10,0 L 15,-5 L 20,5 Z" 
+          fill="url(#adminAccent)" stroke="white" stroke-width="1.5"/>
+    <circle cx="-15" cy="-3" r="2.5" fill="#FFD700"/>
+    <circle cx="0" cy="-5" r="3" fill="#FFD700"/>
+    <circle cx="15" cy="-3" r="2.5" fill="#FFD700"/>
+  </g>
+  
+  <!-- Badge/Shield -->
+  <g transform="translate(100, 145)">
+    <path d="M 0,-15 L 8,-12 L 8,0 L 0,5 L -8,0 L -8,-12 Z" 
+          fill="url(#adminAccent)" opacity="0.8"/>
+    <text x="0" y="0" text-anchor="middle" 
+          font-family="Arial, sans-serif" font-size="10" 
+          font-weight="bold" fill="white">A</text>
+  </g>
+</svg>

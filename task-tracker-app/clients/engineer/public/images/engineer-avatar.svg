@@ -1,0 +1,44 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="engineerBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4facfe;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00f2fe;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="engineerAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#43e97b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#38f9d7;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="100" fill="url(#engineerBg)"/>
+  
+  <!-- Head -->
+  <circle cx="100" cy="75" r="35" fill="white" opacity="0.95"/>
+  
+  <!-- Body -->
+  <ellipse cx="100" cy="160" rx="55" ry="60" fill="white" opacity="0.95"/>
+  
+  <!-- Hard Hat -->
+  <g transform="translate(100, 35)">
+    <!-- Hat brim -->
+    <ellipse cx="0" cy="5" rx="38" ry="6" fill="url(#engineerAccent)"/>
+    <!-- Hat dome -->
+    <path d="M -30,5 Q -30,-15 0,-20 Q 30,-15 30,5 Z" 
+          fill="url(#engineerAccent)" stroke="white" stroke-width="1.5"/>
+    <!-- Hat stripe -->
+    <rect x="-32" y="3" width="64" height="4" fill="#FFD700" opacity="0.8"/>
+  </g>
+  
+  <!-- Tools badge -->
+  <g transform="translate(100, 145)">
+    <circle cx="0" cy="0" r="12" fill="url(#engineerAccent)" opacity="0.8"/>
+    <!-- Wrench icon -->
+    <path d="M -4,-6 L -2,-4 L 2,-8 L 4,-6 L 0,-2 L 2,0 L 0,2 L -2,0 L -6,4 L -8,2 L -4,-2 Z" 
+          fill="white" stroke="white" stroke-width="0.5"/>
+  </g>
+  
+  <!-- Safety vest indicator -->
+  <rect x="70" y="125" width="60" height="8" fill="#FFD700" opacity="0.6" rx="2"/>
+</svg>

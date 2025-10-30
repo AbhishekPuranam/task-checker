@@ -40,7 +40,9 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
   const [previewData, setPreviewData] = useState([]);
   const [uploadProgress, setUploadProgress] = useState(null);
   const [progressInterval, setProgressInterval] = useState(null);
+  const [jobId, setJobId] = useState(null);
   const completionNotifiedRef = useRef(false);
+  const fileInputRef = useRef(null);
 
   // Cleanup interval on unmount or when dialog closes
   useEffect(() => {
@@ -126,8 +128,8 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
 
     try {
       setUploading(true);
-      completionNotifiedRef.current = false; // Reset notification flag
-      setUploadProgress({ stage: 'starting', progress: 0, message: 'Starting upload...', elementsProcessed: 0, totalElements: 0, jobsCreated: 0 });
+      completionNotifiedRef.current = false;
+      setUploadProgress({ stage: 'queued', percent: 0, message: 'Uploading file...', saved: 0, jobsCreated: 0 });
       
       const response = await api.post(`/excel/upload/${projectId}`, formData, {
         headers: {
@@ -135,29 +137,92 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
         },
       });
       
-      // Start polling for progress updates if we have a session ID
-      if (response.data.sessionId) {
-        const interval = setInterval(() => pollProgress(response.data.sessionId), 500);
+      // New BullMQ response has jobId instead of sessionId
+      if (response.data.jobId) {
+        setJobId(response.data.jobId);
+        toast.success('File uploaded! Processing in background...');
+        
+        // Start polling for job status
+        const interval = setInterval(() => pollJobStatus(response.data.jobId), 1000);
         setProgressInterval(interval);
       }
       
-      setUploadResult(response.data);
-      
-      // Don't show immediate toast - let progress polling handle final notification
-      // to avoid duplicate popups
-      
-      if (response.data.summary.errors > 0) {
-        toast.warning(`${response.data.summary.errors} rows had errors`);
-      }
-
-      if (onUploadSuccess) {
-        onUploadSuccess(response.data);
-      }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to upload Excel file');
       setUploadProgress(null);
-    } finally {
       setUploading(false);
+    }
+  };
+
+  const pollJobStatus = async (jobId) => {
+    try {
+      const response = await api.get(`/excel/job-status/${jobId}`);
+      const status = response.data;
+      
+      // Update progress from job data
+      if (status.progress) {
+        setUploadProgress({
+          stage: status.progress.stage || status.state,
+          percent: status.progress.percent || 0,
+          message: status.progress.message || `Status: ${status.state}`,
+          saved: status.progress.saved || 0,
+          jobsCreated: status.progress.jobsCreated || 0,
+          validated: status.progress.validated || 0,
+          errors: status.progress.errors || 0,
+        });
+      }
+      
+      // Check if job is complete
+      if (status.state === 'completed') {
+        if (progressInterval) {
+          clearInterval(progressInterval);
+          setProgressInterval(null);
+        }
+        
+        setUploading(false);
+        
+        // Set upload result from job return value
+        if (status.result) {
+          setUploadResult({
+            summary: {
+              savedElements: status.result.savedElements || 0,
+              duplicateElements: status.result.duplicateElements || 0,
+              errors: status.result.errors?.length || 0,
+              jobsCreated: status.result.jobsCreated || 0,
+              totalRows: status.result.totalRows || 0,
+            },
+            errors: status.result.errors || [],
+          });
+        }
+        
+        // Show final completion notification
+        if (!completionNotifiedRef.current) {
+          completionNotifiedRef.current = true;
+          const jobMessage = status.result?.jobsCreated > 0 
+            ? ` and ${status.result.jobsCreated} Fire Proofing jobs` 
+            : '';
+          toast.success(`Successfully imported ${status.result?.savedElements || 0} elements${jobMessage}!`);
+        }
+        
+        if (onUploadSuccess) {
+          onUploadSuccess(status.result);
+        }
+      }
+      
+      // Check if job failed
+      if (status.state === 'failed') {
+        if (progressInterval) {
+          clearInterval(progressInterval);
+          setProgressInterval(null);
+        }
+        
+        setUploading(false);
+        toast.error(status.error || 'Excel processing failed');
+        setUploadProgress(null);
+      }
+      
+    } catch (error) {
+      console.error('Error polling job status:', error);
     }
   };
 
@@ -193,10 +258,16 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
       setProgressInterval(null);
     }
     
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    
     setSelectedFile(null);
     setUploadResult(null);
     setPreviewData([]);
     setUploadProgress(null);
+    setJobId(null);
     completionNotifiedRef.current = false;
     onClose();
   };
@@ -266,6 +337,7 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
               id="excel-upload"
               type="file"
               onChange={handleFileSelect}
+              ref={fileInputRef}
             />
             <label htmlFor="excel-upload">
               <Button
@@ -309,28 +381,30 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
           {(uploading || uploadProgress) && (
             <Box sx={{ mb: 2 }}>
               <LinearProgress 
-                variant={uploadProgress ? "determinate" : "indeterminate"}
-                value={uploadProgress ? uploadProgress.progress : 0}
+                variant={uploadProgress && uploadProgress.percent !== undefined ? "determinate" : "indeterminate"}
+                value={uploadProgress?.percent || 0}
               />
               <Box sx={{ mt: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="body2">
                   {uploadProgress ? uploadProgress.message : 'Processing Excel file...'}
                 </Typography>
-                {uploadProgress && (
+                {uploadProgress && uploadProgress.percent !== undefined && (
                   <Typography variant="body2" color="text.secondary">
-                    {Math.round(uploadProgress.progress)}%
+                    {Math.round(uploadProgress.percent)}%
                   </Typography>
                 )}
               </Box>
-              {uploadProgress && uploadProgress.totalElements > 0 && (
+              {uploadProgress && (uploadProgress.saved > 0 || uploadProgress.jobsCreated > 0) && (
                 <Box sx={{ mt: 1 }}>
                   <Box sx={{ display: 'flex', gap: 2, mb: 1 }}>
-                    <Chip 
-                      size="small" 
-                      label={`Elements: ${uploadProgress.elementsProcessed}/${uploadProgress.totalElements}`}
-                      color="primary"
-                      variant="outlined"
-                    />
+                    {uploadProgress.saved > 0 && (
+                      <Chip 
+                        size="small" 
+                        label={`Elements: ${uploadProgress.saved}${uploadProgress.validated ? `/${uploadProgress.validated}` : ''}`}
+                        color="primary"
+                        variant="outlined"
+                      />
+                    )}
                     {uploadProgress.jobsCreated > 0 && (
                       <Chip 
                         size="small" 
@@ -440,16 +514,16 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
                 label={`${uploadResult.summary?.savedElements || 0} Successful`}
                 color="success"
               />
-              {uploadResult.errors && uploadResult.errors.length > 0 && (
+              {uploadResult.summary?.errors > 0 && (
                 <Chip
                   icon={<Error />}
-                  label={`${uploadResult.errors.length} Errors`}
+                  label={`${uploadResult.summary.errors} Errors`}
                   color="error"
                 />
               )}
             </Box>
 
-            {uploadResult.errors.length > 0 && (
+            {uploadResult.errors && uploadResult.errors.length > 0 && (
               <Box>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
                   Errors:

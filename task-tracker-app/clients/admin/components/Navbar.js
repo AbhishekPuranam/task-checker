@@ -46,11 +46,26 @@ const Navbar = () => {
     handleClose();
   };
 
+  // Get default avatar based on role
+  const getDefaultAvatar = () => {
+    if (user?.role === 'admin') {
+      return '/admin/images/admin-avatar.svg';
+    }
+    return '/admin/images/engineer-avatar.svg';
+  };
+
+  const getUserAvatar = () => {
+    if (user?.avatar) {
+      return user.avatar;
+    }
+    return getDefaultAvatar();
+  };
+
 
 
   return (
     <AppBar position="static" sx={{ 
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: 'linear-gradient(135deg, #6a11cb 0%, #2575fc 100%)',
       boxShadow: '0 4px 20px rgba(102, 126, 234, 0.3)'
     }}>
       <Toolbar>
@@ -107,7 +122,15 @@ const Navbar = () => {
             onClick={handleMenu}
             color="inherit"
           >
-            <Avatar sx={{ width: 32, height: 32 }}>
+            <Avatar 
+              src={getUserAvatar()}
+              sx={{ 
+                width: 32, 
+                height: 32,
+                border: '2px solid white',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+              }}
+            >
               {user?.name?.charAt(0).toUpperCase()}
             </Avatar>
           </IconButton>

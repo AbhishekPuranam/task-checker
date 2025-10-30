@@ -28,6 +28,7 @@ import {
   Grid,
   Card,
   CardContent,
+  Avatar,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -158,6 +159,20 @@ const UserManagement = () => {
     return role === 'admin' ? <AdminPanelSettings /> : <Engineering />;
   };
 
+  const getDefaultAvatar = (role) => {
+    if (role === 'admin') {
+      return '/admin/images/admin-avatar.svg';
+    }
+    return '/admin/images/engineer-avatar.svg';
+  };
+
+  const getUserAvatar = (user) => {
+    if (user?.avatar) {
+      return user.avatar;
+    }
+    return getDefaultAvatar(user?.role);
+  };
+
   if (!user || user.role !== 'admin') {
     return (
       <Container maxWidth="sm">
@@ -171,132 +186,275 @@ const UserManagement = () => {
   }
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ mt: 4, mb: 4 }}>
-        <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <Paper sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h4" component="h1">
+    <Box
+      sx={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        py: 3
+      }}
+    >
+      <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 2, md: 3 } }}>
+        {/* Header Section */}
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: { xs: 2, sm: 3, md: 4 }, 
+            mb: 3, 
+            background: 'white', 
+            color: '#6a11cb',
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(106, 17, 203, 0.3)'
+          }}
+        >
+          <Box display="flex" alignItems="center" justifyContent="space-between" gap={1} sx={{ flexWrap: 'wrap' }}>
+            <Box display="flex" alignItems="center" gap={1.5}>
+              <Box 
+                sx={{ 
+                  width: { xs: 40, sm: 44, md: 48 }, 
+                  height: { xs: 40, sm: 44, md: 48 }, 
+                  borderRadius: 2, 
+                  background: 'linear-gradient(135deg, #7b2ff7 0%, #f107a3 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(123, 47, 247, 0.3)'
+                }}
+              >
+                <Typography sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>👥</Typography>
+              </Box>
+              <Box>
+                <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#6a11cb', fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' } }}>
                   User Management
                 </Typography>
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={() => handleOpen()}
-                >
-                  Add User
-                </Button>
+                <Typography variant="body2" sx={{ color: '#9D50BB', mt: 0.5 }}>
+                  Manage system users and access control
+                </Typography>
               </Box>
+            </Box>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => handleOpen()}
+              sx={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                px: 3,
+                py: 1,
+                borderRadius: 2,
+                fontWeight: 'bold',
+                textTransform: 'none',
+                boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #5568d3 0%, #6a3a8a 100%)',
+                  transform: 'translateY(-1px)',
+                  boxShadow: '0 6px 20px rgba(102, 126, 234, 0.5)'
+                },
+                transition: 'all 0.3s ease'
+              }}
+            >
+              Add User
+            </Button>
+          </Box>
+        </Paper>
 
-              {/* User Stats */}
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Card>
-                    <CardContent>
-                      <Typography color="textSecondary" gutterBottom>
-                        Total Users
-                      </Typography>
-                      <Typography variant="h4">
-                        {users.length}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Card>
-                    <CardContent>
-                      <Typography color="textSecondary" gutterBottom>
-                        Admins
-                      </Typography>
-                      <Typography variant="h4">
-                        {users.filter(u => u.role === 'admin').length}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Card>
-                    <CardContent>
-                      <Typography color="textSecondary" gutterBottom>
-                        Site Engineers
-                      </Typography>
-                      <Typography variant="h4">
-                        {users.filter(u => u.role === 'site-engineer').length}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Card>
-                    <CardContent>
-                      <Typography color="textSecondary" gutterBottom>
-                        Active Users
-                      </Typography>
-                      <Typography variant="h4">
-                        {users.filter(u => u.isActive).length}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              </Grid>
-
-              <TableContainer>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Name</TableCell>
-                      <TableCell>Username</TableCell>
-                      <TableCell>Email</TableCell>
-                      <TableCell>Role</TableCell>
-                      <TableCell>Department</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell>Created</TableCell>
-                      <TableCell>Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {users.map((user) => (
-                      <TableRow key={user._id}>
-                        <TableCell>{user.name}</TableCell>
-                        <TableCell>{user.username}</TableCell>
-                        <TableCell>{user.email || 'N/A'}</TableCell>
-                        <TableCell>
-                          <Chip
-                            icon={getRoleIcon(user.role)}
-                            label={user.role === 'site-engineer' ? 'Site Engineer' : 'Admin'}
-                            color={getRoleColor(user.role)}
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>{user.department || 'N/A'}</TableCell>
-                        <TableCell>
-                          <Chip
-                            label={user.isActive ? 'Active' : 'Inactive'}
-                            color={user.isActive ? 'success' : 'default'}
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {new Date(user.createdAt).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleOpen(user)}
-                            color="primary"
-                          >
-                            <EditIcon />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Paper>
+        {/* User Stats */}
+        <Grid container spacing={3} sx={{ mb: 3 }}>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card 
+              elevation={3}
+              sx={{ 
+                borderRadius: 3,
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                boxShadow: '0 4px 20px rgba(102, 126, 234, 0.3)',
+                transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                '&:hover': {
+                  transform: 'translateY(-4px)',
+                  boxShadow: '0 8px 30px rgba(102, 126, 234, 0.4)'
+                }
+              }}
+            >
+              <CardContent>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', mb: 1 }}>
+                  Total Users
+                </Typography>
+                <Typography variant="h3" sx={{ fontWeight: 'bold' }}>
+                  {users.length}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card 
+              elevation={3}
+              sx={{ 
+                borderRadius: 3,
+                background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                color: 'white',
+                boxShadow: '0 4px 20px rgba(240, 147, 251, 0.3)',
+                transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                '&:hover': {
+                  transform: 'translateY(-4px)',
+                  boxShadow: '0 8px 30px rgba(240, 147, 251, 0.4)'
+                }
+              }}
+            >
+              <CardContent>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', mb: 1 }}>
+                  Admins
+                </Typography>
+                <Typography variant="h3" sx={{ fontWeight: 'bold' }}>
+                  {users.filter(u => u.role === 'admin').length}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card 
+              elevation={3}
+              sx={{ 
+                borderRadius: 3,
+                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                color: 'white',
+                boxShadow: '0 4px 20px rgba(79, 172, 254, 0.3)',
+                transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                '&:hover': {
+                  transform: 'translateY(-4px)',
+                  boxShadow: '0 8px 30px rgba(79, 172, 254, 0.4)'
+                }
+              }}
+            >
+              <CardContent>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', mb: 1 }}>
+                  Site Engineers
+                </Typography>
+                <Typography variant="h3" sx={{ fontWeight: 'bold' }}>
+                  {users.filter(u => u.role === 'site-engineer').length}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card 
+              elevation={3}
+              sx={{ 
+                borderRadius: 3,
+                background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+                color: 'white',
+                boxShadow: '0 4px 20px rgba(67, 233, 123, 0.3)',
+                transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                '&:hover': {
+                  transform: 'translateY(-4px)',
+                  boxShadow: '0 8px 30px rgba(67, 233, 123, 0.4)'
+                }
+              }}
+            >
+              <CardContent>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', mb: 1 }}>
+                  Active Users
+                </Typography>
+                <Typography variant="h3" sx={{ fontWeight: 'bold' }}>
+                  {users.filter(u => u.isActive).length}
+                </Typography>
+              </CardContent>
+            </Card>
           </Grid>
         </Grid>
+
+        {/* Users Table */}
+        <Paper 
+          elevation={3}
+          sx={{ 
+            borderRadius: 3,
+            overflow: 'hidden',
+            boxShadow: '0 4px 20px rgba(106, 17, 203, 0.2)'
+          }}
+        >
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Avatar</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Name</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Username</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Email</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Role</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Department</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Status</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Created</TableCell>
+                  <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {users.map((user) => (
+                  <TableRow 
+                    key={user._id}
+                    sx={{
+                      '&:hover': {
+                        backgroundColor: 'rgba(102, 126, 234, 0.05)'
+                      }
+                    }}
+                  >
+                    <TableCell>
+                      <Avatar 
+                        src={getUserAvatar(user)}
+                        sx={{ 
+                          width: 40, 
+                          height: 40,
+                          border: '2px solid #6a11cb',
+                          boxShadow: '0 2px 8px rgba(106, 17, 203, 0.2)'
+                        }}
+                      >
+                        {user.name?.charAt(0).toUpperCase()}
+                      </Avatar>
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 500 }}>{user.name}</TableCell>
+                    <TableCell>{user.username}</TableCell>
+                    <TableCell>{user.email || 'N/A'}</TableCell>
+                    <TableCell>
+                      <Chip
+                        icon={getRoleIcon(user.role)}
+                        label={user.role === 'site-engineer' ? 'Site Engineer' : 'Admin'}
+                        color={getRoleColor(user.role)}
+                        size="small"
+                        sx={{ fontWeight: 'bold' }}
+                      />
+                    </TableCell>
+                    <TableCell>{user.department || 'N/A'}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={user.isActive ? 'Active' : 'Inactive'}
+                        color={user.isActive ? 'success' : 'default'}
+                        size="small"
+                        sx={{ fontWeight: 'bold' }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {new Date(user.createdAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleOpen(user)}
+                        sx={{
+                          color: '#6a11cb',
+                          backgroundColor: 'rgba(106, 17, 203, 0.1)',
+                          '&:hover': {
+                            backgroundColor: 'rgba(106, 17, 203, 0.2)',
+                            transform: 'scale(1.1)'
+                          },
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
 
         {/* Add/Edit User Dialog */}
         <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
@@ -410,8 +568,8 @@ const UserManagement = () => {
             </Button>
           </DialogActions>
         </Dialog>
-      </Box>
-    </Container>
+      </Container>
+    </Box>
   );
 };
 

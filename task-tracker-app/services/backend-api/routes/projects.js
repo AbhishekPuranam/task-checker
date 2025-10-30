@@ -141,8 +141,8 @@ router.post('/', auth, async (req, res) => {
     const { title, description, location, category, priority, status, dueDate } = req.body;
     
     // Validation
-    if (!title || !description) {
-      return res.status(400).json({ message: 'Title and description are required' });
+    if (!title) {
+      return res.status(400).json({ message: 'Title is required' });
     }
     
     // Check if project with same title already exists
@@ -154,7 +154,7 @@ router.post('/', auth, async (req, res) => {
     // Create new project
     const project = new Task({
       title: title.trim(),
-      description: description.trim(),
+      description: description?.trim(),
       location: location?.trim(),
       category: category || 'project',
       priority: priority || 'medium',

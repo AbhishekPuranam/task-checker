@@ -4,6 +4,7 @@ const Job = require('../models/Job');
 const StructuralElement = require('../models/StructuralElement');
 const Task = require('../models/Task');
 const { auth, adminAuth } = require('../middleware/auth');
+const { cacheMiddleware, invalidateCache, jobsCacheKeyGenerator, statsCacheKeyGenerator } = require('../middleware/cache');
 
 // Debug middleware to log all requests
 router.use((req, res, next) => {
@@ -198,6 +199,10 @@ router.post('/bulk-create', auth, async (req, res) => {
     const errorCount = errors.length;
     const totalJobsCreated = results.reduce((sum, result) => sum + result.jobsCreated, 0);
 
+    // Invalidate cache for this project
+    await invalidateCache(`cache:jobs:project:${project}:*`);
+    await invalidateCache(`cache:stats:project:${project}`);
+
     res.status(200).json({
       message: `Bulk job creation completed. Successfully processed ${successCount}/${elementIds.length} elements.`,
       summary: {
@@ -294,6 +299,10 @@ router.post('/', auth, async (req, res) => {
       { path: 'createdBy', select: 'name email' }
     ]);
 
+    // Invalidate cache for this project
+    await invalidateCache(`cache:jobs:project:${job.project}:*`);
+    await invalidateCache(`cache:stats:project:${job.project}`);
+
     res.status(201).json(job);
   } catch (error) {
     console.error('Error creating job:', error);
@@ -301,8 +310,8 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
-// Get all jobs (with filters)
-router.get('/', auth, async (req, res) => {
+// Get all jobs (with filters) - WITH REDIS CACHING
+router.get('/', auth, cacheMiddleware(180, jobsCacheKeyGenerator), async (req, res) => {
   try {
     const startTime = Date.now();
     const {
@@ -318,7 +327,6 @@ router.get('/', auth, async (req, res) => {
     // Build filter object
     const filter = {};
     
-    if (project) filter.project = project;
     if (structuralElement) filter.structuralElement = structuralElement;
     if (status) filter.status = status;
     if (assignedTo) filter.assignedTo = assignedTo;
@@ -334,8 +342,32 @@ router.get('/', auth, async (req, res) => {
         ]
       }).select('_id');
       
-      const projectIds = userProjects.map(p => p._id);
-      filter.project = { $in: projectIds };
+      const projectIds = userProjects.map(p => p._id.toString());
+      
+      // If a specific project is requested, verify access and use it
+      if (project) {
+        if (projectIds.includes(project.toString())) {
+          filter.project = project;
+        } else {
+          // User doesn't have access to the requested project
+          return res.json({
+            jobs: [],
+            pagination: {
+              currentPage: parseInt(page),
+              totalPages: 0,
+              totalJobs: 0,
+              hasNext: false,
+              hasPrev: false
+            }
+          });
+        }
+      } else {
+        // No specific project requested, show all accessible projects
+        filter.project = { $in: projectIds };
+      }
+    } else {
+      // Admin can see all projects, use project filter if provided
+      if (project) filter.project = project;
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -372,12 +404,13 @@ router.get('/', auth, async (req, res) => {
 });
 
 // Get job statistics for a project (fast aggregation)
-router.get('/stats/:projectId', auth, async (req, res) => {
+router.get('/stats/:projectId', auth, cacheMiddleware(300, (req) => `cache:stats:project:${req.params.projectId}`), async (req, res) => {
   try {
     const { projectId } = req.params;
+    const mongoose = require('mongoose');
     
     const stats = await Job.aggregate([
-      { $match: { project: require('mongoose').Types.ObjectId(projectId) } },
+      { $match: { project: new mongoose.Types.ObjectId(projectId) } },
       {
         $group: {
           _id: null,
@@ -731,6 +764,10 @@ router.put('/:id', auth, async (req, res) => {
       { path: 'createdBy', select: 'name email' },
       { path: 'qualityCheckedBy', select: 'name email' }
     ]);
+
+    // Invalidate cache for this project
+    await invalidateCache(`cache:jobs:project:${updatedJob.project}:*`);
+    await invalidateCache(`cache:stats:project:${updatedJob.project}`);
 
     console.log(`=== UPDATE JOB DEBUG: Job updated successfully, id=${updatedJob._id}, status=${updatedJob.status}`);
     res.json(updatedJob);

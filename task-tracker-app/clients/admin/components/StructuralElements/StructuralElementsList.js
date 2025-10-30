@@ -64,7 +64,8 @@ import {
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
   Download as DownloadIcon,
-  GetApp as GetAppIcon
+  GetApp as GetAppIcon,
+  TableChart as TableChartIcon
 } from '@mui/icons-material';
 import { useRouter } from 'next/router';
 import api from '../../utils/api';
@@ -218,6 +219,7 @@ const StructuralElementsList = ({ projectSlug }) => {
   // Bulk selection state
   const [selectedElements, setSelectedElements] = useState([]);
   const [showBulkJobDialog, setShowBulkJobDialog] = useState(false);
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [bulkJobForm, setBulkJobForm] = useState({
     jobType: '',
     fireproofingType: ''
@@ -283,6 +285,27 @@ const StructuralElementsList = ({ projectSlug }) => {
     } catch (error) {
       console.error('Error creating bulk jobs:', error);
       toast.error(error.response?.data?.message || 'Failed to create jobs');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedElements.length === 0) {
+      toast.error('Please select at least one element');
+      return;
+    }
+
+    try {
+      const response = await api.post('/structural-elements/bulk-delete', {
+        elementIds: selectedElements
+      });
+
+      toast.success(response.data.message);
+      setSelectedElements([]);
+      setShowBulkDeleteDialog(false);
+      fetchElements(); // Refresh the list
+    } catch (error) {
+      console.error('Error deleting elements:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete elements');
     }
   };
 
@@ -1434,6 +1457,21 @@ const StructuralElementsList = ({ projectSlug }) => {
                 <WorkIcon sx={{ fontSize: 16, color: 'success.main' }} />
               </IconButton>
             </Tooltip>
+            <Tooltip title="Delete Element" placement="top">
+              <IconButton
+                size="small"
+                onClick={() => {
+                  setSelectedElements([element._id]);
+                  setShowBulkDeleteDialog(true);
+                }}
+                sx={{ 
+                  backgroundColor: 'error.50',
+                  '&:hover': { backgroundColor: 'error.100' }
+                }}
+              >
+                <DeleteIcon sx={{ fontSize: 16, color: 'error.main' }} />
+              </IconButton>
+            </Tooltip>
           </Box>
         );
       default:
@@ -1468,15 +1506,53 @@ const StructuralElementsList = ({ projectSlug }) => {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      <Paper sx={{ p: 3 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        py: 3
+      }}
+    >
+      <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 2, md: 3 } }}>
+        {/* Header Section */}
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: { xs: 2, sm: 3, md: 4 }, 
+            mb: 2, 
+            background: 'white', 
+            color: '#6a11cb',
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(106, 17, 203, 0.3)'
+          }}
+        >
           <Box>
             {project ? (
-              <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
-                <Typography variant="h5" color="primary" sx={{ fontWeight: 'bold' }}>
-                  📋 {project.title || project.projectName || `Project ${projectId}`}
-                </Typography>
+              <Box display="flex" alignItems="center" justifyContent="space-between" gap={1} sx={{ mb: 1, flexWrap: 'wrap' }}>
+                <Box display="flex" alignItems="center" gap={1.5}>
+                  <Box 
+                    sx={{ 
+                      width: { xs: 40, sm: 44, md: 48 }, 
+                      height: { xs: 40, sm: 44, md: 48 }, 
+                      borderRadius: 2, 
+                      background: 'linear-gradient(135deg, #7b2ff7 0%, #f107a3 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 4px 12px rgba(123, 47, 247, 0.3)'
+                    }}
+                  >
+                    <Typography sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>📋</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#6a11cb', fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.125rem' } }}>
+                      {project.title || project.projectName || `Project ${projectId}`}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#9D50BB', mt: 0.5 }}>
+                      Manage structural elements and fire proofing jobs
+                    </Typography>
+                  </Box>
+                </Box>
                 <Tooltip title={`Edit Project Details\nLocation: ${project.location || 'N/A'}\nStatus: ${project.status || 'N/A'}`}>
                   <IconButton 
                     size="small" 
@@ -1592,7 +1668,7 @@ const StructuralElementsList = ({ projectSlug }) => {
               </Box>
             )}
           </Box>
-        </Box>
+        </Paper>
 
         {/* Bulk Actions Toolbar */}
         {selectedElements.length > 0 && (
@@ -1617,11 +1693,24 @@ const StructuralElementsList = ({ projectSlug }) => {
                   Assign Fire Proofing Workflow
                 </Button>
                 <Button
+                  variant="contained"
+                  color="error"
+                  startIcon={<DeleteIcon />}
+                  onClick={() => setShowBulkDeleteDialog(true)}
+                  size="small"
+                >
+                  Delete Selected
+                </Button>
+                <Button
                   variant="outlined"
                   onClick={() => {
                     setSelectedElements([]);
                   }}
                   size="small"
+                  sx={{ 
+                    borderColor: 'primary.main',
+                    color: 'primary.main'
+                  }}
                 >
                   Clear Selection
                 </Button>
@@ -1823,7 +1912,7 @@ const StructuralElementsList = ({ projectSlug }) => {
                           p: 3,
                           background: sectionFilters[statusName].expanded 
                             ? `linear-gradient(135deg, ${statusColor}22 0%, ${statusColor}44 100%)`
-                            : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                            : '#ffffff',
                           borderBottom: `3px solid ${statusColor}`,
                           cursor: 'pointer',
                           transition: 'all 0.3s ease',
@@ -1879,21 +1968,29 @@ const StructuralElementsList = ({ projectSlug }) => {
                             />
                             {filteredSectionElements.length > 0 && (
                               <Tooltip title={`Export ${statusTitle} section to Excel`}>
-                                <IconButton
+                                <Button
                                   size="small"
+                                  variant="outlined"
+                                  startIcon={<TableChartIcon />}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleExportSection(statusName);
                                   }}
                                   sx={{ 
                                     color: statusColor,
+                                    borderColor: statusColor,
+                                    fontSize: '0.75rem',
+                                    py: 0.5,
+                                    px: 1.5,
+                                    minWidth: 'auto',
                                     '&:hover': {
-                                      backgroundColor: `${statusColor}20`
+                                      backgroundColor: `${statusColor}20`,
+                                      borderColor: statusColor
                                     }
                                   }}
                                 >
-                                  <DownloadIcon fontSize="small" />
-                                </IconButton>
+                                  Export Excel
+                                </Button>
                               </Tooltip>
                             )}
                           </Box>
@@ -2246,7 +2343,6 @@ const StructuralElementsList = ({ projectSlug }) => {
             </Box>
           </>
         )}
-      </Paper>
 
       {/* Column Settings Dialog */}
       <Dialog 
@@ -3128,6 +3224,56 @@ const StructuralElementsList = ({ projectSlug }) => {
         </DialogActions>
       </Dialog>
 
+      {/* Bulk Delete Confirmation Dialog */}
+      <Dialog
+        open={showBulkDeleteDialog}
+        onClose={() => setShowBulkDeleteDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ 
+          backgroundColor: 'error.main',
+          color: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1
+        }}>
+          <WarningIcon />
+          Confirm Bulk Delete
+        </DialogTitle>
+        
+        <DialogContent sx={{ mt: 2 }}>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            This action cannot be undone!
+          </Alert>
+          
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            Are you sure you want to delete <strong>{selectedElements.length}</strong> structural element{selectedElements.length > 1 ? 's' : ''}?
+          </Typography>
+          
+          <Typography variant="body2" color="text.secondary">
+            This will also delete all associated jobs for these elements.
+          </Typography>
+        </DialogContent>
+
+        <DialogActions>
+          <Button 
+            onClick={() => setShowBulkDeleteDialog(false)}
+            color="inherit"
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleBulkDelete}
+            variant="contained"
+            color="error"
+            startIcon={<DeleteIcon />}
+          >
+            Delete {selectedElements.length} Element{selectedElements.length > 1 ? 's' : ''}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Job Creation Dialog */}
       <Dialog
         open={showJobCreationDialog}
@@ -3462,6 +3608,7 @@ const StructuralElementsList = ({ projectSlug }) => {
       </Dialog>
 
     </Container>
+    </Box>
   );
 };
 

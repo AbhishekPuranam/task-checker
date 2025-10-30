@@ -6,10 +6,6 @@ import {
   Button,
   Typography,
   Box,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Alert,
   Grid,
 } from '@mui/material';
@@ -26,12 +22,8 @@ const CreateProject = () => {
   
   const [formData, setFormData] = useState({
     title: '',
-    description: '',
-    category: '',
-    priority: 'medium',
     location: '',
-    estimatedHours: '',
-    dueDate: '',
+    description: '',
   });
 
   const handleChange = (e) => {
@@ -45,8 +37,8 @@ const CreateProject = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.title || !formData.description) {
-      setError('Project name and description are required');
+    if (!formData.title) {
+      setError('Project name is required');
       return;
     }
 
@@ -56,12 +48,8 @@ const CreateProject = () => {
       // Structure the data to match the backend model
       const taskData = {
         title: formData.title,
-        description: formData.description,
-        category: formData.category,
-        priority: formData.priority,
-        location: formData.location,
-        estimatedHours: formData.estimatedHours ? Number(formData.estimatedHours) : undefined,
-        dueDate: formData.dueDate || undefined,
+        location: formData.location || undefined,
+        description: formData.description || undefined,
       };
 
       await api.post('/projects', taskData);
@@ -89,11 +77,6 @@ const CreateProject = () => {
 
         <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
           <Grid container spacing={3}>
-            {/* Basic Project Information */}
-            <Grid item xs={12}>
-              <Typography variant="h6" sx={{ mb: 2 }}>Project Information</Typography>
-            </Grid>
-            
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -103,6 +86,18 @@ const CreateProject = () => {
                 value={formData.title}
                 onChange={handleChange}
                 required
+                helperText="Required field"
+              />
+            </Grid>
+            
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Location"
+                name="location"
+                placeholder="e.g., Jamnagar, Gujarat"
+                value={formData.location}
+                onChange={handleChange}
               />
             </Grid>
             
@@ -112,76 +107,12 @@ const CreateProject = () => {
                 label="Description"
                 name="description"
                 multiline
-                rows={3}
+                rows={4}
+                placeholder="Enter project description (optional)"
                 value={formData.description}
                 onChange={handleChange}
-                required
               />
             </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Location"
-                name="location"
-                value={formData.location}
-                onChange={handleChange}
-              />
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Priority</InputLabel>
-                <Select
-                  name="priority"
-                  value={formData.priority}
-                  onChange={handleChange}
-                  label="Priority"
-                >
-                  <MenuItem value="low">Low</MenuItem>
-                  <MenuItem value="medium">Medium</MenuItem>
-                  <MenuItem value="high">High</MenuItem>
-                  <MenuItem value="urgent">Urgent</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Category"
-                name="category"
-                value={formData.category}
-                onChange={handleChange}
-              />
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Estimated Hours"
-                name="estimatedHours"
-                type="number"
-                value={formData.estimatedHours}
-                onChange={handleChange}
-              />
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Due Date"
-                name="dueDate"
-                type="datetime-local"
-                value={formData.dueDate}
-                onChange={handleChange}
-                InputLabelProps={{
-                  shrink: true,
-                }}
-              />
-            </Grid>
-
-            
           </Grid>
           
           <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>

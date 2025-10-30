@@ -397,35 +397,83 @@ const ProjectList = () => {
     <Box 
       sx={{ 
         minHeight: '100vh',
-        bgcolor: 'grey.50',
-        py: 4
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        py: 3
       }}
     >
-      <Container maxWidth="xl">
+      <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 2, md: 3 } }}>
         {/* Header Section */}
-        <Box sx={{ mb: 4 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Box>
-              <Typography 
-                variant="h3" 
-                fontWeight="bold"
-                sx={{ 
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1
-                }}
-              >
-                🏗️ Project Dashboard
-              </Typography>
-              <Typography variant="h6" color="text.secondary" sx={{ mt: 1 }}>
-                Manage your structural engineering projects
-              </Typography>
-            </Box>
-            {user?.role === 'admin' && (
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: { xs: 3, sm: 4, md: 5 }, 
+            mb: 2, 
+            background: 'white', 
+            color: '#6a11cb',
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(106, 17, 203, 0.3)'
+          }}
+        >
+          <Box sx={{ textAlign: 'center' }}>
+            <Assessment sx={{ fontSize: { xs: 40, sm: 50, md: 60 }, mb: 2, color: '#7b2ff7' }} />
+            <Typography variant="h3" component="h1" gutterBottom fontWeight="bold" sx={{ color: '#6a11cb', fontSize: { xs: '1.75rem', sm: '2.5rem', md: '3rem' } }}>
+              Hi, {user?.name}! 👋
+            </Typography>
+            <Typography 
+              variant="h5" 
+              sx={{ 
+                opacity: 0.85, 
+                fontStyle: 'italic',
+                mt: 2,
+                fontWeight: 300,
+                color: '#7b2ff7',
+                fontSize: { xs: '1rem', sm: '1.25rem', md: '1.5rem' }
+              }}
+            >
+              "Excellence is not a destination; it is a continuous journey that never ends."
+            </Typography>
+          </Box>
+        </Paper>
+
+        {/* Create New Project Button Section */}
+        {user?.role === 'admin' && (
+          <Paper 
+            elevation={3} 
+            sx={{ 
+              p: { xs: 2, sm: 3, md: 4 }, 
+              mb: 3, 
+              borderRadius: 3, 
+              bgcolor: 'white', 
+              boxShadow: '0 4px 20px rgba(106, 17, 203, 0.2)',
+              border: '2px solid transparent',
+              background: 'linear-gradient(white, white) padding-box, linear-gradient(135deg, #7b2ff7 0%, #f107a3 100%) border-box',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box 
+                  sx={{ 
+                    width: 48, 
+                    height: 48, 
+                    borderRadius: 2, 
+                    background: 'linear-gradient(135deg, #7b2ff7 0%, #f107a3 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(123, 47, 247, 0.3)'
+                  }}
+                >
+                  <Add sx={{ color: 'white', fontSize: 28 }} />
+                </Box>
+                <Box>
+                  <Typography variant="h5" fontWeight="bold" sx={{ color: '#6a11cb' }}>
+                    Create New Project
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#9D50BB', mt: 0.5 }}>
+                    Start a new structural engineering project
+                  </Typography>
+                </Box>
+              </Box>
               <Button
                 variant="contained"
                 size="large"
@@ -433,118 +481,171 @@ const ProjectList = () => {
                 onClick={() => router.push('/projects/new')}
                 sx={{
                   py: 1.5,
-                  px: 3,
+                  px: 4,
                   borderRadius: 2,
-                  background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)',
-                  boxShadow: '0 3px 5px 2px rgba(25, 118, 210, .3)',
+                  background: 'linear-gradient(135deg, #7b2ff7 0%, #f107a3 100%)',
+                  boxShadow: '0 4px 12px rgba(123, 47, 247, 0.4)',
                   fontWeight: 'bold',
+                  fontSize: '1rem',
                   '&:hover': {
                     transform: 'translateY(-2px)',
-                    boxShadow: '0 6px 10px 4px rgba(25, 118, 210, .3)',
+                    boxShadow: '0 6px 16px rgba(123, 47, 247, 0.5)',
                   }
                 }}
               >
                 New Project
               </Button>
-            )}
-          </Box>
+            </Box>
+          </Paper>
+        )}
 
-          {/* Statistics Cards */}
-          <Grid container spacing={3} sx={{ mb: 4 }}>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Box>
-                      <Typography variant="h4" fontWeight="bold">
-                        {projects?.length || 0}
-                      </Typography>
-                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                        Total Projects
-                      </Typography>
-                    </Box>
-                    <Assessment sx={{ fontSize: 40, opacity: 0.7 }} />
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card sx={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white' }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Box>
-                      <Typography variant="h4" fontWeight="bold">
-                        {filteredProjects?.length || 0}
-                      </Typography>
-                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                        Filtered Results
-                      </Typography>
-                    </Box>
-                    <FilterList sx={{ fontSize: 40, opacity: 0.7 }} />
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card sx={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white' }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Box>
-                      <Typography variant="h4" fontWeight="bold">
-                        {Object.values(surfaceAreaTotals).reduce((sum, area) => sum + area, 0).toFixed(0)}
-                      </Typography>
-                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                        Total Area (sqm)
-                      </Typography>
-                    </Box>
-                    <TrendingUp sx={{ fontSize: 40, opacity: 0.7 }} />
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card sx={{ background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', color: 'white' }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Box>
-                      <Typography variant="h4" fontWeight="bold">
-                        {(projects || []).filter(p => getCorrectedProjectStatus(p) === 'complete').length}
-                      </Typography>
-                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                        Completed
-                      </Typography>
-                    </Box>
-                    <Engineering sx={{ fontSize: 40, opacity: 0.7 }} />
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
+        {/* Statistics Cards */}
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid item xs={12} sm={6} md={4}>
+            <Paper 
+              elevation={2}
+              sx={{ 
+                p: { xs: 2, sm: 2.5 }, 
+                borderRadius: 2, 
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                color: 'white',
+                boxShadow: '0 4px 20px rgba(106, 17, 203, 0.3)'
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="h4" fontWeight="bold">
+                    {projects?.length || 0}
+                  </Typography>
+                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                    Total Projects
+                  </Typography>
+                </Box>
+                <Assessment sx={{ fontSize: 40, opacity: 0.7 }} />
+              </Box>
+            </Paper>
           </Grid>
-        </Box>
+          <Grid item xs={12} sm={6} md={4}>
+            <Paper 
+              elevation={2}
+              sx={{ 
+                p: { xs: 2, sm: 2.5 }, 
+                borderRadius: 2, 
+                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', 
+                color: 'white',
+                boxShadow: '0 4px 20px rgba(79, 172, 254, 0.3)'
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="h4" fontWeight="bold">
+                    {Object.values(surfaceAreaTotals).reduce((sum, area) => sum + area, 0).toFixed(0)}
+                  </Typography>
+                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                    Total Area (sqm)
+                  </Typography>
+                </Box>
+                <TrendingUp sx={{ fontSize: 40, opacity: 0.7 }} />
+              </Box>
+            </Paper>
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <Paper 
+              elevation={2}
+              sx={{ 
+                p: { xs: 2, sm: 2.5 }, 
+                borderRadius: 2, 
+                background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', 
+                color: 'white',
+                boxShadow: '0 4px 20px rgba(250, 112, 154, 0.3)'
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box>
+                  <Typography variant="h4" fontWeight="bold">
+                    {(projects || []).filter(p => getCorrectedProjectStatus(p) === 'complete').length}
+                  </Typography>
+                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                    Completed
+                  </Typography>
+                </Box>
+                <Engineering sx={{ fontSize: 40, opacity: 0.7 }} />
+              </Box>
+            </Paper>
+          </Grid>
+        </Grid>
 
         {/* Search and Filters Section */}
-        <Paper sx={{ p: 3, mb: 3, borderRadius: 2, boxShadow: 3 }}>
+        <Paper 
+          elevation={2} 
+          sx={{ 
+            p: { xs: 2, sm: 2.5, md: 3 }, 
+            mb: 3, 
+            borderRadius: 2, 
+            bgcolor: 'white', 
+            boxShadow: '0 4px 20px rgba(106, 17, 203, 0.2)' 
+          }}
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              <Search sx={{ color: '#6a11cb', fontSize: 24 }} />
+              <Typography variant="h6" sx={{ color: '#6a11cb', fontWeight: 600 }}>
+                Search & Filter Projects
+              </Typography>
+              {hasActiveFilters && (
+                <Chip 
+                  label="Filters Active" 
+                  sx={{ 
+                    bgcolor: '#7b2ff7', 
+                    color: 'white',
+                    fontWeight: 500
+                  }}
+                  size="small"
+                  onDelete={clearFilters}
+                  deleteIcon={<Clear sx={{ color: 'white !important' }} />}
+                />
+              )}
+            </Box>
+          </Box>
+
           {/* Search Bar */}
           <TextField
             fullWidth
-            placeholder="Search projects by title or location..."
+            label="Search Projects"
+            placeholder="Search by project title or location..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search color="primary" />
+                  <Search sx={{ color: '#6a11cb' }} />
                 </InputAdornment>
               ),
             }}
             sx={{ 
-              mb: 2,
+              mb: 3,
               '& .MuiOutlinedInput-root': {
                 borderRadius: 2,
+                '& fieldset': {
+                  borderColor: '#e0d4ff',
+                  borderWidth: 2,
+                },
                 '&:hover fieldset': {
-                  borderColor: 'primary.main',
+                  borderColor: '#b794f6',
+                  borderWidth: 2,
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: '#7b2ff7',
+                  borderWidth: 2,
                 },
               },
+              '& .MuiInputLabel-root': {
+                color: '#6a11cb',
+                fontWeight: 500,
+                '&.Mui-focused': {
+                  color: '#7b2ff7'
+                }
+              }
             }}
           />
 
@@ -552,39 +653,65 @@ const ProjectList = () => {
           <Accordion 
             expanded={filtersExpanded} 
             onChange={(e, isExpanded) => setFiltersExpanded(isExpanded)}
-            sx={{ boxShadow: 'none', '&:before': { display: 'none' } }}
+            sx={{ 
+              boxShadow: 'none', 
+              '&:before': { display: 'none' },
+              bgcolor: 'transparent'
+            }}
           >
             <AccordionSummary 
-              expandIcon={<ExpandMore />}
+              expandIcon={<ExpandMore sx={{ color: '#7b2ff7' }} />}
               sx={{ 
-                bgcolor: 'grey.50', 
-                borderRadius: 1,
-                '&:hover': { bgcolor: 'grey.100' }
+                bgcolor: '#f8f7ff', 
+                borderRadius: 2,
+                border: '2px solid #e0d4ff',
+                '&:hover': { bgcolor: '#f0ebff' },
+                minHeight: 48,
+                '&.Mui-expanded': {
+                  minHeight: 48,
+                }
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <FilterList color="primary" />
-                <Typography fontWeight="bold">Advanced Filters</Typography>
-                {hasActiveFilters && (
-                  <Chip 
-                    label="Filters Active" 
-                    size="small" 
-                    color="primary" 
-                    variant="filled"
-                  />
-                )}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <FilterList sx={{ color: '#7b2ff7' }} />
+                <Typography fontWeight="bold" sx={{ color: '#6a11cb' }}>
+                  Advanced Filters
+                </Typography>
               </Box>
             </AccordionSummary>
-            <AccordionDetails sx={{ pt: 3 }}>
-              <Grid container spacing={3}>
+            <AccordionDetails sx={{ pt: 3, bgcolor: 'white' }}>
+              <Grid container spacing={2}>
                 {/* Priority Filter */}
                 <Grid item xs={12} sm={6} md={3}>
                   <FormControl fullWidth>
-                    <InputLabel>Priority</InputLabel>
+                    <InputLabel sx={{ 
+                      color: '#6a11cb',
+                      fontWeight: 500,
+                      '&.Mui-focused': {
+                        color: '#7b2ff7'
+                      }
+                    }}>
+                      Priority
+                    </InputLabel>
                     <Select
                       value={priorityFilter}
                       onChange={(e) => setPriorityFilter(e.target.value)}
                       label="Priority"
+                      sx={{
+                        borderRadius: 2,
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: '#e0d4ff',
+                          borderWidth: 2,
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: '#b794f6',
+                          borderWidth: 2,
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: '#7b2ff7',
+                          borderWidth: 2,
+                        },
+                      }}
                     >
                       <MenuItem value="">All Priorities</MenuItem>
                       {uniquePriorities.map(priority => (
@@ -604,11 +731,34 @@ const ProjectList = () => {
                 {/* Status Filter */}
                 <Grid item xs={12} sm={6} md={3}>
                   <FormControl fullWidth>
-                    <InputLabel>Status</InputLabel>
+                    <InputLabel sx={{ 
+                      color: '#6a11cb',
+                      fontWeight: 500,
+                      '&.Mui-focused': {
+                        color: '#7b2ff7'
+                      }
+                    }}>
+                      Status
+                    </InputLabel>
                     <Select
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
                       label="Status"
+                      sx={{
+                        borderRadius: 2,
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: '#e0d4ff',
+                          borderWidth: 2,
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: '#b794f6',
+                          borderWidth: 2,
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: '#7b2ff7',
+                          borderWidth: 2,
+                        },
+                      }}
                     >
                       <MenuItem value="">All Statuses</MenuItem>
                       {uniqueStatuses.map(status => (
@@ -674,11 +824,17 @@ const ProjectList = () => {
                 {/* Clear Filters Button */}
                 <Grid item xs={12}>
                   <Button
-                    variant="outlined"
+                    variant="contained"
                     startIcon={<Clear />}
                     onClick={clearAllFilters}
                     disabled={!hasActiveFilters}
-                    sx={{ borderRadius: 2 }}
+                    sx={{ 
+                      borderRadius: 2,
+                      background: hasActiveFilters ? 'linear-gradient(135deg, #7b2ff7 0%, #f107a3 100%)' : undefined,
+                      '&:hover': hasActiveFilters ? {
+                        background: 'linear-gradient(135deg, #6a11cb 0%, #d6068a 100%)',
+                      } : undefined
+                    }}
                   >
                     Clear All Filters
                   </Button>
@@ -690,9 +846,18 @@ const ProjectList = () => {
 
         {/* Projects Grid/Cards View */}
         {(!filteredProjects || filteredProjects.length === 0) ? (
-          <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 2 }}>
-            <Engineering sx={{ fontSize: 80, color: 'grey.400', mb: 2 }} />
-            <Typography variant="h5" color="textSecondary" gutterBottom>
+          <Paper 
+            elevation={2}
+            sx={{ 
+              p: 6, 
+              textAlign: 'center', 
+              borderRadius: 3, 
+              bgcolor: 'white',
+              boxShadow: '0 4px 20px rgba(106, 17, 203, 0.2)'
+            }}
+          >
+            <Engineering sx={{ fontSize: 80, color: '#e0d4ff', mb: 2 }} />
+            <Typography variant="h5" sx={{ color: '#6a11cb' }} gutterBottom>
               {(!projects || projects.length === 0)
                 ? "No projects found" 
                 : hasActiveFilters 

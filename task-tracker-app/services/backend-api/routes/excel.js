@@ -8,6 +8,7 @@ const StructuralElement = require('../models/StructuralElement');
 const Task = require('../models/Task');
 const Job = require('../models/Job');
 const { auth } = require('../middleware/auth');
+const { addExcelJob, getJobStatus } = require('../utils/queue');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -449,24 +450,6 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
   console.log('File uploaded:', !!req.file);
   console.log('User:', req.user.email);
   
-  // Generate session ID for progress tracking
-  const sessionId = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
-  // Initialize progress tracking
-  const updateProgress = (stage, progress, message, elementsProcessed = 0, totalElements = 0, jobsCreated = 0) => {
-    uploadProgress.set(sessionId, { 
-      stage, 
-      progress, 
-      message, 
-      elementsProcessed, 
-      totalElements,
-      jobsCreated,
-      timestamp: new Date().toISOString()
-    });
-  };
-  
-  updateProgress('starting', 0, 'Starting upload process...');
-  
   try {
     const { projectId } = req.params;
     
@@ -485,197 +468,24 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
       return res.status(400).json({ message: 'No Excel file uploaded' });
     }
 
-    updateProgress('parsing', 10, 'Parsing Excel file...');
-    
-    // Parse Excel file
-    const excelData = parseExcelFile(req.file.path);
-    
-    if (!excelData || excelData.length === 0) {
-      updateProgress('error', 0, 'Excel file is empty or invalid');
-      return res.status(400).json({ message: 'Excel file is empty or invalid' });
-    }
-    
-    updateProgress('validating', 20, `Processing ${excelData.length} rows...`, 0, excelData.length);
-
-    // Transform and validate data
-    const structuralElements = [];
-    const errors = [];
-    
-    console.log('Processing Excel data:', {
-      totalRows: excelData.length,
-      firstRow: excelData[0]
-    });
-    
-    for (let i = 0; i < excelData.length; i++) {
-      // Update progress every 10 rows or on last row
-      if (i % 10 === 0 || i === excelData.length - 1) {
-        const validationProgress = 20 + (i / excelData.length) * 30; // 20-50% for validation
-        updateProgress('validating', validationProgress, `Validating row ${i + 1} of ${excelData.length}`, i, excelData.length);
-      }
-      
-      try {
-        const transformedData = transformExcelRow(excelData[i], projectId, req.user.id, project);
-        
-        console.log(`Row ${i + 1} transformed:`, transformedData);
-        
-        // Basic validation
-        if (!transformedData.structureNumber) {
-          console.log(`Row ${i + 2} failed validation: missing structureNumber`);
-          errors.push({
-            row: i + 2,
-            message: 'Structure Number is required'
-          });
-          continue;
-        }
-        
-        structuralElements.push(transformedData);
-      } catch (error) {
-        console.log(`Row ${i + 2} error:`, error.message);
-        errors.push({
-          row: i + 2,
-          message: error.message
-        });
-      }
-    }
-    
-    console.log('Validation complete:', {
-      validElements: structuralElements.length,
-      errors: errors.length
+    // Add job to queue for background processing
+    const job = await addExcelJob({
+      filePath: req.file.path,
+      projectId,
+      userId: req.user.id,
+      userEmail: req.user.email,
+      filename: req.file.originalname,
+      priority: req.user.role === 'admin' ? 1 : 2, // Admin uploads get higher priority
     });
 
-    if (errors.length > 0 && structuralElements.length === 0) {
-      return res.status(400).json({ 
-        message: 'All rows contain errors', 
-        errors: errors.slice(0, 10) // Limit error messages
-      });
-    }
+    console.log(`✅ Excel upload queued with job ID: ${job.id}`);
 
-    updateProgress('saving', 50, `Saving ${structuralElements.length} elements...`, 0, structuralElements.length);
-    
-    // Save structural elements to database
-    let savedCount = 0;
-    let duplicateCount = 0;
-    let totalJobsCreated = 0;
-    
-    console.log(`Attempting to save ${structuralElements.length} elements`);
-    
-    for (let idx = 0; idx < structuralElements.length; idx++) {
-      const elementData = structuralElements[idx];
-      
-      // Update progress every element or every 5 elements for large uploads
-      const shouldUpdateProgress = structuralElements.length <= 50 || idx % 5 === 0 || idx === structuralElements.length - 1;
-      if (shouldUpdateProgress) {
-        const saveProgress = 50 + (idx / structuralElements.length) * 40; // 50-90% for saving
-        const jobMessage = totalJobsCreated > 0 ? ` & creating Fire Proofing jobs (${totalJobsCreated} created)` : '';
-        updateProgress('saving', saveProgress, `Processing element ${idx + 1} of ${structuralElements.length}${jobMessage}`, idx, structuralElements.length, totalJobsCreated);
-      }
-      try {
-        console.log('Saving element:', elementData.structureNumber);
-        
-        // Check for existing element (by structure number within project)
-        const existingElement = await StructuralElement.findOne({
-          project: projectId,
-          structureNumber: elementData.structureNumber
-        });
-        
-        if (existingElement) {
-          // Compare all data fields to check if it's truly a duplicate
-          const fieldsToCompare = [
-            'serialNo', 'drawingNo', 'level', 'memberType', 'gridNo', 'partMarkNo', 
-            'sectionSizes', 'lengthMm', 'qty', 'sectionDepthMm', 'flangeWidthMm',
-            'webThicknessMm', 'flangeThicknessMm', 'fireproofingThickness', 'surfaceAreaSqm', 'fireProofingWorkflow'
-          ];
-          
-          let isDuplicate = true;
-          for (const field of fieldsToCompare) {
-            const existingValue = existingElement[field];
-            const newValue = elementData[field];
-            
-            // Convert to string for comparison, handling null/undefined
-            const existingStr = (existingValue == null ? '' : String(existingValue)).trim();
-            const newStr = (newValue == null ? '' : String(newValue)).trim();
-            
-            if (existingStr !== newStr) {
-              isDuplicate = false;
-              console.log(`Field ${field} differs: "${existingStr}" vs "${newStr}"`);
-              break;
-            }
-          }
-          
-          if (isDuplicate) {
-            console.log('True duplicate found (all fields match):', elementData.structureNumber);
-            duplicateCount++;
-            continue;
-          } else {
-            console.log('Data different but same structure number, creating new record:', elementData.structureNumber);
-            // Don't skip - create new record even if structure number exists but data is different
-          }
-        }
-        
-        const structuralElement = new StructuralElement(elementData);
-        const saved = await structuralElement.save();
-        console.log('Successfully saved:', saved._id);
-        
-        // Create Fire Proofing Workflow jobs if workflow is assigned
-        if (saved.fireProofingWorkflow) {
-          try {
-            const createdJobs = await createFireProofingJobs(saved, req.user.id);
-            totalJobsCreated += createdJobs.length;
-            console.log(`Created ${createdJobs.length} jobs for element ${saved.structureNumber}`);
-          } catch (jobError) {
-            console.error(`Error creating jobs for ${saved.structureNumber}:`, jobError);
-          }
-        }
-        
-        savedCount++;
-      } catch (error) {
-        console.log('Save error for element:', elementData.structureNumber, error.message);
-        errors.push({
-          row: `Element ${elementData.structureNumber}`,
-          message: error.message
-        });
-      }
-    }
-    
-    console.log('Save process complete:', {
-      saved: savedCount,
-      duplicates: duplicateCount,
-      errors: errors.length
-    });
-
-    // Clean up uploaded file
-    try {
-      fs.unlinkSync(req.file.path);
-    } catch (error) {
-      console.error('Error deleting uploaded file:', error);
-    }
-
-    // Update project with structural elements count
-    await Task.findByIdAndUpdate(projectId, {
-      $inc: { structuralElementsCount: savedCount }
-    });
-
-    const completionMessage = totalJobsCreated > 0 
-      ? `Successfully processed ${savedCount} elements & created ${totalJobsCreated} Fire Proofing Workflow jobs`
-      : `Successfully processed ${savedCount} elements`;
-    updateProgress('completed', 100, completionMessage, savedCount, structuralElements.length, totalJobsCreated);
-    
-    // Clean up progress after 5 minutes
-    setTimeout(() => {
-      uploadProgress.delete(sessionId);
-    }, 5 * 60 * 1000);
-
+    // Return immediately with job ID for progress tracking
     res.json({
-      message: 'Excel file processed successfully',
-      sessionId: sessionId,
-      summary: {
-        totalRows: excelData.length,
-        savedElements: savedCount,
-        duplicateElements: duplicateCount,
-        errors: errors.length,
-        jobsCreated: totalJobsCreated
-      },
-      errors: errors.slice(0, 5) // Return first 5 errors if any
+      message: 'Excel file uploaded successfully and queued for processing',
+      jobId: job.id,
+      status: 'queued',
+      filename: req.file.originalname
     });
 
   } catch (error) {
@@ -694,6 +504,22 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
       message: 'Error processing Excel file', 
       error: error.message 
     });
+  }
+});
+// Get job status endpoint for progress tracking
+router.get('/job-status/:jobId', auth, async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const status = await getJobStatus(jobId);
+    
+    if (!status) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+    
+    res.json(status);
+  } catch (error) {
+    console.error('Error fetching job status:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 

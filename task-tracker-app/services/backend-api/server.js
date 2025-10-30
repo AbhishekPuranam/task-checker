@@ -8,6 +8,7 @@ const rateLimit = require('express-rate-limit');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
+const { createExcelWorker } = require('./workers/excelProcessor');
 
 // Load environment variables
 dotenv.config();
@@ -63,6 +64,9 @@ app.use(cors({
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files for uploads (avatars, etc.)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Connect to MongoDB with retry logic and persistent connection
 const connectWithRetry = () => {
@@ -206,8 +210,33 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
+// Start Excel processing worker
+let excelWorker;
+try {
+  excelWorker = createExcelWorker();
+  console.log('✅ Excel processing worker started successfully');
+} catch (error) {
+  console.error('❌ Failed to start Excel worker:', error.message);
+  console.warn('⚠️  Excel upload will not work in background mode');
+}
+
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  if (excelWorker) {
+    await excelWorker.close();
+  }
+  server.close(() => {
+    console.log('HTTP server closed');
+    mongoose.connection.close().then(() => {
+      console.log('MongoDB connection closed');
+      process.exit(0);
+    });
+  });
 });
 
 module.exports = { app, io };

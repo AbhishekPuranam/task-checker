@@ -95,7 +95,7 @@ const structuralElementSchema = new mongoose.Schema({
   },
   siteLocation: {
     type: String,
-    required: true
+    required: false
   },
   // Additional notes
   notes: {
