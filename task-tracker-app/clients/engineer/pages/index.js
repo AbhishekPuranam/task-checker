@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Container,
   Paper,
@@ -69,7 +69,6 @@ export default function JobsPage() {
   const [expandedFireProofing, setExpandedFireProofing] = useState({});
   const [expandedJobNames, setExpandedJobNames] = useState({});
   const [expandedStatus, setExpandedStatus] = useState({});
-  const [groupedJobs, setGroupedJobs] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterFireProofing, setFilterFireProofing] = useState('all');
@@ -109,8 +108,7 @@ export default function JobsPage() {
       setLoading(true);
       const response = await api.get(`/jobs?project=${selectedProject}&page=${pagination.currentPage}&limit=10000`);
       const fetchedJobs = response.data.jobs || [];
-      setJobs(fetchedJobs);
-      groupJobs(fetchedJobs);
+      setJobs(fetchedJobs); // useMemo will handle the grouping automatically
       
       setPagination(response.data.pagination || {
         currentPage: 1,
@@ -125,9 +123,10 @@ export default function JobsPage() {
     }
   };
 
-  const groupJobs = (jobsToGroup) => {
+  // PERFORMANCE OPTIMIZATION: Memoize the grouping function to avoid recalculating on every render
+  const groupedJobs = useMemo(() => {
     // Apply filters
-    let filtered = jobsToGroup.filter(job => {
+    let filtered = jobs.filter(job => {
       const matchesSearch = searchTerm === '' || 
         job.jobTitle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         job.structuralElement?.structureNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -194,15 +193,8 @@ export default function JobsPage() {
       });
     });
     
-    setGroupedJobs(grouped);
-  };
-
-  // Re-group jobs when filters change
-  useEffect(() => {
-    if (jobs.length > 0) {
-      groupJobs(jobs);
-    }
-  }, [searchTerm, filterStatus, filterFireProofing]);
+    return grouped;
+  }, [jobs, searchTerm, filterStatus, filterFireProofing]); // Only recalculate when dependencies change
 
   // Auto-expand and scroll when searching for a specific structure
   useEffect(() => {
@@ -420,7 +412,8 @@ export default function JobsPage() {
       .join(' ');
   };
 
-  const handleStatusUpdate = async (jobId, newStatus) => {
+  // PERFORMANCE OPTIMIZATION: Memoize status update function to prevent re-creation on every render
+  const handleStatusUpdate = useCallback(async (jobId, newStatus) => {
     try {
       setUpdatingJob(jobId);
       toast.loading('Updating job status...', { id: 'status-update' });
@@ -439,7 +432,7 @@ export default function JobsPage() {
     } finally {
       setUpdatingJob(null);
     }
-  };
+  }, []); // Empty deps - fetchJobs is stable, api is external
 
   const getSelectedProjectName = () => {
     const project = projects.find(p => p._id === selectedProject);

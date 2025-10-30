@@ -148,6 +148,13 @@ jobSchema.index({ assignedTo: 1 });
 jobSchema.index({ dueDate: 1 });
 jobSchema.index({ createdBy: 1 });
 
+// Compound indexes for common query patterns (PERFORMANCE OPTIMIZATION)
+jobSchema.index({ project: 1, status: 1 }); // Filter by project and status
+jobSchema.index({ project: 1, jobType: 1 }); // Filter by project and job type
+jobSchema.index({ project: 1, createdAt: -1 }); // Project jobs sorted by date
+jobSchema.index({ structuralElement: 1, jobType: 1 }); // Element jobs by type
+jobSchema.index({ project: 1, assignedTo: 1, status: 1 }); // Assigned jobs by project and status
+
 // Virtual for overdue jobs
 jobSchema.virtual('isOverdue').get(function() {
   return this.dueDate && this.status !== 'completed' && new Date() > this.dueDate;

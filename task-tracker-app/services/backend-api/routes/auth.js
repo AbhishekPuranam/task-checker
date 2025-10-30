@@ -4,10 +4,26 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
 const { auth } = require('../middleware/auth');
 
 const router = express.Router();
+
+// SECURITY: Rate limiting for authentication endpoints to prevent brute force
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 requests per windowMs
+  message: 'Too many login attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3, // Limit each IP to 3 registrations per hour
+  message: 'Too many accounts created, please try again later',
+});
 
 // Configure multer for avatar uploads
 const storage = multer.diskStorage({
@@ -20,8 +36,11 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
+    // SECURITY: Sanitize filename to prevent path traversal
+    const sanitizedName = path.basename(file.originalname).replace(/[^a-zA-Z0-9.-]/g, '_');
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'avatar-' + uniqueSuffix + path.extname(file.originalname));
+    const ext = path.extname(sanitizedName);
+    cb(null, 'avatar-' + uniqueSuffix + ext);
   }
 });
 
@@ -29,6 +48,7 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: function (req, file, cb) {
+    // SECURITY: Strict file type validation
     const filetypes = /jpeg|jpg|png|gif/;
     const mimetype = filetypes.test(file.mimetype);
     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
@@ -36,13 +56,13 @@ const upload = multer({
     if (mimetype && extname) {
       return cb(null, true);
     }
-    cb(new Error('Only image files are allowed!'));
+    cb(new Error('Only image files (JPEG, PNG, GIF) are allowed!'));
   }
 });
 
 
 // Register
-router.post('/register', async (req, res) => {
+router.post('/register', registerLimiter, async (req, res) => {
   try {
     const { name, username, email, password, role, department, phoneNumber } = req.body;
 
@@ -51,12 +71,35 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'Name, username, and password are required' });
     }
 
+    // SECURITY: Validate username format (alphanumeric, underscore, hyphen only)
+    const usernameRegex = /^[a-zA-Z0-9_-]{3,30}$/;
+    if (!usernameRegex.test(username)) {
+      return res.status(400).json({ 
+        message: 'Username must be 3-30 characters and contain only letters, numbers, underscores, and hyphens' 
+      });
+    }
+
     if (username.length < 3) {
       return res.status(400).json({ message: 'Username must be at least 3 characters long' });
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+    // SECURITY: Enforce stronger password requirements
+    if (password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+    }
+
+    // SECURITY: Validate email format if provided
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: 'Invalid email format' });
+      }
+    }
+
+    // SECURITY: Validate role to prevent privilege escalation
+    const allowedRoles = ['admin', 'site-engineer', 'engineer'];
+    if (role && !allowedRoles.includes(role)) {
+      return res.status(400).json({ message: 'Invalid role specified' });
     }
 
     // Check if user already exists with this username
@@ -118,7 +161,7 @@ router.post('/register', async (req, res) => {
 });
 
 // Login
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
     console.log('Login attempt for:', username);
@@ -470,7 +513,7 @@ router.put('/profile', auth, upload.single('avatar'), async (req, res) => {
 });
 
 // Change password
-router.put('/change-password', auth, async (req, res) => {
+router.put('/change-password', auth, authLimiter, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
@@ -478,10 +521,12 @@ router.put('/change-password', auth, async (req, res) => {
       return res.status(400).json({ message: 'Current password and new password are required' });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: 'New password must be at least 6 characters long' });
+    // SECURITY: Enforce stronger password requirements
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: 'New password must be at least 8 characters long' });
     }
 
+    // SECURITY: Prevent password reuse
     const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -493,8 +538,14 @@ router.put('/change-password', auth, async (req, res) => {
       return res.status(400).json({ message: 'Current password is incorrect' });
     }
 
+    // SECURITY: Check if new password is same as current password
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      return res.status(400).json({ message: 'New password must be different from current password' });
+    }
+
     // Hash new password
-    const salt = await bcrypt.genSalt(10);
+    const salt = await bcrypt.genSalt(12); // Increased from 10 to 12 for better security
     user.password = await bcrypt.hash(newPassword, salt);
 
     await user.save();

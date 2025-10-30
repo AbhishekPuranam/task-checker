@@ -33,7 +33,26 @@ const io = socketIo(server, {
 });
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  },
+  frameguard: {
+    action: 'deny'
+  },
+  noSniff: true,
+  xssFilter: true
+}));
 
 // Cookie parser middleware
 app.use(cookieParser());
@@ -62,8 +81,17 @@ app.use(cors({
 }));
 
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ 
+  limit: '10mb',
+  // SECURITY: Prevent prototype pollution
+  reviver: (key, value) => {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      return undefined;
+    }
+    return value;
+  }
+}));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Serve static files for uploads (avatars, etc.)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

@@ -15,7 +15,13 @@ const auth = async (req, res, next) => {
       return res.status(401).json({ message: 'Access denied. No token provided.' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-jwt-secret-key');
+    // SECURITY: Ensure JWT_SECRET is set
+    if (!process.env.JWT_SECRET) {
+      console.error('CRITICAL: JWT_SECRET environment variable is not set!');
+      return res.status(500).json({ message: 'Server configuration error' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     // Handle both 'userId' and 'id' for backwards compatibility
     const userId = decoded.userId || decoded.id;
     const user = await User.findById(userId).select('-password');
