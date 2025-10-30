@@ -304,6 +304,7 @@ router.post('/', auth, async (req, res) => {
 // Get all jobs (with filters)
 router.get('/', auth, async (req, res) => {
   try {
+    const startTime = Date.now();
     const {
       project,
       structuralElement,
@@ -346,9 +347,13 @@ router.get('/', auth, async (req, res) => {
       .populate('createdBy', 'name email')
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit));
+      .limit(parseInt(limit))
+      .lean(); // Use lean() for faster queries when not modifying documents
 
     const totalJobs = await Job.countDocuments(filter);
+    
+    const queryTime = Date.now() - startTime;
+    console.log(`Jobs query completed in ${queryTime}ms - Found ${jobs.length} jobs (total: ${totalJobs})`);
 
     res.json({
       jobs,
@@ -362,6 +367,49 @@ router.get('/', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching jobs:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Get job statistics for a project (fast aggregation)
+router.get('/stats/:projectId', auth, async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    
+    const stats = await Job.aggregate([
+      { $match: { project: require('mongoose').Types.ObjectId(projectId) } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          completed: {
+            $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] }
+          },
+          not_applicable: {
+            $sum: { $cond: [{ $eq: ['$status', 'not_applicable'] }, 1, 0] }
+          },
+          pending: {
+            $sum: {
+              $cond: [
+                {
+                  $or: [
+                    { $eq: ['$status', 'pending'] },
+                    { $eq: ['$status', 'in_progress'] },
+                    { $eq: ['$status', null] }
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]);
+
+    res.json(stats[0] || { total: 0, completed: 0, not_applicable: 0, pending: 0 });
+  } catch (error) {
+    console.error('Error fetching job stats:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -633,17 +681,27 @@ router.put('/:id', auth, async (req, res) => {
   try {
     const jobId = req.params.id;
     const updates = req.body;
+    
+    console.log(`=== UPDATE JOB DEBUG: jobId=${jobId}, updates=`, JSON.stringify(updates));
+    console.log(`=== UPDATE JOB DEBUG: user=`, JSON.stringify({ id: req.user.id, role: req.user.role }));
 
     // Find the job
     const job = await Job.findById(jobId);
     if (!job) {
+      console.log(`=== UPDATE JOB DEBUG: Job not found for jobId=${jobId}`);
       return res.status(404).json({ message: 'Job not found' });
     }
+    
+    console.log(`=== UPDATE JOB DEBUG: Found job, createdBy=${job.createdBy}, assignedTo=${job.assignedTo}`);
 
-    // Check permissions - only creator, assigned user, or admin can update
-    if (req.user.role !== 'admin' && 
-        job.createdBy.toString() !== req.user.id && 
-        (!job.assignedTo || job.assignedTo.toString() !== req.user.id)) {
+    // Check permissions - admin, creator, assigned user, or site-engineer can update
+    const canUpdate = req.user.role === 'admin' || 
+                     req.user.role === 'site-engineer' ||
+                     job.createdBy.toString() === req.user.id || 
+                     (job.assignedTo && job.assignedTo.toString() === req.user.id);
+    
+    if (!canUpdate) {
+      console.log(`=== UPDATE JOB DEBUG: Permission denied for user ${req.user.id}`);
       return res.status(403).json({ message: 'Not authorized to update this job' });
     }
 
@@ -674,9 +732,11 @@ router.put('/:id', auth, async (req, res) => {
       { path: 'qualityCheckedBy', select: 'name email' }
     ]);
 
+    console.log(`=== UPDATE JOB DEBUG: Job updated successfully, id=${updatedJob._id}, status=${updatedJob.status}`);
     res.json(updatedJob);
   } catch (error) {
     console.error('Error updating job:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });

@@ -1,0 +1,1007 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Container,
+  Paper,
+  Typography,
+  Box,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Button,
+  Grid,
+  Card,
+  CardContent,
+  Alert,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  AppBar,
+  Toolbar,
+  IconButton,
+  TextField,
+  Chip,
+  Collapse,
+  Badge,
+  Divider,
+} from '@mui/material';
+import {
+  CheckCircle,
+  Cancel,
+  Build,
+  LogoutOutlined,
+  ExpandMore,
+  ExpandLess,
+  Search,
+  FilterList,
+  GridOn,
+  LocalFireDepartment,
+  ClearAll,
+} from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext';
+import api from '../utils/api';
+import toast from 'react-hot-toast';
+
+export default function JobsPage() {
+  const { user, logout } = useAuth();
+  const [jobs, setJobs] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [selectedProject, setSelectedProject] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [updatingJob, setUpdatingJob] = useState(null);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalJobs: 0
+  });
+  const [stats, setStats] = useState({
+    total: 0,
+    pending: 0,
+    completed: 0,
+    not_applicable: 0
+  });
+  const [expandedGrids, setExpandedGrids] = useState({});
+  const [expandedFireProofing, setExpandedFireProofing] = useState({});
+  const [expandedStatus, setExpandedStatus] = useState({});
+  const [groupedJobs, setGroupedJobs] = useState({});
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterFireProofing, setFilterFireProofing] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  useEffect(() => {
+    if (selectedProject) {
+      fetchJobs();
+      fetchStats();
+    }
+  }, [selectedProject, pagination.currentPage]);
+
+  const fetchProjects = async () => {
+    try {
+      const response = await api.get('/projects');
+      setProjects(response.data.tasks || []);
+      // Auto-select first project if available
+      if (response.data.tasks && response.data.tasks.length > 0) {
+        setSelectedProject(response.data.tasks[0]._id);
+      }
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      toast.error('Failed to fetch projects');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchJobs = async () => {
+    if (!selectedProject) return;
+    
+    try {
+      setLoading(true);
+      const response = await api.get(`/jobs?project=${selectedProject}&page=${pagination.currentPage}&limit=10000`);
+      const fetchedJobs = response.data.jobs || [];
+      setJobs(fetchedJobs);
+      groupJobs(fetchedJobs);
+      
+      setPagination(response.data.pagination || {
+        currentPage: 1,
+        totalPages: 1,
+        totalJobs: 0
+      });
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+      toast.error('Failed to fetch jobs');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const groupJobs = (jobsToGroup) => {
+    // Apply filters
+    let filtered = jobsToGroup.filter(job => {
+      const matchesSearch = searchTerm === '' || 
+        job.jobTitle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        job.structuralElement?.structureNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        job.structuralElement?.gridNo?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = filterStatus === 'all' || 
+        (filterStatus === 'pending' && (!job.status || job.status === 'pending' || job.status === 'in_progress')) ||
+        job.status === filterStatus;
+      
+      // Fire proofing filter
+      let matchesFireProofing = true;
+      if (filterFireProofing !== 'all') {
+        // Match based on fireProofingType or jobType field
+        const fireProofingType = (job.fireProofingType || job.jobType || '').toLowerCase();
+        matchesFireProofing = fireProofingType === filterFireProofing.toLowerCase();
+      }
+      
+      return matchesSearch && matchesStatus && matchesFireProofing;
+    });
+
+    // Group filtered jobs by grid → fireproofing type → status
+    const grouped = {};
+    filtered.forEach(job => {
+      const gridNo = job.structuralElement?.gridNo || 'No Grid';
+      
+      // Use the actual fire proofing type from the job
+      let fireProofingType = job.fireProofingType || job.jobType || 'other';
+      
+      // Determine status group
+      let statusGroup = job.status || 'pending';
+      if (!job.status || job.status === 'in_progress') {
+        statusGroup = 'pending';
+      }
+      
+      // Create nested structure
+      if (!grouped[gridNo]) {
+        grouped[gridNo] = {};
+      }
+      
+      if (!grouped[gridNo][fireProofingType]) {
+        grouped[gridNo][fireProofingType] = {};
+      }
+      
+      if (!grouped[gridNo][fireProofingType][statusGroup]) {
+        grouped[gridNo][fireProofingType][statusGroup] = [];
+      }
+      
+      grouped[gridNo][fireProofingType][statusGroup].push(job);
+    });
+    
+    // Sort jobs within each group by step number
+    Object.keys(grouped).forEach(gridNo => {
+      Object.keys(grouped[gridNo]).forEach(fireProofingType => {
+        Object.keys(grouped[gridNo][fireProofingType]).forEach(statusGroup => {
+          grouped[gridNo][fireProofingType][statusGroup].sort((a, b) => (a.stepNumber || 0) - (b.stepNumber || 0));
+        });
+      });
+    });
+    
+    setGroupedJobs(grouped);
+  };
+
+  // Re-group jobs when filters change
+  useEffect(() => {
+    if (jobs.length > 0) {
+      groupJobs(jobs);
+    }
+  }, [searchTerm, filterStatus, filterFireProofing]);
+
+  // Auto-expand and scroll when searching for a specific structure
+  useEffect(() => {
+    if (searchTerm && jobs.length > 0) {
+      // Find the first matching job
+      const matchingJob = jobs.find(job => 
+        job.structuralElement?.structureNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        job.jobTitle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        job.structuralElement?.gridNo?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+
+      if (matchingJob) {
+        const gridNo = matchingJob.structuralElement?.gridNo || 'No Grid';
+        
+        // Determine fire proofing type
+        let fireProofingType = 'other';
+        if (matchingJob.jobType === 'fireproofing') {
+          const jobTitle = matchingJob.jobTitle?.toLowerCase() || '';
+          if (jobTitle.includes('preparation') || jobTitle.includes('prep') || jobTitle.includes('surface')) {
+            fireProofingType = 'preparation';
+          } else if (jobTitle.includes('application') || jobTitle.includes('apply') || jobTitle.includes('spray')) {
+            fireProofingType = 'application';
+          } else if (jobTitle.includes('inspection') || jobTitle.includes('inspect') || jobTitle.includes('check') || jobTitle.includes('measure')) {
+            fireProofingType = 'inspection';
+          } else if (jobTitle.includes('curing') || jobTitle.includes('cure') || jobTitle.includes('dry')) {
+            fireProofingType = 'curing';
+          }
+        }
+
+        // Determine status group
+        let statusGroup = matchingJob.status || 'pending';
+        if (!matchingJob.status || matchingJob.status === 'in_progress') {
+          statusGroup = 'pending';
+        }
+
+        // Auto-expand all levels
+        setExpandedGrids(prev => ({ ...prev, [gridNo]: true }));
+        setExpandedFireProofing(prev => ({ ...prev, [`${gridNo}-${fireProofingType}`]: true }));
+        setExpandedStatus(prev => ({ ...prev, [`${gridNo}-${fireProofingType}-${statusGroup}`]: true }));
+
+        // Scroll to element after a brief delay to allow rendering
+        setTimeout(() => {
+          const element = document.getElementById(`job-${matchingJob._id}`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Highlight the row briefly
+            element.style.backgroundColor = '#ffe6f0';
+            setTimeout(() => {
+              element.style.backgroundColor = '';
+            }, 2000);
+          }
+        }, 300);
+      }
+    }
+  }, [searchTerm, jobs]);
+
+  const fetchStats = async () => {
+    if (!selectedProject) return;
+    
+    try {
+      const response = await api.get(`/jobs/stats/${selectedProject}`);
+      setStats(response.data || {
+        total: 0,
+        pending: 0,
+        completed: 0,
+        not_applicable: 0
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  };
+
+  const toggleGrid = (gridKey) => {
+    setExpandedGrids(prev => ({
+      ...prev,
+      [gridKey]: !prev[gridKey]
+    }));
+  };
+
+  const toggleFireProofing = (gridKey, fpType) => {
+    const key = `${gridKey}-${fpType}`;
+    setExpandedFireProofing(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
+  const toggleStatus = (gridKey, fpType, status) => {
+    const key = `${gridKey}-${fpType}-${status}`;
+    setExpandedStatus(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
+  const getWorkflowDisplayName = (jobType) => {
+    const names = {
+      fireproofing: 'Fire Proofing Workflow',
+      formwork: 'Formwork',
+      rebar: 'Rebar',
+      concreting: 'Concreting',
+      preparation: '🔧 Surface Preparation',
+      application: '🔥 Application/Spray',
+      inspection: '📏 Inspection/Measurement',
+      curing: '⏱️ Curing/Drying',
+      other: 'Other'
+    };
+    return names[jobType] || jobType;
+  };
+
+  const getStatusDisplayName = (status) => {
+    const names = {
+      pending: '⏳ Pending',
+      completed: '✅ Completed',
+      not_applicable: '🚫 Non-clearance'
+    };
+    return names[status] || status;
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      pending: 'warning.main',
+      completed: 'success.main',
+      not_applicable: 'error.main'
+    };
+    return colors[status] || 'grey.500';
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setFilterStatus('all');
+    setFilterFireProofing('all');
+  };
+
+  const expandAllGrids = () => {
+    const allExpanded = {};
+    const allFPExpanded = {};
+    const allStatusExpanded = {};
+    
+    Object.keys(groupedJobs).forEach(gridNo => {
+      allExpanded[gridNo] = true;
+      
+      Object.keys(groupedJobs[gridNo]).forEach(fpType => {
+        const fpKey = `${gridNo}-${fpType}`;
+        allFPExpanded[fpKey] = true;
+        
+        Object.keys(groupedJobs[gridNo][fpType]).forEach(status => {
+          const statusKey = `${gridNo}-${fpType}-${status}`;
+          allStatusExpanded[statusKey] = true;
+        });
+      });
+    });
+    
+    setExpandedGrids(allExpanded);
+    setExpandedFireProofing(allFPExpanded);
+    setExpandedStatus(allStatusExpanded);
+  };
+
+  const collapseAllGrids = () => {
+    setExpandedGrids({});
+    setExpandedFireProofing({});
+    setExpandedStatus({});
+  };
+
+  const getGridStats = (gridNo) => {
+    const gridData = groupedJobs[gridNo] || {};
+    const gridJobs = Object.values(gridData).flatMap(fpType => Object.values(fpType).flat());
+    const total = gridJobs.length;
+    const completed = gridJobs.filter(j => j.status === 'completed').length;
+    const pending = gridJobs.filter(j => !j.status || j.status === 'pending' || j.status === 'in_progress').length;
+    const notApplicable = gridJobs.filter(j => j.status === 'not_applicable').length;
+    return { total, completed, pending, notApplicable };
+  };
+
+  const getFireProofingType = (job) => {
+    // Return the fire proofing type from the job
+    if (job.fireProofingType) {
+      // Format the type nicely (replace underscores with spaces and capitalize)
+      return job.fireProofingType
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    }
+    
+    // Fallback to job type if fire proofing type is not available
+    if (job.jobType) {
+      return job.jobType
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    }
+    
+    return 'N/A';
+  };
+
+  const handleStatusUpdate = async (jobId, newStatus) => {
+    try {
+      setUpdatingJob(jobId);
+      toast.loading('Updating job status...', { id: 'status-update' });
+      
+      await api.put(`/jobs/${jobId}`, {
+        status: newStatus,
+        progressPercentage: newStatus === 'completed' ? 100 : 
+                           newStatus === 'not_applicable' ? 0 : 0
+      });
+
+      toast.success('Job status updated successfully!', { id: 'status-update' });
+      fetchJobs(); // Refresh the list
+    } catch (error) {
+      console.error('Error updating job status:', error);
+      toast.error('Failed to update job status', { id: 'status-update' });
+    } finally {
+      setUpdatingJob(null);
+    }
+  };
+
+  const getSelectedProjectName = () => {
+    const project = projects.find(p => p._id === selectedProject);
+    return project ? project.name || project.title : '';
+  };
+
+  if (loading && !selectedProject) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+          <CircularProgress />
+        </Box>
+      </Container>
+    );
+  }
+
+  return (
+    <Box sx={{ flexGrow: 1, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', minHeight: '100vh' }}>
+      {/* App Bar */}
+      <AppBar position="static" sx={{ background: 'linear-gradient(135deg, #6a11cb 0%, #2575fc 100%)' }}>
+        <Toolbar>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            🏗️ Site Engineer Portal
+          </Typography>
+          <Typography variant="body1" sx={{ mr: 2 }}>
+            {user?.name}
+          </Typography>
+          <IconButton color="inherit" onClick={logout}>
+            <LogoutOutlined />
+          </IconButton>
+        </Toolbar>
+      </AppBar>
+
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        {/* Header */}
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: 5, 
+            mb: 3, 
+            background: 'white', 
+            color: '#6a11cb',
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(106, 17, 203, 0.3)'
+          }}
+        >
+          <Box sx={{ textAlign: 'center' }}>
+            <Build sx={{ fontSize: 60, mb: 2, color: '#7b2ff7' }} />
+            <Typography variant="h3" component="h1" gutterBottom fontWeight="bold" sx={{ color: '#6a11cb' }}>
+              Hi, {user?.name}! 👋
+            </Typography>
+            <Typography 
+              variant="h5" 
+              sx={{ 
+                opacity: 0.85, 
+                fontStyle: 'italic',
+                mt: 2,
+                fontWeight: 300,
+                color: '#7b2ff7'
+              }}
+            >
+              "We shape our buildings; thereafter they shape us."
+            </Typography>
+          </Box>
+        </Paper>
+
+        {/* Project Selection */}
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: 4, 
+            mb: 3, 
+            borderRadius: 3, 
+            bgcolor: 'white', 
+            boxShadow: '0 4px 20px rgba(106, 17, 203, 0.2)',
+            border: '2px solid transparent',
+            background: 'linear-gradient(white, white) padding-box, linear-gradient(135deg, #7b2ff7 0%, #f107a3 100%) border-box',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+            <Box 
+              sx={{ 
+                width: 48, 
+                height: 48, 
+                borderRadius: 2, 
+                background: 'linear-gradient(135deg, #7b2ff7 0%, #f107a3 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(123, 47, 247, 0.3)'
+              }}
+            >
+              <Typography variant="h5" sx={{ color: 'white' }}>📁</Typography>
+            </Box>
+            <Box>
+              <Typography variant="h5" fontWeight="bold" sx={{ color: '#6a11cb' }}>
+                Select Your Project
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#9D50BB', mt: 0.5 }}>
+                Choose a project to view and manage fire proofing jobs
+              </Typography>
+            </Box>
+          </Box>
+          <FormControl fullWidth>
+            <InputLabel sx={{ 
+              color: '#6a11cb',
+              fontWeight: 500,
+              '&.Mui-focused': {
+                color: '#7b2ff7'
+              }
+            }}>
+              Project Name
+            </InputLabel>
+            <Select
+              value={selectedProject}
+              onChange={(e) => setSelectedProject(e.target.value)}
+              label="Project Name"
+              sx={{
+                borderRadius: 2,
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#e0d4ff',
+                  borderWidth: 2,
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#b794f6',
+                  borderWidth: 2,
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#7b2ff7',
+                  borderWidth: 2,
+                },
+                '& .MuiSelect-select': {
+                  color: '#6a11cb',
+                  fontWeight: 500,
+                  py: 1.5,
+                }
+              }}
+            >
+              {projects.map((project) => (
+                <MenuItem 
+                  key={project._id} 
+                  value={project._id}
+                  sx={{
+                    '&:hover': {
+                      bgcolor: '#f8f7ff'
+                    },
+                    '&.Mui-selected': {
+                      bgcolor: '#e0d4ff',
+                      '&:hover': {
+                        bgcolor: '#d4c5f9'
+                      }
+                    }
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box 
+                      sx={{ 
+                        width: 8, 
+                        height: 8, 
+                        borderRadius: '50%', 
+                        bgcolor: '#7b2ff7' 
+                      }} 
+                    />
+                    <Typography sx={{ color: '#6a11cb', fontWeight: 500 }}>
+                      {project.name || project.title}
+                    </Typography>
+                  </Box>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Paper>
+
+        {selectedProject && (
+          <>
+            {/* Project Name Section */}
+            <Paper 
+              elevation={2} 
+              sx={{ 
+                p: 3, 
+                mb: 3, 
+                bgcolor: 'white',
+                color: '#6a11cb',
+                borderRadius: 2,
+                boxShadow: '0 4px 20px rgba(106, 17, 203, 0.2)'
+              }}
+            >
+              <Typography variant="h4" component="h2" fontWeight="bold">
+                📋 {getSelectedProjectName()}
+              </Typography>
+            </Paper>
+
+            {/* Search and Filter Section */}
+            <Paper elevation={2} sx={{ p: 3, mb: 3, borderRadius: 2, bgcolor: 'white', boxShadow: '0 4px 20px rgba(106, 17, 203, 0.2)' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                  <Search sx={{ color: '#6a11cb' }} />
+                  <Typography variant="h6" sx={{ color: '#6a11cb', fontWeight: 600 }}>Search & Filter</Typography>
+                  {(searchTerm || filterStatus !== 'all' || filterFireProofing !== 'all') && (
+                    <Chip 
+                      label="Filters Active" 
+                      sx={{ 
+                        bgcolor: '#7b2ff7', 
+                        color: 'white',
+                        fontWeight: 500
+                      }}
+                      size="small"
+                      onDelete={clearFilters}
+                    />
+                  )}
+                </Box>
+              </Box>
+              
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    label="Search Jobs"
+                    placeholder="Search by job name, structure no, or grid..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    InputProps={{
+                      startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />
+                    }}
+                  />
+                </Grid>
+                
+                <Grid item xs={12} md={4}>
+                  <FormControl fullWidth>
+                    <InputLabel>Filter by Status</InputLabel>
+                    <Select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      label="Filter by Status"
+                    >
+                      <MenuItem value="all">All Statuses</MenuItem>
+                      <MenuItem value="pending">Pending</MenuItem>
+                      <MenuItem value="completed">Completed</MenuItem>
+                      <MenuItem value="not_applicable">Non-clearance</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                
+                <Grid item xs={12} md={4}>
+                  <FormControl fullWidth>
+                    <InputLabel>Fire Proofing Type Filter</InputLabel>
+                    <Select
+                      value={filterFireProofing}
+                      onChange={(e) => setFilterFireProofing(e.target.value)}
+                      label="Fire Proofing Type Filter"
+                    >
+                      <MenuItem value="all">All Fire Proofing Types</MenuItem>
+                      <MenuItem value="cement_fire_proofing">� Cement Fire Proofing</MenuItem>
+                      <MenuItem value="refinery_fire_proofing">⚡ Refinery Fire Proofing</MenuItem>
+                      <MenuItem value="gypsum_fire_proofing">🧱 Gypsum Fire Proofing</MenuItem>
+                      <MenuItem value="intumescent_coatings">🎨 Intumescent Coatings</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+
+              {Object.keys(groupedJobs).length > 0 && (
+                <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  <Chip 
+                    icon={<GridOn />}
+                    label={`${Object.keys(groupedJobs).length} Grids`} 
+                    sx={{ 
+                      bgcolor: '#e0d4ff',
+                      color: '#6a11cb',
+                      fontWeight: 500,
+                      borderColor: '#7b2ff7'
+                    }}
+                    variant="outlined"
+                  />
+                </Box>
+              )}
+            </Paper>
+
+            {/* Jobs Table */}
+            <Paper elevation={2} sx={{ borderRadius: 2, bgcolor: 'white', boxShadow: '0 4px 20px rgba(106, 17, 203, 0.2)' }}>
+              {loading ? (
+                <Box sx={{ p: 4, textAlign: 'center' }}>
+                  <CircularProgress sx={{ color: '#7b2ff7' }} />
+                </Box>
+              ) : jobs.length === 0 ? (
+                <Box sx={{ p: 4, textAlign: 'center' }}>
+                  <Build sx={{ fontSize: 64, color: '#b794f6', mb: 2 }} />
+                  <Alert severity="info">
+                    No jobs found for this project.
+                  </Alert>
+                </Box>
+              ) : (
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: 'primary.main' }}>
+                        <TableCell sx={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem', width: '50px' }}>
+                          
+                        </TableCell>
+                        <TableCell sx={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                          Grid / Workflow Type
+                        </TableCell>
+                        <TableCell sx={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                          Job Name
+                        </TableCell>
+                        <TableCell sx={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                          Structure No.
+                        </TableCell>
+                        <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                          Current Status
+                        </TableCell>
+                        <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                          Actions
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {Object.keys(groupedJobs).length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                            <FilterList sx={{ fontSize: 64, color: '#b794f6', mb: 2 }} />
+                            <Typography variant="h6" sx={{ color: '#6a11cb' }}>
+                              No jobs match your filters
+                            </Typography>
+                            <Button 
+                              sx={{ 
+                                mt: 2,
+                                borderColor: '#7b2ff7',
+                                color: '#7b2ff7',
+                                '&:hover': {
+                                  borderColor: '#6a11cb',
+                                  bgcolor: '#f8f7ff'
+                                }
+                              }} 
+                              variant="outlined" 
+                              onClick={clearFilters}
+                              startIcon={<ClearAll />}
+                            >
+                              Clear Filters
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        Object.keys(groupedJobs)
+                          .sort((a, b) => {
+                            // Sort by highest pending count
+                            const statsA = getGridStats(a);
+                            const statsB = getGridStats(b);
+                            // Primary sort: pending count (descending)
+                            if (statsB.pending !== statsA.pending) {
+                              return statsB.pending - statsA.pending;
+                            }
+                            // Secondary sort: grid name (ascending)
+                            return a.localeCompare(b);
+                          })
+                          .map((gridNo) => {
+                          const gridStats = getGridStats(gridNo);
+                          return (
+                            <React.Fragment key={gridNo}>
+                              {/* Grid Header Row */}
+                              <TableRow 
+                                sx={{ 
+                                  background: 'white',
+                                  cursor: 'pointer',
+                                  borderLeft: '4px solid #7b2ff7',
+                                  '&:hover': { 
+                                    bgcolor: '#f8f7ff'
+                                  }
+                                }}
+                                onClick={() => toggleGrid(gridNo)}
+                              >
+                                <TableCell sx={{ py: 2 }}>
+                                  <IconButton size="small" sx={{ color: '#7b2ff7' }}>
+                                    {expandedGrids[gridNo] ? <ExpandLess /> : <ExpandMore />}
+                                  </IconButton>
+                                </TableCell>
+                                <TableCell colSpan={5}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      <GridOn sx={{ color: '#7b2ff7' }} />
+                                      <Typography variant="h6" fontWeight="bold" sx={{ color: '#6a11cb' }}>
+                                        Grid: {gridNo}
+                                      </Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                      <Chip 
+                                        label={`${gridStats.total} Total`} 
+                                        size="small" 
+                                        sx={{ bgcolor: '#e0d4ff', color: '#6a11cb', fontWeight: 'bold' }}
+                                      />
+                                      {gridStats.completed > 0 && (
+                                        <Chip 
+                                          label={`${gridStats.completed} Done`} 
+                                          size="small" 
+                                          sx={{ bgcolor: '#d4edda', color: '#155724', fontWeight: 'bold' }}
+                                        />
+                                      )}
+                                      {gridStats.pending > 0 && (
+                                        <Chip 
+                                          label={`${gridStats.pending} Pending`} 
+                                          size="small" 
+                                          sx={{ bgcolor: '#fff3cd', color: '#856404', fontWeight: 'bold' }}
+                                        />
+                                      )}
+                                    </Box>
+                                  </Box>
+                                </TableCell>
+                              </TableRow>
+                          
+                              {/* Jobs for this Grid */}
+                              {expandedGrids[gridNo] && (
+                                <>
+                                  {/* Column Headers for Jobs */}
+                                  <TableRow sx={{ bgcolor: '#f3e8ff' }}>
+                                    <TableCell></TableCell>
+                                    <TableCell sx={{ pl: 4 }}>
+                                      <Typography variant="caption" fontWeight="bold" sx={{ color: '#6a11cb' }}>
+                                        Fire Proofing Type
+                                      </Typography>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Typography variant="caption" fontWeight="bold" sx={{ color: '#6a11cb' }}>
+                                        Job Name
+                                      </Typography>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Typography variant="caption" fontWeight="bold" sx={{ color: '#6a11cb' }}>
+                                        Structure No.
+                                      </Typography>
+                                    </TableCell>
+                                    <TableCell align="center">
+                                      <Typography variant="caption" fontWeight="bold" sx={{ color: '#6a11cb' }}>
+                                        Current Status
+                                      </Typography>
+                                    </TableCell>
+                                    <TableCell align="center">
+                                      <Typography variant="caption" fontWeight="bold" sx={{ color: '#6a11cb' }}>
+                                        Actions
+                                      </Typography>
+                                    </TableCell>
+                                  </TableRow>
+
+                                  {/* Individual Job Rows */}
+                                  {Object.keys(groupedJobs[gridNo]).sort().map((fireProofingType) => {
+                                    return Object.keys(groupedJobs[gridNo][fireProofingType]).sort((a, b) => {
+                                      const order = { pending: 1, completed: 2, not_applicable: 3 };
+                                      return (order[a] || 99) - (order[b] || 99);
+                                    }).map((statusGroup) => {
+                                      return groupedJobs[gridNo][fireProofingType][statusGroup].map((job, index) => (
+                                        <TableRow 
+                                          key={job._id}
+                                          id={`job-${job._id}`}
+                                          sx={{ 
+                                            '&:nth-of-type(odd)': { bgcolor: 'action.hover' },
+                                            '&:hover': { bgcolor: 'primary.light', opacity: 0.8 },
+                                            transition: 'background-color 0.3s ease'
+                                          }}
+                                        >
+                                  <TableCell></TableCell>
+                                  <TableCell sx={{ pl: 4 }}>
+                                    <Typography variant="caption" color="text.secondary" fontWeight="medium">
+                                      {getFireProofingType(job)}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography variant="body2">
+                                      {job.jobTitle}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography variant="body2">
+                                      {job.structuralElement?.structureNumber || 'N/A'}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                                      {job.status === 'completed' && (
+                                        <Box sx={{ 
+                                          px: 1.5, 
+                                          py: 0.5, 
+                                          bgcolor: 'success.light',
+                                          color: 'success.contrastText',
+                                          borderRadius: 1,
+                                          fontSize: '0.75rem',
+                                          fontWeight: 'bold',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: 0.5
+                                        }}>
+                                          <CheckCircle sx={{ fontSize: 14 }} />
+                                          Completed
+                                        </Box>
+                                      )}
+                                      {job.status === 'not_applicable' && (
+                                        <Box sx={{ 
+                                          px: 1.5, 
+                                          py: 0.5, 
+                                          bgcolor: 'error.light',
+                                          color: 'error.contrastText',
+                                          borderRadius: 1,
+                                          fontSize: '0.75rem',
+                                          fontWeight: 'bold',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: 0.5
+                                        }}>
+                                          <Cancel sx={{ fontSize: 14 }} />
+                                          Non-clearance
+                                        </Box>
+                                      )}
+                                      {(!job.status || job.status === 'pending' || job.status === 'in_progress') && (
+                                        <Box sx={{ 
+                                          px: 1.5, 
+                                          py: 0.5, 
+                                          bgcolor: 'warning.light',
+                                          color: 'warning.contrastText',
+                                          borderRadius: 1,
+                                          fontSize: '0.75rem',
+                                          fontWeight: 'bold',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: 0.5
+                                        }}>
+                                          <Build sx={{ fontSize: 14 }} />
+                                          Pending
+                                        </Box>
+                                      )}
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', flexWrap: 'wrap' }}>
+                                      <Button
+                                        variant={(!job.status || job.status === 'pending' || job.status === 'in_progress') ? "contained" : "outlined"}
+                                        color="warning"
+                                        size="small"
+                                        onClick={() => handleStatusUpdate(job._id, 'pending')}
+                                        disabled={updatingJob === job._id}
+                                        sx={{ 
+                                          minWidth: 80,
+                                          fontSize: '0.7rem',
+                                          py: 0.5
+                                        }}
+                                      >
+                                        Pending
+                                      </Button>
+                                      <Button
+                                        variant={job.status === 'completed' ? "contained" : "outlined"}
+                                        color="success"
+                                        size="small"
+                                        onClick={() => handleStatusUpdate(job._id, 'completed')}
+                                        disabled={updatingJob === job._id}
+                                        sx={{ 
+                                          minWidth: 90,
+                                          fontSize: '0.7rem',
+                                          py: 0.5
+                                        }}
+                                      >
+                                        Complete
+                                      </Button>
+                                      <Button
+                                        variant={job.status === 'not_applicable' ? "contained" : "outlined"}
+                                        color="error"
+                                        size="small"
+                                        onClick={() => handleStatusUpdate(job._id, 'not_applicable')}
+                                        disabled={updatingJob === job._id}
+                                        sx={{ 
+                                          minWidth: 100,
+                                          fontSize: '0.7rem',
+                                          py: 0.5
+                                        }}
+                                      >
+                                        Non-clearance
+                                      </Button>
+                                    </Box>
+                                  </TableCell>
+                                </TableRow>
+                              ));
+                            });
+                          })}
+                        </>
+                      )}
+                    </React.Fragment>
+                    );
+                  })
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Paper>
+          </>
+        )}
+      </Container>
+    </Box>
+  );
+}
