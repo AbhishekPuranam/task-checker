@@ -351,24 +351,13 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
             </label>
             
             {selectedFile && (
-              <>
-                <Button
-                  variant="outlined"
-                  onClick={handlePreview}
-                  disabled={uploading}
-                  sx={{ mr: 2 }}
-                >
-                  Preview Data
-                </Button>
-                <Button
-                  variant="contained"
-                  color="success"
-                  onClick={handleUpload}
-                  disabled={uploading}
-                >
-                  Import Projects
-                </Button>
-              </>
+              <Button
+                variant="outlined"
+                onClick={handlePreview}
+                disabled={uploading}
+              >
+                Preview Data
+              </Button>
             )}
           </Box>
 
@@ -474,13 +463,13 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
                 <TableBody>
                   {previewData.slice(0, 10).map((row, index) => (
                     <TableRow key={index}>
-                      <TableCell>{row.title || 'N/A'}</TableCell>
-                      <TableCell>{row.structuralData?.serialNo || 'N/A'}</TableCell>
-                      <TableCell>{row.structuralData?.structureNumber || 'N/A'}</TableCell>
-                      <TableCell>{row.structuralData?.drawingNo || 'N/A'}</TableCell>
-                      <TableCell>{row.structuralData?.level || 'N/A'}</TableCell>
-                      <TableCell>{row.structuralData?.memberType || 'N/A'}</TableCell>
-                      <TableCell>{row.location || 'N/A'}</TableCell>
+                      <TableCell>{row.projectName || 'N/A'}</TableCell>
+                      <TableCell>{row.serialNo || 'N/A'}</TableCell>
+                      <TableCell>{row.structureNumber || 'N/A'}</TableCell>
+                      <TableCell>{row.drawingNo || 'N/A'}</TableCell>
+                      <TableCell>{row.level || 'N/A'}</TableCell>
+                      <TableCell>{row.memberType || 'N/A'}</TableCell>
+                      <TableCell>{row.gridNo || 'N/A'}</TableCell>
                       <TableCell>
                         <Chip
                           label="Ready to import"

@@ -8,22 +8,34 @@ const { auth } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Get all projects
+// Get all projects (with role-based filtering)
 router.get('/', auth, async (req, res) => {
   try {
     const { limit, sortBy = 'createdAt', sortOrder = 'desc', search } = req.query;
     
     let query = {};
     
+    // **SECURITY FIX**: Engineers should only see projects assigned to them
+    if (req.user.role === 'site-engineer') {
+      query.assignedEngineers = req.user.id;
+    }
+    
     // Add search functionality if search term provided
     if (search) {
-      query = {
+      const searchConditions = {
         $or: [
           { title: { $regex: search, $options: 'i' } },
           { location: { $regex: search, $options: 'i' } },
           { description: { $regex: search, $options: 'i' } }
         ]
       };
+      
+      // Combine with existing query (engineer filter)
+      if (query.assignedEngineers) {
+        query = { $and: [{ assignedEngineers: query.assignedEngineers }, searchConditions] };
+      } else {
+        query = searchConditions;
+      }
     }
     
     // Build sort object

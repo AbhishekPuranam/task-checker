@@ -101,7 +101,7 @@ export default function JobsPage() {
     }
   };
 
-  const fetchJobs = async () => {
+  const fetchJobs = useCallback(async () => {
     if (!selectedProject) return;
     
     try {
@@ -121,7 +121,7 @@ export default function JobsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedProject, pagination.currentPage]);
 
   // PERFORMANCE OPTIMIZATION: Memoize the grouping function to avoid recalculating on every render
   const groupedJobs = useMemo(() => {
@@ -233,7 +233,7 @@ export default function JobsPage() {
     }
   }, [searchTerm, jobs]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     if (!selectedProject) return;
     
     try {
@@ -247,7 +247,7 @@ export default function JobsPage() {
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
-  };
+  }, [selectedProject]);
 
   const toggleGrid = (gridKey) => {
     setExpandedGrids(prev => ({
@@ -425,14 +425,19 @@ export default function JobsPage() {
       });
 
       toast.success('Job status updated successfully!', { id: 'status-update' });
-      fetchJobs(); // Refresh the list
+      
+      // Refresh both jobs list and stats
+      await Promise.all([
+        fetchJobs(),
+        fetchStats()
+      ]);
     } catch (error) {
       console.error('Error updating job status:', error);
       toast.error('Failed to update job status', { id: 'status-update' });
     } finally {
       setUpdatingJob(null);
     }
-  }, []); // Empty deps - fetchJobs is stable, api is external
+  }, [fetchJobs, fetchStats]); // Include dependencies
 
   const getSelectedProjectName = () => {
     const project = projects.find(p => p._id === selectedProject);
@@ -609,19 +614,9 @@ export default function JobsPage() {
                     }
                   }}
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box 
-                      sx={{ 
-                        width: 8, 
-                        height: 8, 
-                        borderRadius: '50%', 
-                        bgcolor: '#7b2ff7' 
-                      }} 
-                    />
-                    <Typography sx={{ color: '#6a11cb', fontWeight: 500 }}>
-                      {project.name || project.title}
-                    </Typography>
-                  </Box>
+                  <Typography sx={{ color: '#6a11cb', fontWeight: 500 }}>
+                    {project.name || project.title}
+                  </Typography>
                 </MenuItem>
               ))}
             </Select>

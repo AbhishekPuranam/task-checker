@@ -48,11 +48,13 @@ const upload = multer({
 // Column mapping for Excel import
 const EXCEL_COLUMN_MAPPING = {
   'Sl No': 'serialNo',
+  'Serial No': 'serialNo', // Alternative column name
   'Structure Number': 'structureNumber',
   'Drawing No': 'drawingNo',
   'Level': 'level',
   'Member Type': 'memberType',
   'GridNo': 'gridNo',
+  'Location': 'gridNo', // Alternative for GridNo
   'Part Mark No': 'partMarkNo',
   'Section Sizes': 'sectionSizes',
   'Length in (mm)': 'lengthMm',
