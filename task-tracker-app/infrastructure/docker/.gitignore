@@ -1,0 +1,19 @@
+# Vault Secrets - NEVER COMMIT THESE!
+vault-keys.json
+vault-summary.txt
+secrets/
+*.pem
+*.key
+
+# Vault data
+/vault/file/
+/vault/logs/
+
+# Environment files with secrets
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Backup files
+*.bak
