@@ -315,7 +315,79 @@ ls -la /opt/projecttracker/task-checker/task-tracker-app/clients/engineer/.env.l
 
 ## SSL/HTTPS Setup
 
+### Understanding SSL Certificates for Subdomains
+
+**Important:** SSL certificates for your main domain (`sapc.in`) **DO NOT automatically cover subdomains** like `tracker.sapc.in`.
+
+#### SSL Certificate Types:
+
+1. **Single Domain Certificate**
+   - Covers: `sapc.in` ONLY
+   - Does NOT cover: `tracker.sapc.in`, `www.sapc.in`, or any subdomain
+   - Example: If you have SSL for `sapc.in`, it won't work for `tracker.sapc.in`
+
+2. **Wildcard Certificate** (Recommended for multiple subdomains)
+   - Covers: `*.sapc.in` (all first-level subdomains)
+   - Covers: `tracker.sapc.in`, `www.sapc.in`, `api.sapc.in`, etc.
+   - Does NOT cover: `sapc.in` (main domain) or `sub.tracker.sapc.in` (multi-level)
+   - Cost: Usually more expensive than single domain
+   - Let's Encrypt: FREE wildcard certificates available!
+
+3. **Multi-Domain (SAN) Certificate**
+   - Covers: Specific domains you list
+   - Example: `sapc.in`, `tracker.sapc.in`, `www.sapc.in`
+   - Can add/remove domains (with reissue)
+   - Let's Encrypt: FREE for multiple specific domains
+
+4. **Single Domain + Subdomain Certificate**
+   - What you need for this project
+   - Covers: `tracker.sapc.in` ONLY
+   - Let's Encrypt: FREE
+
+### SSL Certificate Scenarios for tracker.sapc.in
+
+#### Scenario 1: Main domain (sapc.in) has SSL, subdomain (tracker.sapc.in) does NOT
+
+```
+sapc.in              → Has SSL ✅ (works with HTTPS)
+tracker.sapc.in      → No SSL ❌ (browser shows "Not Secure")
+```
+
+**Solution:** You must obtain a separate SSL certificate for `tracker.sapc.in`
+
+#### Scenario 2: Main domain has Wildcard SSL
+
+```
+Certificate: *.sapc.in
+
+sapc.in              → Not covered (main domain) ❌
+tracker.sapc.in      → Covered ✅
+www.sapc.in          → Covered ✅
+api.sapc.in          → Covered ✅
+```
+
+**Solution:** If your main domain already has a wildcard certificate, you can use it! Just configure your server to use the same certificate files.
+
+#### Scenario 3: Obtain new SSL for subdomain only (Recommended for this project)
+
+```
+Certificate: tracker.sapc.in
+
+sapc.in              → Not covered (use existing SSL)
+tracker.sapc.in      → Covered ✅
+```
+
+**Solution:** Follow the instructions below to get a FREE Let's Encrypt certificate for `tracker.sapc.in`
+
+---
+
 ### Option 1: Using Let's Encrypt (Recommended for Production)
+
+**Advantages:**
+- ✅ FREE forever
+- ✅ Auto-renewal every 90 days
+- ✅ Trusted by all browsers
+- ✅ Easy to setup
 
 ```bash
 # Install Certbot
@@ -325,7 +397,7 @@ sudo apt install -y certbot python3-certbot-nginx
 cd /opt/projecttracker/task-checker/task-tracker-app/infrastructure/docker
 docker compose down
 
-# Obtain SSL certificate
+# Obtain SSL certificate for subdomain ONLY
 sudo certbot certonly --standalone \
   -d tracker.sapc.in \
   --email admin@sapc.in \
@@ -350,7 +422,63 @@ sudo chmod 644 /opt/projecttracker/task-checker/task-tracker-app/infrastructure/
 sudo certbot renew --dry-run
 ```
 
-### Option 2: Using Self-Signed Certificate (Development/Testing Only)
+### Option 1a: Using Let's Encrypt Wildcard Certificate (For multiple subdomains)
+
+If you plan to have multiple subdomains (e.g., `tracker.sapc.in`, `api.sapc.in`, `admin.sapc.in`), get a wildcard certificate:
+
+```bash
+# Install Certbot with DNS plugin (required for wildcard)
+# Note: This requires DNS API access from your domain provider
+sudo apt install -y certbot python3-certbot-dns-cloudflare  # For Cloudflare
+# OR
+sudo apt install -y certbot python3-certbot-dns-route53     # For AWS Route53
+
+# For Cloudflare (most common):
+# 1. Get API token from Cloudflare dashboard
+# 2. Create credentials file
+sudo mkdir -p /root/.secrets/certbot
+sudo cat > /root/.secrets/certbot/cloudflare.ini << EOF
+dns_cloudflare_api_token = YOUR_CLOUDFLARE_API_TOKEN
+EOF
+sudo chmod 600 /root/.secrets/certbot/cloudflare.ini
+
+# Obtain wildcard certificate
+sudo certbot certonly \
+  --dns-cloudflare \
+  --dns-cloudflare-credentials /root/.secrets/certbot/cloudflare.ini \
+  -d "*.sapc.in" \
+  -d "sapc.in" \
+  --email admin@sapc.in \
+  --agree-tos \
+  --non-interactive
+
+# This will cover ALL subdomains: tracker.sapc.in, api.sapc.in, admin.sapc.in, etc.
+```
+
+### Option 2: If Your Main Domain Already Has Wildcard SSL
+
+If `sapc.in` already has a wildcard SSL certificate (`*.sapc.in`), you can reuse it:
+
+```bash
+# Check if wildcard certificate exists on your main server
+# Look for certificate files that cover *.sapc.in
+
+# Copy the wildcard certificate to your project tracker server
+# (Replace paths with your actual certificate locations)
+sudo cp /path/to/wildcard/fullchain.pem \
+  /opt/projecttracker/task-checker/task-tracker-app/infrastructure/ssl/
+sudo cp /path/to/wildcard/privkey.pem \
+  /opt/projecttracker/task-checker/task-tracker-app/infrastructure/ssl/
+
+# Set proper permissions
+sudo chmod 644 /opt/projecttracker/task-checker/task-tracker-app/infrastructure/ssl/*
+```
+
+**Note:** Make sure the wildcard certificate includes `*.sapc.in` in the Subject Alternative Names (SAN).
+
+### Option 3: Using Self-Signed Certificate (Development/Testing Only)
+
+⚠️ **Not recommended for production** - Browsers will show security warnings
 
 ```bash
 # Generate self-signed certificate
@@ -397,6 +525,46 @@ certificatesResolvers:
       httpChallenge:
         entryPoint: web
 ```
+
+---
+
+### SSL/HTTPS Summary & Quick Decision Guide
+
+**Question: "I have SSL for sapc.in. Will tracker.sapc.in work with HTTPS?"**
+
+**Answer:** NO, unless you have a wildcard certificate.
+
+#### Decision Tree:
+
+**Do you have a wildcard SSL certificate (`*.sapc.in`) for your main domain?**
+
+→ **YES** - Great! You can reuse it for `tracker.sapc.in`
+   - Copy the wildcard certificate files to your Project Tracker server
+   - No need to obtain a new certificate
+   - All subdomains are covered
+
+→ **NO** - You need a new SSL certificate for `tracker.sapc.in`
+   - **Best Option:** Use Let's Encrypt (FREE)
+   - **Alternative:** Buy a wildcard certificate if you plan multiple subdomains
+   - **Quick Test:** Use self-signed certificate (not for production)
+
+#### Recommended Approach for tracker.sapc.in:
+
+1. **Single Subdomain (Just tracker.sapc.in):**
+   ```bash
+   sudo certbot certonly --standalone -d tracker.sapc.in
+   ```
+   ✅ FREE, Simple, Covers tracker.sapc.in only
+
+2. **Multiple Subdomains (tracker, api, admin, etc.):**
+   ```bash
+   sudo certbot certonly --dns-cloudflare -d "*.sapc.in" -d "sapc.in"
+   ```
+   ✅ FREE, Covers all subdomains, Requires DNS API
+
+3. **Already have wildcard SSL:**
+   - Just copy existing certificate files
+   ✅ Already paid for, Instant setup
 
 ---
 
