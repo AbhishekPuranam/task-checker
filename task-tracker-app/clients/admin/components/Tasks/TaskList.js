@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Typography,
@@ -13,17 +13,6 @@ import {
   Button,
   Box,
   CircularProgress,
-  TextField,
-  InputAdornment,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Grid,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Slider,
   Card,
   CardContent,
   CardActions,
@@ -36,13 +25,10 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  Grid,
 } from '@mui/material';
 import { 
   Add, 
-  Search, 
-  FilterList, 
-  Clear,
-  ExpandMore,
   Engineering,
   Assessment,
   Timeline,
@@ -73,17 +59,6 @@ const ProjectList = () => {
   // Delete confirmation state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState(null);
-  
-  // Filter and search states
-  const [searchTerm, setSearchTerm] = useState('');
-  const [priorityFilter, setPriorityFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [surfaceAreaRange, setSurfaceAreaRange] = useState([0, 1000]);
-  const [dateRange, setDateRange] = useState({
-    startDate: '',
-    endDate: ''
-  });
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   // Utility function to create URL-safe slug from project title
   const createSlug = (title) => {
@@ -212,9 +187,6 @@ const ProjectList = () => {
       setSurfaceAreaTotals(totals);
       setProjectProgress(progress);
       
-      // Update surface area range based on actual data
-      const maxArea = Math.max(...Object.values(totals), 1000);
-      setSurfaceAreaRange([0, maxArea]);
     } catch (error) {
       console.error('Error fetching projects:', error);
       
@@ -328,62 +300,6 @@ const ProjectList = () => {
     }
     return project.status;
   };
-
-  // Filter and search logic
-  const filteredProjects = useMemo(() => {
-    if (!projects) return [];
-    return projects.filter(project => {
-      // Search term filter
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        const titleMatch = project.title.toLowerCase().includes(searchLower);
-        const locationMatch = project.location?.toLowerCase().includes(searchLower);
-        if (!titleMatch && !locationMatch) return false;
-      }
-
-      // Priority filter
-      if (priorityFilter && project.priority !== priorityFilter) return false;
-
-      // Status filter
-      if (statusFilter && getCorrectedProjectStatus(project) !== statusFilter) return false;
-
-      // Surface area filter
-      const projectSurfaceArea = surfaceAreaTotals[project._id] || 0;
-      if (projectSurfaceArea < surfaceAreaRange[0] || projectSurfaceArea > surfaceAreaRange[1]) {
-        return false;
-      }
-
-      // Date range filter
-      if (dateRange.startDate || dateRange.endDate) {
-        const projectDate = new Date(project.createdAt);
-        if (dateRange.startDate && projectDate < new Date(dateRange.startDate)) return false;
-        if (dateRange.endDate && projectDate > new Date(dateRange.endDate)) return false;
-      }
-
-      return true;
-    });
-  }, [projects, searchTerm, priorityFilter, statusFilter, surfaceAreaRange, dateRange, surfaceAreaTotals]);
-
-  // Get unique values for filter dropdowns
-  const uniquePriorities = [...new Set((projects || []).map(p => p.priority))].filter(Boolean);
-  const uniqueStatuses = [...new Set((projects || []).map(p => getCorrectedProjectStatus(p)))].filter(Boolean);
-  
-  // Calculate surface area range for slider
-  const maxSurfaceArea = Math.max(...Object.values(surfaceAreaTotals), 1000);
-  
-  // Clear all filters
-  const clearAllFilters = () => {
-    setSearchTerm('');
-    setPriorityFilter('');
-    setStatusFilter('');
-    setSurfaceAreaRange([0, maxSurfaceArea]);
-    setDateRange({ startDate: '', endDate: '' });
-  };
-
-  // Check if any filters are active
-  const hasActiveFilters = searchTerm || priorityFilter || statusFilter || 
-    surfaceAreaRange[0] > 0 || surfaceAreaRange[1] < maxSurfaceArea || 
-    dateRange.startDate || dateRange.endDate;
 
   if (loading) {
     return (
@@ -575,277 +491,8 @@ const ProjectList = () => {
           </Grid>
         </Grid>
 
-        {/* Search and Filters Section */}
-        <Paper 
-          elevation={2} 
-          sx={{ 
-            p: { xs: 2, sm: 2.5, md: 3 }, 
-            mb: 3, 
-            borderRadius: 2, 
-            bgcolor: 'white', 
-            boxShadow: '0 4px 20px rgba(106, 17, 203, 0.2)' 
-          }}
-        >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-              <Search sx={{ color: '#6a11cb', fontSize: 24 }} />
-              <Typography variant="h6" sx={{ color: '#6a11cb', fontWeight: 600 }}>
-                Search & Filter Projects
-              </Typography>
-              {hasActiveFilters && (
-                <Chip 
-                  label="Filters Active" 
-                  sx={{ 
-                    bgcolor: '#7b2ff7', 
-                    color: 'white',
-                    fontWeight: 500
-                  }}
-                  size="small"
-                  onDelete={clearFilters}
-                  deleteIcon={<Clear sx={{ color: 'white !important' }} />}
-                />
-              )}
-            </Box>
-          </Box>
-
-          {/* Search Bar */}
-          <TextField
-            fullWidth
-            label="Search Projects"
-            placeholder="Search by project title or location..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search sx={{ color: '#6a11cb' }} />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ 
-              mb: 3,
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                '& fieldset': {
-                  borderColor: '#e0d4ff',
-                  borderWidth: 2,
-                },
-                '&:hover fieldset': {
-                  borderColor: '#b794f6',
-                  borderWidth: 2,
-                },
-                '&.Mui-focused fieldset': {
-                  borderColor: '#7b2ff7',
-                  borderWidth: 2,
-                },
-              },
-              '& .MuiInputLabel-root': {
-                color: '#6a11cb',
-                fontWeight: 500,
-                '&.Mui-focused': {
-                  color: '#7b2ff7'
-                }
-              }
-            }}
-          />
-
-          {/* Filters Accordion */}
-          <Accordion 
-            expanded={filtersExpanded} 
-            onChange={(e, isExpanded) => setFiltersExpanded(isExpanded)}
-            sx={{ 
-              boxShadow: 'none', 
-              '&:before': { display: 'none' },
-              bgcolor: 'transparent'
-            }}
-          >
-            <AccordionSummary 
-              expandIcon={<ExpandMore sx={{ color: '#7b2ff7' }} />}
-              sx={{ 
-                bgcolor: '#f8f7ff', 
-                borderRadius: 2,
-                border: '2px solid #e0d4ff',
-                '&:hover': { bgcolor: '#f0ebff' },
-                minHeight: 48,
-                '&.Mui-expanded': {
-                  minHeight: 48,
-                }
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <FilterList sx={{ color: '#7b2ff7' }} />
-                <Typography fontWeight="bold" sx={{ color: '#6a11cb' }}>
-                  Advanced Filters
-                </Typography>
-              </Box>
-            </AccordionSummary>
-            <AccordionDetails sx={{ pt: 3, bgcolor: 'white' }}>
-              <Grid container spacing={2}>
-                {/* Priority Filter */}
-                <Grid item xs={12} sm={6} md={3}>
-                  <FormControl fullWidth>
-                    <InputLabel sx={{ 
-                      color: '#6a11cb',
-                      fontWeight: 500,
-                      '&.Mui-focused': {
-                        color: '#7b2ff7'
-                      }
-                    }}>
-                      Priority
-                    </InputLabel>
-                    <Select
-                      value={priorityFilter}
-                      onChange={(e) => setPriorityFilter(e.target.value)}
-                      label="Priority"
-                      sx={{
-                        borderRadius: 2,
-                        '& .MuiOutlinedInput-notchedOutline': {
-                          borderColor: '#e0d4ff',
-                          borderWidth: 2,
-                        },
-                        '&:hover .MuiOutlinedInput-notchedOutline': {
-                          borderColor: '#b794f6',
-                          borderWidth: 2,
-                        },
-                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                          borderColor: '#7b2ff7',
-                          borderWidth: 2,
-                        },
-                      }}
-                    >
-                      <MenuItem value="">All Priorities</MenuItem>
-                      {uniquePriorities.map(priority => (
-                        <MenuItem key={priority} value={priority}>
-                          <Chip
-                            label={priority}
-                            color={getPriorityColor(priority)}
-                            size="small"
-                            variant="outlined"
-                          />
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-
-                {/* Status Filter */}
-                <Grid item xs={12} sm={6} md={3}>
-                  <FormControl fullWidth>
-                    <InputLabel sx={{ 
-                      color: '#6a11cb',
-                      fontWeight: 500,
-                      '&.Mui-focused': {
-                        color: '#7b2ff7'
-                      }
-                    }}>
-                      Status
-                    </InputLabel>
-                    <Select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      label="Status"
-                      sx={{
-                        borderRadius: 2,
-                        '& .MuiOutlinedInput-notchedOutline': {
-                          borderColor: '#e0d4ff',
-                          borderWidth: 2,
-                        },
-                        '&:hover .MuiOutlinedInput-notchedOutline': {
-                          borderColor: '#b794f6',
-                          borderWidth: 2,
-                        },
-                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                          borderColor: '#7b2ff7',
-                          borderWidth: 2,
-                        },
-                      }}
-                    >
-                      <MenuItem value="">All Statuses</MenuItem>
-                      {uniqueStatuses.map(status => (
-                        <MenuItem key={status} value={status}>
-                          <Chip
-                            label={status}
-                            color={getStatusColor(status)}
-                            size="small"
-                            variant="outlined"
-                          />
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-
-                {/* Date Range Filters */}
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField
-                    fullWidth
-                    label="From Date"
-                    type="date"
-                    value={dateRange.startDate}
-                    onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField
-                    fullWidth
-                    label="To Date"
-                    type="date"
-                    value={dateRange.endDate}
-                    onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-
-                {/* Surface Area Range Filter */}
-                <Grid item xs={12}>
-                  <Typography gutterBottom fontWeight="bold">
-                    Surface Area Range: {surfaceAreaRange[0]} - {surfaceAreaRange[1]} sqm
-                  </Typography>
-                  <Slider
-                    value={surfaceAreaRange}
-                    onChange={(e, newValue) => setSurfaceAreaRange(newValue)}
-                    valueLabelDisplay="auto"
-                    min={0}
-                    max={maxSurfaceArea}
-                    step={10}
-                    sx={{
-                      '& .MuiSlider-thumb': {
-                        background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)',
-                      },
-                      '& .MuiSlider-track': {
-                        background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)',
-                      },
-                    }}
-                  />
-                </Grid>
-
-                {/* Clear Filters Button */}
-                <Grid item xs={12}>
-                  <Button
-                    variant="contained"
-                    startIcon={<Clear />}
-                    onClick={clearAllFilters}
-                    disabled={!hasActiveFilters}
-                    sx={{ 
-                      borderRadius: 2,
-                      background: hasActiveFilters ? 'linear-gradient(135deg, #7b2ff7 0%, #f107a3 100%)' : undefined,
-                      '&:hover': hasActiveFilters ? {
-                        background: 'linear-gradient(135deg, #6a11cb 0%, #d6068a 100%)',
-                      } : undefined
-                    }}
-                  >
-                    Clear All Filters
-                  </Button>
-                </Grid>
-              </Grid>
-            </AccordionDetails>
-          </Accordion>
-        </Paper>
-
         {/* Projects Grid/Cards View */}
-        {(!filteredProjects || filteredProjects.length === 0) ? (
+        {(!projects || projects.length === 0) ? (
           <Paper 
             elevation={2}
             sx={{ 
@@ -858,20 +505,10 @@ const ProjectList = () => {
           >
             <Engineering sx={{ fontSize: 80, color: '#e0d4ff', mb: 2 }} />
             <Typography variant="h5" sx={{ color: '#6a11cb' }} gutterBottom>
-              {(!projects || projects.length === 0)
-                ? "No projects found" 
-                : hasActiveFilters 
-                  ? "No projects match your filters"
-                  : "No projects available"
-              }
+              No projects found
             </Typography>
             <Typography variant="body1" color="textSecondary" sx={{ mb: 3 }}>
-              {(!projects || projects.length === 0)
-                ? "Create your first project to get started!" 
-                : hasActiveFilters 
-                  ? "Try adjusting your search criteria."
-                  : "Start by creating a new project."
-              }
+              Create your first project to get started!
             </Typography>
             {user?.role === 'admin' && (
               <Button
@@ -890,7 +527,7 @@ const ProjectList = () => {
           </Paper>
         ) : (
           <Grid container spacing={3}>
-            {filteredProjects.map((project) => (
+            {projects.map((project) => (
               <Grid item xs={12} sm={6} md={4} key={project._id}>
                 <Card 
                   sx={{ 
