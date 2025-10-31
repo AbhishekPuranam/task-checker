@@ -652,7 +652,7 @@ router.get('/section-report', adminAuth, async (req, res) => {
       { header: 'Job Count', key: 'jobCount', width: 10 },
       { header: 'Current Job', key: 'currentJob', width: 25 },
       { header: 'Job Status', key: 'jobStatus', width: 12 },
-      { header: 'Created Date', key: 'createdAt', width: 15 },
+      { header: 'Completed Date', key: 'completedDate', width: 15 },
       { header: 'Notes', key: 'notes', width: 30 }
     ];
 
@@ -680,6 +680,19 @@ router.get('/section-report', adminAuth, async (req, res) => {
                         jobs.find(job => job.status !== 'completed' && job.status !== 'cancelled') ||
                         jobs[0];
       
+      // Find the latest completion date from all jobs
+      let completedDate = '';
+      if (element.status === 'complete' && jobs.length > 0) {
+        const completedDates = jobs
+          .filter(job => job.completedDate)
+          .map(job => new Date(job.completedDate));
+        
+        if (completedDates.length > 0) {
+          const latestDate = new Date(Math.max(...completedDates));
+          completedDate = moment(latestDate).format('DD/MM/YYYY');
+        }
+      }
+      
       const row = worksheet.addRow({
         serialNo: element.serialNo,
         structureNumber: element.structureNumber,
@@ -696,7 +709,7 @@ router.get('/section-report', adminAuth, async (req, res) => {
         jobCount: jobs.length,
         currentJob: currentJob ? currentJob.jobTitle : 'No jobs',
         jobStatus: currentJob ? currentJob.status : '',
-        createdAt: moment(element.createdAt).format('DD/MM/YYYY'),
+        completedDate: completedDate,
         notes: element.notes || ''
       });
 
