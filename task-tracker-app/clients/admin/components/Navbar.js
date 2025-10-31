@@ -18,6 +18,7 @@ import {
   Add,
   AdminPanelSettings,
   Logout,
+  MenuBook,
 } from '@mui/icons-material';
 import { useRouter } from 'next/router';
 import { useAuth } from '../contexts/AuthContext';
@@ -113,6 +114,14 @@ const Navbar = () => {
               User Management
             </Button>
           )}
+
+          <Button
+            color="inherit"
+            startIcon={<MenuBook />}
+            onClick={() => router.push('/docs')}
+          >
+            Documentation
+          </Button>
 
           <IconButton
             size="large"

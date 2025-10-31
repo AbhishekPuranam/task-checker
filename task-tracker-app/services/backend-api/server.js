@@ -13,6 +13,8 @@ const rateLimit = require('express-rate-limit');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./swagger');
 const { createExcelWorker } = require('./workers/excelProcessor');
 
 // Load environment variables
@@ -210,6 +212,13 @@ app.delete('/api/cleanup-jobs', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// Swagger API Documentation
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'Task Tracker API Documentation',
+  customfavIcon: '/favicon.ico'
+}));
 
 // Routes
 app.use('/api/auth', authRoutes);

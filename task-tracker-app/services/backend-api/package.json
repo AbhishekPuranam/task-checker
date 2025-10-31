@@ -40,6 +40,8 @@
     "playwright": "^1.56.1",
     "redis": "^4.7.1",
     "socket.io": "^4.7.2",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

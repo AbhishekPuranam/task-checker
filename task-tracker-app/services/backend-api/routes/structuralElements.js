@@ -137,6 +137,7 @@ router.post('/', auth, upload.array('attachments', 5), async (req, res) => {
       unitWeightKgPerM,
       totalWeightKg,
       surfaceAreaSqm,
+      fireProofingWorkflow,
       projectName,
       siteLocation,
       notes
@@ -175,6 +176,7 @@ router.post('/', auth, upload.array('attachments', 5), async (req, res) => {
       unitWeightKgPerM: unitWeightKgPerM ? Number(unitWeightKgPerM) : null,
       totalWeightKg: totalWeightKg ? Number(totalWeightKg) : null,
       surfaceAreaSqm: surfaceAreaSqm ? Number(surfaceAreaSqm) : null,
+      fireProofingWorkflow: fireProofingWorkflow || null,
       projectName: projectName || 'Default Project',
       siteLocation: siteLocation || 'Default Site',
       notes,
@@ -216,7 +218,7 @@ router.put('/:id', adminAuth, async (req, res) => {
       'structureNumber', 'drawingNo', 'level', 'memberType', 'gridNo',
       'partMarkNo', 'sectionSizes', 'lengthMm', 'quantity', 'sectionDepthMm',
       'flangeWidthMm', 'webThicknessMm', 'flangeThicknessMm', 'fireproofingThickness',
-      'surfaceAreaSqm', 'projectName', 'siteLocation', 'notes', 'status'
+      'surfaceAreaSqm', 'fireProofingWorkflow', 'projectName', 'siteLocation', 'notes', 'status'
     ];
 
     updateFields.forEach(field => {

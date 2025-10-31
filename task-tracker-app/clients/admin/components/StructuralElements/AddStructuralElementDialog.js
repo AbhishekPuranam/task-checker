@@ -9,7 +9,11 @@ import {
   TextField,
   Typography,
   Box,
-  IconButton
+  IconButton,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 import api from '../../utils/api';
@@ -35,8 +39,17 @@ const AddStructuralElementDialog = ({ open, onClose, projectId, onElementAdded, 
     flangeThicknessMm: '',
     fireproofingThickness: '',
     surfaceAreaSqm: '',
+    fireProofingWorkflow: '',
     notes: ''
   });
+
+  // Fireproofing type options
+  const fireproofingTypes = [
+    { value: 'cement_fire_proofing', label: 'Cement Fire Proofing' },
+    { value: 'gypsum_fire_proofing', label: 'Gypsum Fire Proofing' },
+    { value: 'intumescent_coatings', label: 'Intumescent Coatings' },
+    { value: 'refinery_fire_proofing', label: 'Refinery Fire Proofing' }
+  ];
 
   // Populate form when editing
   React.useEffect(() => {
@@ -58,6 +71,7 @@ const AddStructuralElementDialog = ({ open, onClose, projectId, onElementAdded, 
         flangeThicknessMm: editingElement.flangeThicknessMm || '',
         fireproofingThickness: editingElement.fireproofingThickness || '',
         surfaceAreaSqm: editingElement.surfaceAreaSqm || '',
+        fireProofingWorkflow: editingElement.fireProofingWorkflow || '',
         notes: editingElement.notes || ''
       });
     } else {
@@ -79,6 +93,7 @@ const AddStructuralElementDialog = ({ open, onClose, projectId, onElementAdded, 
         flangeThicknessMm: '',
         fireproofingThickness: '',
         surfaceAreaSqm: '',
+        fireProofingWorkflow: '',
         notes: ''
       });
     }
@@ -154,6 +169,7 @@ const AddStructuralElementDialog = ({ open, onClose, projectId, onElementAdded, 
         flangeThicknessMm: '',
         fireproofingThickness: '',
         surfaceAreaSqm: '',
+        fireProofingWorkflow: '',
         notes: ''
       });
       
@@ -369,6 +385,27 @@ const AddStructuralElementDialog = ({ open, onClose, projectId, onElementAdded, 
                 value={formData.fireproofingThickness}
                 onChange={handleChange}
               />
+            </Grid>
+            
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth>
+                <InputLabel>Fire Proofing Type</InputLabel>
+                <Select
+                  name="fireProofingWorkflow"
+                  value={formData.fireProofingWorkflow}
+                  onChange={handleChange}
+                  label="Fire Proofing Type"
+                >
+                  <MenuItem value="">
+                    <em>None</em>
+                  </MenuItem>
+                  {fireproofingTypes.map((type) => (
+                    <MenuItem key={type.value} value={type.value}>
+                      {type.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Grid>
             
             {/* Surface Area */}

@@ -2,14 +2,6 @@
 
 A comprehensive web-based task tracking system designed for **Office Admins** and **Site Engineers** to manage structural engineering projects and work orders.
 
-## � Documentation
-
-- **User Guide**: Login to Admin Portal → [Documentation Page](/admin/docs)
-- **API Documentation**: [Swagger API Docs](/api/docs)
-- **Deployment Guide**: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
-
----
-
 ## Features
 
 ### For Office Admins (Blue Work) 📘
@@ -50,26 +42,21 @@ A comprehensive web-based task tracking system designed for **Office Admins** an
 ### Backend
 - **Node.js** with Express.js
 - **MongoDB** with Mongoose
-- **HashiCorp Vault** for secret management
 - **JWT** Authentication
 - **Socket.IO** for real-time updates
-- **Swagger/OpenAPI** for API documentation
 - **ExcelJS** for report generation
 - **Multer** for file uploads
 
 ### Frontend
 - **Next.js 14** with React 18
-- **Tailwind CSS** & **Heroicons** for design
+- **Material-UI (MUI)** for design
 - **Next.js Router** for navigation
 - **Axios** for API calls
 - **Server-Side Rendering (SSR)** for better performance
-- **Built-in Documentation** pages
 
 ### Infrastructure
 - **Docker & Docker Compose** for containerization
-- **HashiCorp Vault** for encrypted secret storage
-- **Traefik v2.10** as reverse proxy with SSL/TLS
-- **Let's Encrypt** for automatic SSL certificates
+- **Traefik v2.10** as API Gateway with ForwardAuth
 - **Microservices Architecture** with separate services
 
 ## 📁 Project Structure
@@ -78,49 +65,23 @@ A comprehensive web-based task tracking system designed for **Office Admins** an
 task-tracker-app/
 ├── clients/                    # Frontend Applications (Next.js)
 │   ├── admin/                 # Admin Portal
-│   │   └── pages/docs.js      # Built-in user documentation
 │   └── engineer/              # Engineer Portal
 ├── services/                   # Backend Services (Node.js)
 │   ├── backend-api/           # Main API Service
-│   │   ├── swagger.js         # Swagger/OpenAPI configuration
-│   │   └── routes/            # API endpoints with documentation
 │   └── auth-service/          # Authentication Service
 ├── infrastructure/             # Infrastructure & Deployment
 │   └── docker/                # Docker Compose configs
-│       ├── docker-compose.yml # Vault-enabled production config
-│       └── vault-config.hcl   # HashiCorp Vault configuration
-├── deploy.sh                   # One-command deployment script
-├── docs/                       # Deployment documentation
-│   ├── DEPLOYMENT.md          # Full deployment guide
-│   └── archive/               # Archived legacy docs
+├── scripts/                    # Utility scripts (DB init, etc.)
+├── docs/                       # Documentation
 ├── uploads/                    # File storage
 └── logs/                       # Application logs
 ```
 
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture documentation.
+
 ## Installation & Setup
 
-### 🚀 Production Deployment (Recommended)
-
-Deploy with enterprise-grade security in one command:
-
-```bash
-curl -o deploy.sh https://raw.githubusercontent.com/AbhishekPuranam/task-checker/main/task-tracker-app/deploy.sh
-chmod +x deploy.sh
-sudo ./deploy.sh
-```
-
-**Features:**
-- ✅ HashiCorp Vault for encrypted secret storage
-- ✅ Automatic SSL certificates (Let's Encrypt)
-- ✅ Docker Compose orchestration
-- ✅ Traefik reverse proxy
-- ✅ Production-ready security
-
-See [DEPLOYMENT_README.md](DEPLOYMENT_README.md) for full deployment guide.
-
----
-
-### Quick Start with Docker (Development)
+### Quick Start with Docker (Recommended)
 
 ```bash
 # 1. Clone the repository
@@ -132,53 +93,17 @@ cp .env.example .env
 
 # 3. Start all services with Docker Compose
 cd infrastructure/docker
-docker compose -f docker-compose.dev.yml up --build
+docker-compose -f docker-compose.dev.yml up --build
 
 # 4. Access the application
 # - Admin Portal: http://localhost/admin
-# - Admin Documentation: http://localhost/admin/docs
 # - Engineer Portal: http://localhost/jobs
-# - API Documentation: http://localhost:5000/api/docs
 # - Traefik Dashboard: http://localhost:8080
 ```
 
 Default credentials:
 - Admin: `admin` / `admin123`
 - Engineer: `engineer` / `engineer123`
-
----
-
-## 📖 Accessing Documentation
-
-After deployment, you can access:
-
-### User Documentation
-Navigate to the admin portal and click the "Documentation" link in the menu, or visit:
-- Production: `https://your-domain.com/admin/docs`
-- Development: `http://localhost/admin/docs`
-
-The documentation includes:
-- Getting Started Guide
-- Project Management
-- Task Tracking
-- User Management
-- Excel Upload Instructions
-- Security Best Practices
-- Settings Configuration
-
-### API Documentation
-Access the interactive Swagger UI at:
-- Production: `https://your-domain.com/api/docs`
-- Development: `http://localhost:5000/api/docs`
-
-The API docs provide:
-- Complete endpoint reference
-- Request/response schemas
-- Authentication examples
-- Try-it-out functionality
-- Model definitions
-
----
 
 ### Manual Setup (Development)
 
