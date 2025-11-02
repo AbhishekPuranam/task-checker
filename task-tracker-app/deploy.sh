@@ -181,6 +181,15 @@ else
     print_success "Git already installed"
 fi
 
+# Check jq (required for parsing JSON)
+if ! command_exists jq; then
+    print_warning "jq not found. Installing..."
+    sudo apt-get update && sudo apt-get install -y jq
+    print_success "jq installed"
+else
+    print_success "jq already installed"
+fi
+
 print_header "STEP 4: FIREWALL CONFIGURATION"
 
 # Configure firewall
