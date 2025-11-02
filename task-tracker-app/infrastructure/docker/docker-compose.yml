@@ -81,8 +81,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.backend.rule=PathPrefix(`/api`)"
-      - "traefik.http.routers.backend.entrypoints=websecure"
-      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend.entrypoints=web"
       - "traefik.http.services.backend.loadbalancer.server.port=5000"
 
   # Auth Service
@@ -110,8 +109,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.auth.rule=Path(`/`) || Path(`/login`)"
-      - "traefik.http.routers.auth.entrypoints=websecure"
-      - "traefik.http.routers.auth.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.auth.entrypoints=web"
       - "traefik.http.routers.auth.priority=100"
       - "traefik.http.services.auth.loadbalancer.server.port=4000"
 
@@ -132,8 +130,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.admin.rule=PathPrefix(`/admin`)"
-      - "traefik.http.routers.admin.entrypoints=websecure"
-      - "traefik.http.routers.admin.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.admin.entrypoints=web"
       - "traefik.http.services.admin.loadbalancer.server.port=3000"
 
   # Engineer Client
@@ -153,8 +150,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.engineer.rule=PathPrefix(`/engineer`)"
-      - "traefik.http.routers.engineer.entrypoints=websecure"
-      - "traefik.http.routers.engineer.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.engineer.entrypoints=web"
       - "traefik.http.services.engineer.loadbalancer.server.port=3000"
 
   # Traefik Reverse Proxy
