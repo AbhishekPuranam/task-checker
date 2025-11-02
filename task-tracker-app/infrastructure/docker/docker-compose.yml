@@ -132,7 +132,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.admin.rule=PathPrefix(`/admin`)"
       - "traefik.http.routers.admin.entrypoints=web"
-      - "traefik.http.services.admin.loadbalancer.server.port=3000"
+      - "traefik.http.services.admin.loadbalancer.server.port=3002"
 
   # Engineer Client
   tasktracker-engineer:
