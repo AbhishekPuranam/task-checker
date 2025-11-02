@@ -250,24 +250,33 @@ fi
 
 print_header "STEP 5: APPLICATION SETUP"
 
-# Create installation directory
-print_info "Creating installation directory..."
-sudo mkdir -p "$INSTALL_DIR"
-sudo chown -R $USER:$USER "$INSTALL_DIR"
-
-# Clone repository
-cd "$INSTALL_DIR"
-if [ -d "task-checker" ]; then
-    print_info "Repository already exists. Pulling latest changes..."
-    cd task-checker/task-tracker-app
-    git pull origin main
+# Check if we're already in the repository
+CURRENT_DIR=$(pwd)
+if [ -f "deploy.sh" ] && [ -d "infrastructure/docker" ]; then
+    print_info "Already in repository directory"
+    REPO_DIR="$CURRENT_DIR"
 else
-    print_info "Cloning repository..."
-    git clone https://github.com/AbhishekPuranam/task-checker.git
-    cd task-checker/task-tracker-app
+    # Create installation directory
+    print_info "Creating installation directory..."
+    sudo mkdir -p "$INSTALL_DIR"
+    sudo chown -R $USER:$USER "$INSTALL_DIR"
+
+    # Clone repository
+    cd "$INSTALL_DIR"
+    if [ -d "task-checker" ]; then
+        print_info "Repository already exists. Pulling latest changes..."
+        cd task-checker/task-tracker-app
+        git pull origin main
+    else
+        print_info "Cloning repository..."
+        git clone https://github.com/AbhishekPuranam/task-checker.git
+        cd task-checker/task-tracker-app
+    fi
+    REPO_DIR=$(pwd)
 fi
 
-print_success "Repository ready"
+print_success "Repository ready at: $REPO_DIR"
+cd "$REPO_DIR"
 
 print_header "STEP 6: CONFIGURATION FILES"
 
