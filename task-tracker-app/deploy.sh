@@ -305,8 +305,19 @@ fi
 
 # Check if Vault is already initialized
 print_info "Checking Vault initialization status..."
-VAULT_STATUS=$(docker exec tasktracker-vault vault status -format=json 2>/dev/null || echo '{"initialized":false}')
-IS_INITIALIZED=$(echo "$VAULT_STATUS" | jq -r '.initialized')
+VAULT_STATUS=$(docker exec tasktracker-vault vault status -format=json 2>&1)
+IS_INITIALIZED=$(echo "$VAULT_STATUS" | jq -r '.initialized' 2>/dev/null || echo "false")
+
+# If jq fails, try to parse error message
+if [ "$IS_INITIALIZED" = "null" ] || [ -z "$IS_INITIALIZED" ]; then
+    if echo "$VAULT_STATUS" | grep -q "Vault is already initialized"; then
+        IS_INITIALIZED="true"
+    else
+        IS_INITIALIZED="false"
+    fi
+fi
+
+print_info "Vault initialization status: $IS_INITIALIZED"
 
 VAULT_KEYS_FILE="vault-keys.json"
 
