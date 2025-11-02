@@ -44,9 +44,9 @@ router.post('/login', async (req, res) => {
     // Determine redirect URL based on role (handle both 'site-engineer' and 'site_engineer')
     let redirectUrl;
     if (user.role === 'admin') {
-      redirectUrl = 'http://localhost/admin/projects';
+      redirectUrl = '/admin/projects';
     } else if (user.role === 'site_engineer' || user.role === 'site-engineer') {
-      redirectUrl = 'http://localhost/engineer';
+      redirectUrl = '/engineer';
     } else {
       return res.status(403).json({ message: `Invalid user role: ${user.role}` });
     }

@@ -1,4 +1,5 @@
 const redis = require('redis');
+const fs = require('fs');
 
 // Redis client singleton
 let redisClient = null;
@@ -9,8 +10,23 @@ const getRedisClient = async () => {
   }
 
   try {
+    // Read Redis password from Docker secrets
+    let redisPassword = '';
+    try {
+      redisPassword = fs.readFileSync('/run/secrets/redis_password', 'utf8').trim();
+    } catch (err) {
+      console.warn('⚠️ Redis password not found in secrets, using default');
+    }
+
+    // Use 'redis' hostname in Docker, 'localhost' for local dev
+    const redisHost = process.env.REDIS_HOST || 'redis';
+    const redisPort = process.env.REDIS_PORT || '6379';
+    const redisUrl = redisPassword 
+      ? `redis://:${redisPassword}@${redisHost}:${redisPort}`
+      : `redis://${redisHost}:${redisPort}`;
+
     redisClient = redis.createClient({
-      url: process.env.REDIS_URL || 'redis://localhost:6379',
+      url: redisUrl,
       socket: {
         reconnectStrategy: (retries) => {
           if (retries > 10) {
