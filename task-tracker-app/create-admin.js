@@ -18,8 +18,9 @@ async function createAdmin() {
       mongoPassword = process.env.MONGODB_PASSWORD || 'your-mongodb-password';
     }
 
-    // Connect to MongoDB
-    const mongoUri = `mongodb://admin:${mongoPassword}@localhost:27017/projecttracker?authSource=admin`;
+    // Connect to MongoDB (use 'mongodb' hostname when running in Docker)
+    const mongoHost = process.env.MONGO_HOST || 'mongodb';
+    const mongoUri = `mongodb://admin:${mongoPassword}@${mongoHost}:27017/projecttracker?authSource=admin`;
     console.log('Connecting to MongoDB...');
     await mongoose.connect(mongoUri);
     console.log('Connected to MongoDB');
