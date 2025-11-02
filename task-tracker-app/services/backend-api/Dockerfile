@@ -20,14 +20,6 @@ COPY . .
 EXPOSE 5000
 CMD ["npm", "run", "dev"]
 
-# Build stage for client
-FROM node:18-alpine AS client-build
-WORKDIR /app/client
-COPY client/package*.json ./
-RUN npm install
-COPY client/ ./
-RUN npm run build
-
 # Production stage
 FROM node:18-alpine AS production
 
@@ -44,9 +36,6 @@ COPY --from=base /app/package*.json ./
 
 # Copy application code
 COPY . .
-
-# Copy built client
-COPY --from=client-build /app/client/build ./client/build
 
 # Create uploads directory
 RUN mkdir -p uploads/structural uploads/tasks
