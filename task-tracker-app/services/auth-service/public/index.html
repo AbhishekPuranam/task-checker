@@ -251,10 +251,14 @@
                     throw new Error(data.message || 'Login failed');
                 }
 
-                // Store token in sessionStorage (more secure than localStorage)
+                // Store token in sessionStorage AND localStorage for compatibility
                 sessionStorage.setItem('auth_token', data.token);
                 sessionStorage.setItem('auth_user', JSON.stringify(data.user));
                 sessionStorage.setItem('auth_timestamp', Date.now().toString());
+                
+                // Also store in localStorage for admin/engineer client compatibility
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
 
                 // Show success message
                 const roleName = data.user.role === 'admin' ? 'Admin Dashboard' : 'Jobs View';
