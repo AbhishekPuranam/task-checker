@@ -102,6 +102,77 @@ router.post('/', adminAuth, async (req, res) => {
   }
 });
 
+// Update user (admin only)
+router.put('/:id', adminAuth, async (req, res) => {
+  try {
+    const { name, username, email, password, role, department, phoneNumber, isActive } = req.body;
+    
+    // Find the user
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Validation
+    if (username && username.length < 3) {
+      return res.status(400).json({ message: 'Username must be at least 3 characters long' });
+    }
+
+    if (password && password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+    }
+
+    if (role && !['admin', 'site-engineer'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role. Must be admin or site-engineer' });
+    }
+
+    // Check if username is being changed and already exists
+    if (username && username.toLowerCase() !== user.username) {
+      const existingUser = await User.findOne({ username: username.toLowerCase() });
+      if (existingUser) {
+        return res.status(400).json({ message: 'Username already exists' });
+      }
+    }
+
+    // Check if email is being changed and already exists
+    if (email && email.toLowerCase() !== user.email) {
+      const existingEmail = await User.findOne({ email: email.toLowerCase() });
+      if (existingEmail) {
+        return res.status(400).json({ message: 'Email already exists' });
+      }
+    }
+
+    // Update fields
+    if (name) user.name = name;
+    if (username) user.username = username.toLowerCase();
+    if (email !== undefined) user.email = email ? email.toLowerCase() : undefined;
+    if (role) user.role = role;
+    if (department !== undefined) user.department = department;
+    if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
+    if (isActive !== undefined) user.isActive = isActive;
+
+    // Update password if provided
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(password, salt);
+    }
+
+    await user.save();
+
+    // Return user without password
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    res.json({ 
+      message: 'User updated successfully',
+      user: userResponse
+    });
+  } catch (error) {
+    console.error('Update user error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Update user status (admin only)
 router.put('/:id/status', adminAuth, async (req, res) => {
   try {
