@@ -284,7 +284,7 @@ echo "$JWT_SECRET" > "$SECRETS_DIR/jwt_secret"
 echo "$SESSION_SECRET" > "$SECRETS_DIR/session_secret"
 echo "dummy-vault-token" > "$SECRETS_DIR/vault_token"  # Placeholder, will be updated after Vault starts
 
-chmod 600 "$SECRETS_DIR"/*
+chmod 644 "$SECRETS_DIR"/*
 print_success "Docker secrets created"
 
 # Update CORS in backend
