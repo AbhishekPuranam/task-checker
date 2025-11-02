@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   # HashiCorp Vault for Secret Management
   vault:
-    image: vault:1.15
+    image: hashicorp/vault:1.15
     container_name: tasktracker-vault
     restart: unless-stopped
     ports:
