@@ -21,8 +21,13 @@ app.use(express.json());
 // Serve static files (login page)
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Read MongoDB credentials from Docker secrets
+const fs = require('fs');
+const MONGODB_PASSWORD = fs.readFileSync('/run/secrets/mongodb_password', 'utf8').trim();
+
 // MongoDB Connection
-mongoose.connect('mongodb://mongodb:27017/tasktracker', {
+const mongoUri = `mongodb://admin:${MONGODB_PASSWORD}@mongodb:27017/projecttracker?authSource=admin`;
+mongoose.connect(mongoUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })

@@ -103,10 +103,23 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Serve static files for uploads (avatars, etc.)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Read MongoDB credentials from Docker secrets
+const fs = require('fs');
+let MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+  try {
+    const MONGODB_PASSWORD = fs.readFileSync('/run/secrets/mongodb_password', 'utf8').trim();
+    MONGODB_URI = `mongodb://admin:${MONGODB_PASSWORD}@mongodb:27017/projecttracker?authSource=admin`;
+  } catch (err) {
+    console.warn('Warning: Could not read MongoDB password from secrets, using default connection');
+    MONGODB_URI = 'mongodb://mongodb:27017/projecttracker';
+  }
+}
+
 // Connect to MongoDB with retry logic and persistent connection
 const connectWithRetry = () => {
   console.log('Attempting to connect to MongoDB...');
-  mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/tasktracker', {
+  mongoose.connect(MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
     serverSelectionTimeoutMS: 30000,
