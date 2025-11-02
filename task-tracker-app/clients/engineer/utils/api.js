@@ -17,9 +17,14 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor - cookies are sent automatically
+// Add request interceptor - send token in Authorization header
 api.interceptors.request.use(
   (config) => {
+    // Get token from localStorage (set by auth service after login)
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (error) => {
