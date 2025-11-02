@@ -61,9 +61,18 @@ const sdk = new NodeSDK({
   ],
 });
 
-sdk.start()
-  .then(() => console.log(`[OpenTelemetry] Auth Service initialized - exporting to: ${OTEL_ENDPOINT}`))
-  .catch((error) => console.error('[OpenTelemetry] Error initializing SDK:', error));
+try {
+  const startPromise = sdk.start();
+  if (startPromise && startPromise.then) {
+    startPromise
+      .then(() => console.log(`[OpenTelemetry] Auth Service initialized - exporting to: ${OTEL_ENDPOINT}`))
+      .catch((error) => console.error('[OpenTelemetry] Error initializing SDK:', error));
+  } else {
+    console.log('[OpenTelemetry] Auth Service started synchronously');
+  }
+} catch (error) {
+  console.error('[OpenTelemetry] Error initializing SDK:', error);
+}
 
 process.on('SIGTERM', () => {
   sdk.shutdown()

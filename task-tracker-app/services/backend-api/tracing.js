@@ -111,16 +111,23 @@ const sdk = new NodeSDK({
 });
 
 // Start the SDK
-sdk.start()
-  .then(() => {
-    console.log(`[OpenTelemetry] Initialized for service: ${SERVICE_NAME}`);
-    console.log(`[OpenTelemetry] Exporting to: ${OTEL_ENDPOINT}`);
-    console.log(`[OpenTelemetry] Traces: ${TRACES_ENABLED ? 'enabled' : 'disabled'}`);
-    console.log(`[OpenTelemetry] Metrics: ${METRICS_ENABLED ? 'enabled' : 'disabled'}`);
-  })
-  .catch((error) => {
-    console.error('[OpenTelemetry] Error initializing SDK:', error);
-  });
+try {
+  const startPromise = sdk.start();
+  if (startPromise && startPromise.then) {
+    startPromise
+      .then(() => {
+        console.log(`[OpenTelemetry] Initialized for service: ${SERVICE_NAME}`);
+        console.log(`[OpenTelemetry] Exporting to: ${OTEL_ENDPOINT}`);
+        console.log(`[OpenTelemetry] Traces: ${TRACES_ENABLED ? 'enabled' : 'disabled'}`);
+        console.log(`[OpenTelemetry] Metrics: ${METRICS_ENABLED ? 'enabled' : 'disabled'}`);
+      })
+      .catch((error) => console.error('[OpenTelemetry] Error starting SDK:', error));
+  } else {
+    console.log('[OpenTelemetry] SDK started synchronously');
+  }
+} catch (error) {
+  console.error('[OpenTelemetry] Error initializing SDK:', error);
+}
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
