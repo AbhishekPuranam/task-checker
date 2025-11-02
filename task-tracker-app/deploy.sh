@@ -475,25 +475,20 @@ print_success "Vault configured with secrets"
 
 print_header "STEP 9: DATABASE INITIALIZATION"
 
-print_info "Waiting for MongoDB to be ready..."
-sleep 10
+print_info "Waiting for MongoDB and services to be ready..."
+sleep 15
 
-print_info "Creating initial admin user..."
+print_info "Creating initial admin user using create-admin script..."
 
-# Create admin user
-docker exec -i tasktracker-mongodb mongosh -u admin -p "${MONGODB_PASSWORD}" --authenticationDatabase admin << MONGOEOF
-use projecttracker
-db.users.insertOne({
-  username: "admin",
-  email: "${ADMIN_EMAIL}",
-  password: "\$2a\$10\$rH8JhQKNsLJHxJ2RzqLX4.xY7vJ3YzJHYvJ3YzJHYvJ3YzJHYvJ3Y",
-  role: "admin",
-  createdAt: new Date(),
-  updatedAt: new Date()
-})
-MONGOEOF
+# Copy and run the create-admin script
+docker cp $REPO_DIR/create-admin.js tasktracker-app:/app/
+docker exec tasktracker-app node /app/create-admin.js
 
-print_success "Admin user created"
+if [ $? -eq 0 ]; then
+  print_success "Admin user created successfully"
+else
+  print_error "Failed to create admin user"
+fi
 
 print_header "STEP 10: VERIFICATION"
 
