@@ -72,6 +72,7 @@ services:
       - mongodb_password
       - jwt_secret
       - session_secret
+      - redis_password
     depends_on:
       - mongodb
       - redis
