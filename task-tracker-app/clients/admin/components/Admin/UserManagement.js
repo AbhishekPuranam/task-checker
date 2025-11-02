@@ -67,7 +67,7 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/auth/users');
+      const response = await api.get('/users');
       setUsers(response.data);
     } catch (error) {
       toast.error('Failed to fetch users');
@@ -132,7 +132,7 @@ const UserManagement = () => {
         if (!updateData.password) {
           delete updateData.password; // Don't update password if not provided
         }
-        await api.put(`/auth/users/${selectedUser._id}`, updateData);
+        await api.put(`/users/${selectedUser._id}`, updateData);
         toast.success('User updated successfully');
       } else {
         // Create user
