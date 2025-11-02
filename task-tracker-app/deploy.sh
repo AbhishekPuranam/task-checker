@@ -106,19 +106,18 @@ print_header "STEP 1: CONFIGURATION"
 print_info "Let's gather your deployment configuration..."
 echo ""
 
-# Domain configuration (for future HTTPS setup)
-prompt_input "Enter your domain (optional, for future HTTPS setup)" "projects.sapcindia.com" DOMAIN
-prompt_input "Enter admin email (optional, for future SSL certificates)" "admin@sapcindia.com" ADMIN_EMAIL
+# Domain configuration (use defaults for HTTP-only deployment)
+DOMAIN="projects.sapcindia.com"
+ADMIN_EMAIL="admin@sapcindia.com"
+print_info "Using default domain: $DOMAIN (can be changed later for HTTPS)"
+print_info "Using default email: $ADMIN_EMAIL"
+echo ""
 
 # Server configuration
 print_info "Checking current server IP..."
-SERVER_IP=$(curl -s ifconfig.me || echo "")
-if [ -n "$SERVER_IP" ]; then
-    print_success "Detected server IP: $SERVER_IP"
-    prompt_input "Confirm server IP" "$SERVER_IP" SERVER_IP
-else
-    prompt_input "Enter server IP" "" SERVER_IP
-fi
+SERVER_IP=$(curl -s ifconfig.me || curl -s ipv4.icanhazip.com || echo "127.0.0.1")
+print_success "Detected server IP: $SERVER_IP"
+echo ""
 
 # Generate secrets
 print_info "Generating secure secrets..."
@@ -128,16 +127,13 @@ MONGODB_PASSWORD=$(openssl rand -base64 16)
 
 print_success "Secrets generated successfully"
 echo ""
-print_warning "IMPORTANT: Save these credentials securely!"
+print_info "Credentials saved to deployment-config.txt after deployment"
 echo ""
-echo "MongoDB Password: $MONGODB_PASSWORD"
-echo "JWT Secret: $JWT_SECRET"
-echo "Session Secret: $SESSION_SECRET"
-echo ""
-read -p "Press Enter to continue after saving these credentials..."
 
 # Installation directory
-prompt_input "Installation directory" "/opt/projecttracker" INSTALL_DIR
+INSTALL_DIR="/opt/projecttracker"
+print_info "Installation directory: $INSTALL_DIR"
+echo ""
 
 print_header "STEP 2: DNS VERIFICATION (SKIPPED FOR HTTP DEPLOYMENT)"
 
