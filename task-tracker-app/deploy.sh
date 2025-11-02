@@ -269,21 +269,66 @@ fi
 
 print_success "Repository ready"
 
-print_header "STEP 6: VAULT INITIALIZATION"
+print_header "STEP 6: CONFIGURATION FILES"
 
 # Create secrets directory
 SECRETS_DIR="infrastructure/docker/secrets"
 mkdir -p "$SECRETS_DIR"
 chmod 700 "$SECRETS_DIR"
 
-# Start Vault container first
-print_info "Starting Vault container..."
+# Create Docker secret files (used by services directly, no Vault needed initially)
+print_info "Creating Docker secret files..."
+echo "$MONGODB_PASSWORD" > "$SECRETS_DIR/mongodb_password"
+echo "$(openssl rand -base64 16)" > "$SECRETS_DIR/redis_password"
+echo "$JWT_SECRET" > "$SECRETS_DIR/jwt_secret"
+echo "$SESSION_SECRET" > "$SECRETS_DIR/session_secret"
+echo "dummy-vault-token" > "$SECRETS_DIR/vault_token"  # Placeholder, will be updated after Vault starts
+
+chmod 600 "$SECRETS_DIR"/*
+print_success "Docker secrets created"
+
+cd ../..
+
+# Update CORS in backend
+print_info "Updating CORS configuration..."
+sed -i.bak "s|\"https://tracker.sapc.in\"|\"https://${DOMAIN}\"|g" services/backend-api/server.js 2>/dev/null || true
+sed -i.bak "s|\"http://tracker.sapc.in\"|\"http://${DOMAIN}\"|g" services/backend-api/server.js 2>/dev/null || true
+sed -i.bak "s|https://tracker.sapc.in|https://${DOMAIN}|g" clients/admin/.env.local 2>/dev/null || true
+sed -i.bak "s|https://tracker.sapc.in|https://${DOMAIN}|g" clients/engineer/.env.local 2>/dev/null || true
+
+# Create upload directories
+print_info "Creating upload directories..."
+mkdir -p uploads/excel uploads/structural logs
+chmod -R 755 uploads logs
+print_success "Upload directories created"
+
+print_header "STEP 7: DOCKER DEPLOYMENT"
+
+# Build and start services with appropriate Traefik config
+print_info "Configuring Traefik..."
 cd infrastructure/docker
-docker compose up -d vault
+if [ "$USE_DOMAIN" = "true" ]; then
+    # Use HTTPS config
+    cp traefik-https.yml traefik.yml
+    # Replace admin email in traefik.yml
+    sed -i.bak "s|ADMIN_EMAIL_PLACEHOLDER|$ADMIN_EMAIL|g" traefik.yml
+    print_success "Using HTTPS/Let's Encrypt Traefik config"
+else
+    cp traefik-http.yml traefik.yml
+    print_success "Using HTTP-only Traefik config"
+fi
+
+print_info "Starting all services with Docker Compose..."
+docker compose up -d --build
+cd ../..
+
+print_success "All services started"
+
+print_header "STEP 8: VAULT INITIALIZATION"
 
 # Wait for Vault to be ready
 print_info "Waiting for Vault to be ready..."
-sleep 5
+sleep 10
 
 VAULT_ADDR="http://localhost:8200"
 max_attempts=30
@@ -299,12 +344,12 @@ while [ $attempt -lt $max_attempts ]; do
 done
 
 if [ $attempt -eq $max_attempts ]; then
-    print_error "Vault failed to start"
-    exit 1
+    print_warning "Vault health check failed, but continuing..."
 fi
 
 # Check if Vault is already initialized
 print_info "Checking Vault initialization status..."
+cd infrastructure/docker
 VAULT_STATUS=$(docker exec tasktracker-vault vault status -format=json 2>&1)
 IS_INITIALIZED=$(echo "$VAULT_STATUS" | jq -r '.initialized' 2>/dev/null || echo "false")
 
@@ -392,7 +437,7 @@ if [ "$SECRETS_EXIST" = "null" ]; then
     docker exec -e VAULT_TOKEN="$ROOT_TOKEN" tasktracker-vault \
         vault kv put secret/projecttracker/database \
         mongodb_password="$MONGODB_PASSWORD" \
-        redis_password=$(openssl rand -base64 16)
+        redis_password=$(cat "$SECRETS_DIR/redis_password")
 
     docker exec -e VAULT_TOKEN="$ROOT_TOKEN" tasktracker-vault \
         vault kv put secret/projecttracker/app \
@@ -403,29 +448,7 @@ if [ "$SECRETS_EXIST" = "null" ]; then
     
     print_success "New secrets stored in Vault"
 else
-    print_warning "Secrets already exist in Vault"
-    
-    read -p "Do you want to update the secrets? (y/N): " update_secrets
-    if [[ $update_secrets =~ ^[Yy]$ ]]; then
-        docker exec -e VAULT_TOKEN="$ROOT_TOKEN" tasktracker-vault \
-            vault kv put secret/projecttracker/database \
-            mongodb_password="$MONGODB_PASSWORD" \
-            redis_password=$(openssl rand -base64 16)
-
-        docker exec -e VAULT_TOKEN="$ROOT_TOKEN" tasktracker-vault \
-            vault kv put secret/projecttracker/app \
-            jwt_secret="$JWT_SECRET" \
-            session_secret="$SESSION_SECRET" \
-            domain="$DOMAIN" \
-            admin_email="$ADMIN_EMAIL"
-        
-        print_success "Secrets updated in Vault"
-    else
-        print_info "Keeping existing secrets"
-        # Retrieve existing MongoDB password if not updating
-        MONGODB_PASSWORD=$(docker exec -e VAULT_TOKEN="$ROOT_TOKEN" tasktracker-vault \
-            vault kv get -format=json secret/projecttracker/database | jq -r '.data.data.mongodb_password')
-    fi
+    print_warning "Secrets already exist in Vault - keeping existing secrets"
 fi
 
 # Create application policy
@@ -435,76 +458,16 @@ path "secret/data/projecttracker/*" {
 }
 POLICY
 
-# Create application token
+# Create application token and update vault_token file
 APP_TOKEN=$(docker exec -e VAULT_TOKEN="$ROOT_TOKEN" tasktracker-vault \
     vault token create -policy=projecttracker-policy -format=json | jq -r '.auth.client_token')
 
+echo "$APP_TOKEN" > "$SECRETS_DIR/vault_token"
+chmod 600 "$SECRETS_DIR/vault_token"
+
 print_success "Vault configured with secrets"
 
-# Create Docker secret files
-print_info "Creating Docker secret files..."
-echo "$MONGODB_PASSWORD" > "$SECRETS_DIR/mongodb_password"
-echo "$(openssl rand -base64 16)" > "$SECRETS_DIR/redis_password"
-echo "$JWT_SECRET" > "$SECRETS_DIR/jwt_secret"
-echo "$SESSION_SECRET" > "$SECRETS_DIR/session_secret"
-echo "$APP_TOKEN" > "$SECRETS_DIR/vault_token"
-
-chmod 600 "$SECRETS_DIR"/*
-print_success "Docker secrets created"
-
 cd ../..
-
-# Update CORS in backend
-print_info "Updating CORS configuration..."
-sed -i.bak "s|\"https://tracker.sapc.in\"|\"https://${DOMAIN}\"|g" services/backend-api/server.js 2>/dev/null || true
-sed -i.bak "s|\"http://tracker.sapc.in\"|\"http://${DOMAIN}\"|g" services/backend-api/server.js 2>/dev/null || true
-sed -i.bak "s|https://tracker.sapc.in|https://${DOMAIN}|g" clients/admin/.env.local 2>/dev/null || true
-sed -i.bak "s|https://tracker.sapc.in|https://${DOMAIN}|g" clients/engineer/.env.local 2>/dev/null || true
-
-print_header "STEP 7: DOCKER DEPLOYMENT"
-
-
-# Build and start services with appropriate Traefik config
-print_info "Starting all services with Docker Compose..."
-cd infrastructure/docker
-if [ "$USE_DOMAIN" = "true" ]; then
-    # Use HTTPS config
-    cp traefik-https.yml traefik.yml
-    # Replace admin email in traefik.yml
-    sed -i.bak "s|ADMIN_EMAIL_PLACEHOLDER|$ADMIN_EMAIL|g" traefik.yml
-    print_success "Using HTTPS/Let's Encrypt Traefik config."
-else
-    cp traefik-http.yml traefik.yml
-    print_success "Using HTTP-only Traefik config."
-fi
-docker compose up -d --build
-cd ../..
-
-# Update docker-compose.yml with MongoDB password
-print_info "Updating docker-compose.yml..."
-sed -i.bak "s|MONGO_INITDB_ROOT_PASSWORD:.*|MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}|" infrastructure/docker/docker-compose.yml
-
-# Create upload directories
-print_info "Creating upload directories..."
-mkdir -p uploads/excel uploads/structural logs
-chmod -R 755 uploads logs
-print_success "Upload directories created"
-
-print_header "STEP 8: DOCKER BUILD & START"
-
-cd infrastructure/docker
-
-print_info "Building Docker images (this may take several minutes)..."
-docker compose build
-
-print_info "Starting services..."
-docker compose up -d
-
-print_success "Services started"
-
-# Wait for services to be ready
-print_info "Waiting for services to be ready..."
-sleep 10
 
 print_header "STEP 9: DATABASE INITIALIZATION"
 
@@ -529,6 +492,8 @@ MONGOEOF
 print_success "Admin user created"
 
 print_header "STEP 10: VERIFICATION"
+
+cd infrastructure/docker
 
 # Check services
 print_info "Checking service status..."
