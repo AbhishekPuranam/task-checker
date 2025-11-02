@@ -115,8 +115,9 @@ echo ""
 
 # Server configuration
 print_info "Checking current server IP..."
-SERVER_IP=$(curl -s ifconfig.me || curl -s ipv4.icanhazip.com || echo "127.0.0.1")
-print_success "Detected server IP: $SERVER_IP"
+# Force IPv4 detection
+SERVER_IP=$(curl -4 -s ifconfig.me || curl -4 -s icanhazip.com || curl -s ipv4.icanhazip.com || echo "127.0.0.1")
+print_success "Detected server IP (IPv4): $SERVER_IP"
 echo ""
 
 # Generate secrets
