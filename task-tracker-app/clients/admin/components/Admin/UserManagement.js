@@ -140,7 +140,7 @@ const UserManagement = () => {
           setError('Name, username, and password are required');
           return;
         }
-        await api.post('/auth/create-user', formData);
+        await api.post('/create-user', formData);
         toast.success('User created successfully');
       }
       
