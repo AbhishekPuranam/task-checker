@@ -1,5 +1,9 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const fs = require('fs');
+
+// Read JWT secret from Docker secrets
+const JWT_SECRET = fs.readFileSync('/run/secrets/jwt_secret', 'utf8').trim();
 
 const auth = async (req, res, next) => {
   try {
@@ -15,13 +19,7 @@ const auth = async (req, res, next) => {
       return res.status(401).json({ message: 'Access denied. No token provided.' });
     }
 
-    // SECURITY: Ensure JWT_SECRET is set
-    if (!process.env.JWT_SECRET) {
-      console.error('CRITICAL: JWT_SECRET environment variable is not set!');
-      return res.status(500).json({ message: 'Server configuration error' });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
     // Handle both 'userId' and 'id' for backwards compatibility
     const userId = decoded.userId || decoded.id;
     const user = await User.findById(userId).select('-password');

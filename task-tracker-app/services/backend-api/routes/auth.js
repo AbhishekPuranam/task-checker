@@ -10,6 +10,9 @@ const { auth } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Read JWT secret from Docker secrets
+const JWT_SECRET = fs.readFileSync('/run/secrets/jwt_secret', 'utf8').trim();
+
 /**
  * @swagger
  * /api/auth/login:
@@ -246,7 +249,7 @@ router.post('/register', registerLimiter, async (req, res) => {
       role: user.role
     };
 
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
 
     res.status(201).json({
       token,
@@ -274,12 +277,6 @@ router.post('/login', authLimiter, async (req, res) => {
     // Validation
     if (!username || !password) {
       return res.status(400).json({ message: 'Username and password are required' });
-    }
-
-    // Check JWT secret
-    if (!process.env.JWT_SECRET) {
-      console.error('JWT_SECRET not set!');
-      return res.status(500).json({ message: 'Server configuration error' });
     }
 
     // Log mongoose connection state for debugging
@@ -317,7 +314,7 @@ router.post('/login', authLimiter, async (req, res) => {
       role: user.role
     };
 
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
 
     res.json({
       token,

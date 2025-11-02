@@ -3,8 +3,10 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const fs = require('fs');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+// Read JWT secret from Docker secrets
+const JWT_SECRET = fs.readFileSync('/run/secrets/jwt_secret', 'utf8').trim();
 
 // Unified Login - handles both admin and site engineer
 router.post('/login', async (req, res) => {
