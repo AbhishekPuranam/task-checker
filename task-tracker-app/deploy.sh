@@ -106,18 +106,34 @@ print_header "STEP 1: CONFIGURATION"
 print_info "Let's gather your deployment configuration..."
 echo ""
 
-# Domain configuration
-prompt_input "Enter your domain" "projects.sapcindia.com" DOMAIN
-prompt_input "Enter admin email for SSL certificates" "admin@sapcindia.com" ADMIN_EMAIL
+# Deployment mode selection
+echo "Select deployment mode:"
+echo "  1) IP-based deployment (HTTP only, no domain required)"
+echo "  2) Domain-based deployment (HTTPS with Let's Encrypt)"
+echo ""
+read -p "Enter choice [1]: " deploy_mode
+deploy_mode=${deploy_mode:-1}
 
 # Server configuration
 print_info "Checking current server IP..."
-SERVER_IP=$(curl -s ifconfig.me || echo "")
+SERVER_IP=$(curl -4s ifconfig.me || echo "")
 if [ -n "$SERVER_IP" ]; then
     print_success "Detected server IP: $SERVER_IP"
     prompt_input "Confirm server IP" "$SERVER_IP" SERVER_IP
 else
     prompt_input "Enter server IP" "" SERVER_IP
+fi
+
+# Domain configuration based on mode
+if [ "$deploy_mode" = "2" ]; then
+    USE_DOMAIN=true
+    prompt_input "Enter your domain" "projects.sapcindia.com" DOMAIN
+    prompt_input "Enter admin email for SSL certificates" "admin@sapcindia.com" ADMIN_EMAIL
+else
+    USE_DOMAIN=false
+    DOMAIN="$SERVER_IP"
+    ADMIN_EMAIL="admin@localhost"
+    print_success "Using IP-based deployment: http://${SERVER_IP}"
 fi
 
 # Generate secrets
@@ -141,27 +157,45 @@ prompt_input "Installation directory" "/opt/projecttracker" INSTALL_DIR
 
 print_header "STEP 2: DNS VERIFICATION"
 
-# Check DNS
-if check_dns "$DOMAIN"; then
-    DNS_IP=$(nslookup "$DOMAIN" | grep -A1 "Name:" | tail -n1 | awk '{print $2}')
-    if [ "$DNS_IP" != "$SERVER_IP" ]; then
-        print_warning "DNS points to $DNS_IP but server IP is $SERVER_IP"
-        print_info "Make sure your DNS A record is configured correctly:"
+# Skip DNS check for IP-based deployment
+if [ "$USE_DOMAIN" = "true" ]; then
+    # Check DNS
+    if check_dns "$DOMAIN"; then
+        DNS_IP=$(nslookup "$DOMAIN" | grep -A1 "Name:" | tail -n1 | awk '{print $2}')
+        if [ "$DNS_IP" != "$SERVER_IP" ]; then
+            print_warning "DNS points to $DNS_IP but server IP is $SERVER_IP"
+            print_info "Make sure your DNS A record is configured correctly:"
+            echo ""
+            echo "  Type: A"
+            echo "  Name: projects"
+            echo "  Value: $SERVER_IP"
+            echo "  TTL: 3600"
+            echo ""
+            read -p "Continue anyway? (y/N): " continue
+            if [[ ! $continue =~ ^[Yy]$ ]]; then
+                exit 1
+            fi
+        fi
+    else
+        print_warning "DNS not configured yet!"
+        echo ""
+        print_info "Please configure DNS before continuing:"
         echo ""
         echo "  Type: A"
-        echo "  Name: projects"
+        echo "  Name: projects (or appropriate subdomain)"
         echo "  Value: $SERVER_IP"
         echo "  TTL: 3600"
         echo ""
-        read -p "Continue anyway? (y/N): " continue
+        read -p "Continue without DNS? Let's Encrypt will fail without proper DNS! (y/N): " continue
         if [[ ! $continue =~ ^[Yy]$ ]]; then
+            print_info "Please configure DNS and run this script again."
             exit 1
         fi
     fi
 else
-    print_warning "DNS not configured yet!"
-    echo ""
-    print_info "Please configure DNS before continuing:"
+    print_success "Skipping DNS verification for IP-based deployment"
+    print_info "Access will be via: http://${SERVER_IP}"
+fi
     echo ""
     echo "  Type: A"
     echo "  Name: projects (or appropriate subdomain)"
@@ -430,9 +464,20 @@ sed -i.bak "s|https://tracker.sapc.in|https://${DOMAIN}|g" clients/engineer/.env
 
 print_header "STEP 7: DOCKER DEPLOYMENT"
 
-# Build and start services
+
+# Build and start services with appropriate Traefik config
 print_info "Starting all services with Docker Compose..."
 cd infrastructure/docker
+if [ "$USE_DOMAIN" = "true" ]; then
+    # Use HTTPS config
+    cp traefik-https.yml traefik.yml
+    # Replace admin email in traefik.yml
+    sed -i.bak "s|ADMIN_EMAIL_PLACEHOLDER|$ADMIN_EMAIL|g" traefik.yml
+    print_success "Using HTTPS/Let's Encrypt Traefik config."
+else
+    cp traefik-http.yml traefik.yml
+    print_success "Using HTTP-only Traefik config."
+fi
 docker compose up -d --build
 cd ../..
 
