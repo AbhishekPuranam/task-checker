@@ -196,18 +196,6 @@ else
     print_success "Skipping DNS verification for IP-based deployment"
     print_info "Access will be via: http://${SERVER_IP}"
 fi
-    echo ""
-    echo "  Type: A"
-    echo "  Name: projects (or appropriate subdomain)"
-    echo "  Value: $SERVER_IP"
-    echo "  TTL: 3600"
-    echo ""
-    read -p "Continue without DNS? Let's Encrypt will fail without proper DNS! (y/N): " continue
-    if [[ ! $continue =~ ^[Yy]$ ]]; then
-        print_info "Please configure DNS and run this script again."
-        exit 1
-    fi
-fi
 
 print_header "STEP 3: SYSTEM DEPENDENCIES"
 
