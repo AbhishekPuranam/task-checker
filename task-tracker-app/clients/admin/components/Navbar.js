@@ -39,7 +39,8 @@ const Navbar = () => {
   const handleLogout = () => {
     logout();
     handleClose();
-    router.push('/login');
+    // Redirect to auth service login (not /admin/login)
+    window.location.href = '/login';
   };
 
   const handleProfile = () => {
