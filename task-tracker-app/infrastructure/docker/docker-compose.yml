@@ -108,7 +108,7 @@ services:
       - tasktracker-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.auth.rule=Path(`/`) || Path(`/login`)"
+      - "traefik.http.routers.auth.rule=Path(`/`) || Path(`/login`) || PathPrefix(`/api/auth`)"
       - "traefik.http.routers.auth.entrypoints=web"
       - "traefik.http.routers.auth.priority=100"
       - "traefik.http.services.auth.loadbalancer.server.port=4000"
