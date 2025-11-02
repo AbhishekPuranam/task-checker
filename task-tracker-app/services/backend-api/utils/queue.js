@@ -1,5 +1,6 @@
 const { Queue } = require('bullmq');
 const { getRedisClient } = require('./redis');
+const fs = require('fs');
 
 let excelQueue = null;
 
@@ -20,13 +21,23 @@ function getExcelQueue() {
   }
 
   try {
+    // Read Redis password from Docker secrets
+    let redisPassword = '';
+    try {
+      redisPassword = fs.readFileSync('/run/secrets/redis_password', 'utf8').trim();
+    } catch (err) {
+      console.warn('⚠️ Redis password not found in secrets');
+    }
+
     // BullMQ requires connection options, not client instance
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+    const redisHost = process.env.REDIS_HOST || 'redis';
+    const redisPort = process.env.REDIS_PORT || '6379';
     
     excelQueue = new Queue('excel-processing', {
       connection: {
-        host: redisUrl.includes('://') ? new URL(redisUrl).hostname : redisUrl,
-        port: redisUrl.includes('://') ? parseInt(new URL(redisUrl).port || '6379') : 6379,
+        host: redisHost,
+        port: parseInt(redisPort),
+        password: redisPassword || undefined,
       },
       defaultJobOptions: {
         attempts: 3, // Retry up to 3 times

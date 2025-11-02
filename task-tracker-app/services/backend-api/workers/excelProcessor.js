@@ -156,7 +156,17 @@ async function createFireProofingJobs(structuralElement, userId) {
  * Create and start Excel processing worker
  */
 function createExcelWorker() {
-  const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+  // Read Redis password from Docker secrets
+  const fs = require('fs');
+  let redisPassword = '';
+  try {
+    redisPassword = fs.readFileSync('/run/secrets/redis_password', 'utf8').trim();
+  } catch (err) {
+    console.warn('⚠️ Redis password not found in secrets');
+  }
+
+  const redisHost = process.env.REDIS_HOST || 'redis';
+  const redisPort = process.env.REDIS_PORT || '6379';
   
   const worker = new Worker(
     'excel-processing',
@@ -375,8 +385,9 @@ function createExcelWorker() {
     },
     {
       connection: {
-        host: redisUrl.includes('://') ? new URL(redisUrl).hostname : redisUrl,
-        port: redisUrl.includes('://') ? parseInt(new URL(redisUrl).port || '6379') : 6379,
+        host: redisHost,
+        port: parseInt(redisPort),
+        password: redisPassword || undefined,
       },
       concurrency: 2, // Process 2 Excel files simultaneously
       limiter: {

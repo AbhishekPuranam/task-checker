@@ -2,7 +2,7 @@
 const http = require('http');
 
 const options = {
-  hostname: 'localhost',
+  hostname: '127.0.0.1', // Use 127.0.0.1 instead of localhost for container health checks
   port: process.env.PORT || 5000,
   path: '/health',
   method: 'GET',
