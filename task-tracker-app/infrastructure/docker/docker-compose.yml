@@ -152,7 +152,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.engineer.rule=PathPrefix(`/engineer`)"
       - "traefik.http.routers.engineer.entrypoints=web"
-      - "traefik.http.services.engineer.loadbalancer.server.port=3000"
+      - "traefik.http.services.engineer.loadbalancer.server.port=3001"
 
   # Traefik Reverse Proxy
   traefik:
