@@ -5,7 +5,7 @@ import { CircularProgress, Box } from '@mui/material';
 export default function Home() {
   useEffect(() => {
     // Always redirect to external /login page
-    window.location.href = 'http://localhost/login';
+    window.location.href = '/login';
   }, []);
 
   return (

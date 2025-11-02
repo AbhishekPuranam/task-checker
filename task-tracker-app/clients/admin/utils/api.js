@@ -38,7 +38,7 @@ api.interceptors.response.use(
       localStorage.removeItem('user');
       // Redirect to login page
       if (typeof window !== 'undefined') {
-        window.location.href = 'http://localhost/login';
+        window.location.href = '/login';
       }
     } else if (error.response?.status === 429) {
       console.warn('Rate limit exceeded, will retry...');

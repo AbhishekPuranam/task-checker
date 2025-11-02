@@ -36,7 +36,7 @@ api.interceptors.response.use(
       if (typeof window !== 'undefined') {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        window.location.href = 'http://localhost/';
+        window.location.href = '/';
       }
     }
     return Promise.reject(error);

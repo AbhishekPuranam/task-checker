@@ -10,13 +10,13 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       // Redirect to login page (external)
-      window.location.href = 'http://localhost/login';
+      window.location.href = '/login';
       return;
     }
 
     if (!isLoading && adminOnly && user?.role !== 'admin') {
       // Not an admin, redirect to login
-      window.location.href = 'http://localhost/login';
+      window.location.href = '/login';
       return;
     }
   }, [isAuthenticated, user, adminOnly, router, isLoading]);
