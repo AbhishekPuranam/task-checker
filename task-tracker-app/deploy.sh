@@ -106,9 +106,9 @@ print_header "STEP 1: CONFIGURATION"
 print_info "Let's gather your deployment configuration..."
 echo ""
 
-# Domain configuration
-prompt_input "Enter your domain" "projects.sapcindia.com" DOMAIN
-prompt_input "Enter admin email for SSL certificates" "admin@sapcindia.com" ADMIN_EMAIL
+# Domain configuration (for future HTTPS setup)
+prompt_input "Enter your domain (optional, for future HTTPS setup)" "projects.sapcindia.com" DOMAIN
+prompt_input "Enter admin email (optional, for future SSL certificates)" "admin@sapcindia.com" ADMIN_EMAIL
 
 # Server configuration
 print_info "Checking current server IP..."
@@ -139,41 +139,16 @@ read -p "Press Enter to continue after saving these credentials..."
 # Installation directory
 prompt_input "Installation directory" "/opt/projecttracker" INSTALL_DIR
 
-print_header "STEP 2: DNS VERIFICATION"
+print_header "STEP 2: DNS VERIFICATION (SKIPPED FOR HTTP DEPLOYMENT)"
 
-# Check DNS
-if check_dns "$DOMAIN"; then
-    DNS_IP=$(nslookup "$DOMAIN" | grep -A1 "Name:" | tail -n1 | awk '{print $2}')
-    if [ "$DNS_IP" != "$SERVER_IP" ]; then
-        print_warning "DNS points to $DNS_IP but server IP is $SERVER_IP"
-        print_info "Make sure your DNS A record is configured correctly:"
-        echo ""
-        echo "  Type: A"
-        echo "  Name: projects"
-        echo "  Value: $SERVER_IP"
-        echo "  TTL: 3600"
-        echo ""
-        read -p "Continue anyway? (y/N): " continue
-        if [[ ! $continue =~ ^[Yy]$ ]]; then
-            exit 1
-        fi
-    fi
-else
-    print_warning "DNS not configured yet!"
-    echo ""
-    print_info "Please configure DNS before continuing:"
-    echo ""
-    echo "  Type: A"
-    echo "  Name: projects (or appropriate subdomain)"
-    echo "  Value: $SERVER_IP"
-    echo "  TTL: 3600"
-    echo ""
-    read -p "Continue without DNS? Let's Encrypt will fail without proper DNS! (y/N): " continue
-    if [[ ! $continue =~ ^[Yy]$ ]]; then
-        print_info "Please configure DNS and run this script again."
-        exit 1
-    fi
-fi
+# Skip DNS check for HTTP-only deployment
+print_warning "DNS verification skipped - deploying with HTTP only"
+print_info "You can configure DNS and enable HTTPS later"
+echo ""
+print_info "Current setup will be accessible via:"
+echo "  - IP Address: http://${SERVER_IP}:PORT"
+echo "  - After DNS is configured, run this script again for HTTPS"
+echo ""
 
 print_header "STEP 3: SYSTEM DEPENDENCIES"
 
@@ -433,24 +408,34 @@ fi
 # Check Traefik logs for SSL certificate
 print_info "Checking SSL certificate status..."
 sleep 5
-if docker compose logs traefik | grep -q "Obtained certificate"; then
-    print_success "SSL certificate obtained from Let's Encrypt!"
-else
-    print_warning "SSL certificate not obtained yet. Check logs with: docker compose logs traefik"
-fi
+print_warning "SSL/HTTPS skipped for this deployment (HTTP only)"
+print_info "Services are accessible via HTTP on their respective ports"
+print_info "To enable HTTPS later: Configure DNS and rerun this script"
 
 print_header "DEPLOYMENT COMPLETE! 🎉"
 
 echo ""
 print_success "Project Tracker has been deployed successfully!"
 echo ""
-print_info "Access your application at: https://${DOMAIN}"
+print_info "Access your application via HTTP:"
+echo "  Server IP: ${SERVER_IP}"
+echo ""
+print_info "Application URLs (check docker-compose.yml for exact ports):"
+echo "  Admin Panel:    http://${SERVER_IP}:3001 (or as configured)"
+echo "  Engineer Panel: http://${SERVER_IP}:3002 (or as configured)"
+echo "  Backend API:    http://${SERVER_IP}:5000"
 echo ""
 print_info "Default login credentials:"
 echo "  Username: admin"
 echo "  Password: admin123"
 echo ""
 print_warning "IMPORTANT: Change the default password immediately after first login!"
+echo ""
+print_warning "NOTE: This is an HTTP-only deployment (no SSL/HTTPS)"
+print_info "To enable HTTPS:"
+echo "  1. Configure DNS: ${DOMAIN} → ${SERVER_IP}"
+echo "  2. Wait for DNS propagation"
+echo "  3. Rerun this script"
 echo ""
 print_info "Important credentials (save these securely):"
 echo "  MongoDB Password: $MONGODB_PASSWORD"
@@ -498,12 +483,16 @@ echo ""
 
 print_success "=== DEPLOYMENT SUCCESSFUL! ==="
 echo ""
-print_info "Access your application:"
-echo "   ${GREEN}https://${DOMAIN}${NC}"
+print_info "Access your application via HTTP:"
+echo "   ${GREEN}http://${SERVER_IP}:3001${NC} (Admin)"
+echo "   ${GREEN}http://${SERVER_IP}:3002${NC} (Engineer)"
+echo "   ${GREEN}http://${SERVER_IP}:5000${NC} (API)"
 echo ""
 print_info "Configuration saved to: deployment-config.txt"
 echo ""
-print_warning "IMPORTANT SECURITY NOTES:"
+print_warning "IMPORTANT NOTES:"
+echo "   1. This is HTTP-only (no SSL) - suitable for testing"
+echo "   2. For production HTTPS: Configure DNS then rerun this script"
 echo "   1. Vault unseal keys saved to: infrastructure/docker/vault-keys.json"
 echo "   2. ${YELLOW}BACKUP THIS FILE IMMEDIATELY to a secure location${NC}"
 echo "   3. ${YELLOW}Store unseal keys in a password manager or offline safe${NC}"
