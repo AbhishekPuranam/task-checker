@@ -287,8 +287,6 @@ echo "dummy-vault-token" > "$SECRETS_DIR/vault_token"  # Placeholder, will be up
 chmod 600 "$SECRETS_DIR"/*
 print_success "Docker secrets created"
 
-cd ../..
-
 # Update CORS in backend
 print_info "Updating CORS configuration..."
 sed -i.bak "s|\"https://tracker.sapc.in\"|\"https://${DOMAIN}\"|g" services/backend-api/server.js 2>/dev/null || true
@@ -349,7 +347,6 @@ fi
 
 # Check if Vault is already initialized
 print_info "Checking Vault initialization status..."
-cd infrastructure/docker
 VAULT_STATUS=$(docker exec tasktracker-vault vault status -format=json 2>&1)
 IS_INITIALIZED=$(echo "$VAULT_STATUS" | jq -r '.initialized' 2>/dev/null || echo "false")
 
@@ -364,7 +361,7 @@ fi
 
 print_info "Vault initialization status: $IS_INITIALIZED"
 
-VAULT_KEYS_FILE="vault-keys.json"
+VAULT_KEYS_FILE="infrastructure/docker/vault-keys.json"
 
 if [ "$IS_INITIALIZED" = "true" ]; then
     print_warning "Vault is already initialized"
@@ -466,8 +463,6 @@ echo "$APP_TOKEN" > "$SECRETS_DIR/vault_token"
 chmod 600 "$SECRETS_DIR/vault_token"
 
 print_success "Vault configured with secrets"
-
-cd ../..
 
 print_header "STEP 9: DATABASE INITIALIZATION"
 
