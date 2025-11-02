@@ -106,19 +106,19 @@ print_header "STEP 1: CONFIGURATION"
 print_info "Let's gather your deployment configuration..."
 echo ""
 
-# Domain configuration (use defaults for HTTP-only deployment)
-DOMAIN="projects.sapcindia.com"
-ADMIN_EMAIL="admin@sapcindia.com"
-print_info "Using default domain: $DOMAIN (can be changed later for HTTPS)"
-print_info "Using default email: $ADMIN_EMAIL"
-echo ""
+# Domain configuration
+prompt_input "Enter your domain" "projects.sapcindia.com" DOMAIN
+prompt_input "Enter admin email for SSL certificates" "admin@sapcindia.com" ADMIN_EMAIL
 
 # Server configuration
 print_info "Checking current server IP..."
-# Force IPv4 detection
-SERVER_IP=$(curl -4 -s ifconfig.me || curl -4 -s icanhazip.com || curl -s ipv4.icanhazip.com || echo "127.0.0.1")
-print_success "Detected server IP (IPv4): $SERVER_IP"
-echo ""
+SERVER_IP=$(curl -s ifconfig.me || echo "")
+if [ -n "$SERVER_IP" ]; then
+    print_success "Detected server IP: $SERVER_IP"
+    prompt_input "Confirm server IP" "$SERVER_IP" SERVER_IP
+else
+    prompt_input "Enter server IP" "" SERVER_IP
+fi
 
 # Generate secrets
 print_info "Generating secure secrets..."
@@ -128,24 +128,52 @@ MONGODB_PASSWORD=$(openssl rand -base64 16)
 
 print_success "Secrets generated successfully"
 echo ""
-print_info "Credentials saved to deployment-config.txt after deployment"
+print_warning "IMPORTANT: Save these credentials securely!"
 echo ""
+echo "MongoDB Password: $MONGODB_PASSWORD"
+echo "JWT Secret: $JWT_SECRET"
+echo "Session Secret: $SESSION_SECRET"
+echo ""
+read -p "Press Enter to continue after saving these credentials..."
 
 # Installation directory
-INSTALL_DIR="/opt/projecttracker"
-print_info "Installation directory: $INSTALL_DIR"
-echo ""
+prompt_input "Installation directory" "/opt/projecttracker" INSTALL_DIR
 
-print_header "STEP 2: DNS VERIFICATION (SKIPPED FOR HTTP DEPLOYMENT)"
+print_header "STEP 2: DNS VERIFICATION"
 
-# Skip DNS check for HTTP-only deployment
-print_warning "DNS verification skipped - deploying with HTTP only"
-print_info "You can configure DNS and enable HTTPS later"
-echo ""
-print_info "Current setup will be accessible via:"
-echo "  - IP Address: http://${SERVER_IP}:PORT"
-echo "  - After DNS is configured, run this script again for HTTPS"
-echo ""
+# Check DNS
+if check_dns "$DOMAIN"; then
+    DNS_IP=$(nslookup "$DOMAIN" | grep -A1 "Name:" | tail -n1 | awk '{print $2}')
+    if [ "$DNS_IP" != "$SERVER_IP" ]; then
+        print_warning "DNS points to $DNS_IP but server IP is $SERVER_IP"
+        print_info "Make sure your DNS A record is configured correctly:"
+        echo ""
+        echo "  Type: A"
+        echo "  Name: projects"
+        echo "  Value: $SERVER_IP"
+        echo "  TTL: 3600"
+        echo ""
+        read -p "Continue anyway? (y/N): " continue
+        if [[ ! $continue =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
+    fi
+else
+    print_warning "DNS not configured yet!"
+    echo ""
+    print_info "Please configure DNS before continuing:"
+    echo ""
+    echo "  Type: A"
+    echo "  Name: projects (or appropriate subdomain)"
+    echo "  Value: $SERVER_IP"
+    echo "  TTL: 3600"
+    echo ""
+    read -p "Continue without DNS? Let's Encrypt will fail without proper DNS! (y/N): " continue
+    if [[ ! $continue =~ ^[Yy]$ ]]; then
+        print_info "Please configure DNS and run this script again."
+        exit 1
+    fi
+fi
 
 print_header "STEP 3: SYSTEM DEPENDENCIES"
 
@@ -179,15 +207,6 @@ if ! command_exists git; then
     print_success "Git installed"
 else
     print_success "Git already installed"
-fi
-
-# Check jq (required for parsing JSON)
-if ! command_exists jq; then
-    print_warning "jq not found. Installing..."
-    sudo apt-get update && sudo apt-get install -y jq
-    print_success "jq installed"
-else
-    print_success "jq already installed"
 fi
 
 print_header "STEP 4: FIREWALL CONFIGURATION"
@@ -262,29 +281,65 @@ if [ $attempt -eq $max_attempts ]; then
     exit 1
 fi
 
-# Initialize Vault
-print_info "Initializing Vault..."
-VAULT_INIT=$(docker exec tasktracker-vault vault operator init -key-shares=5 -key-threshold=3 -format=json)
+# Check if Vault is already initialized
+print_info "Checking Vault initialization status..."
+VAULT_STATUS=$(docker exec tasktracker-vault vault status -format=json 2>/dev/null || echo '{"initialized":false}')
+IS_INITIALIZED=$(echo "$VAULT_STATUS" | jq -r '.initialized')
 
-# Extract tokens and keys
-ROOT_TOKEN=$(echo "$VAULT_INIT" | jq -r '.root_token')
-UNSEAL_KEY_1=$(echo "$VAULT_INIT" | jq -r '.unseal_keys_b64[0]')
-UNSEAL_KEY_2=$(echo "$VAULT_INIT" | jq -r '.unseal_keys_b64[1]')
-UNSEAL_KEY_3=$(echo "$VAULT_INIT" | jq -r '.unseal_keys_b64[2]')
-
-# Save Vault keys
 VAULT_KEYS_FILE="vault-keys.json"
-echo "$VAULT_INIT" > "$VAULT_KEYS_FILE"
-chmod 600 "$VAULT_KEYS_FILE"
 
-print_success "Vault initialized"
+if [ "$IS_INITIALIZED" = "true" ]; then
+    print_warning "Vault is already initialized"
+    
+    # Check if vault-keys.json exists
+    if [ -f "$VAULT_KEYS_FILE" ]; then
+        print_success "Found existing vault-keys.json file"
+        VAULT_INIT=$(cat "$VAULT_KEYS_FILE")
+        
+        # Extract tokens and keys
+        ROOT_TOKEN=$(echo "$VAULT_INIT" | jq -r '.root_token')
+        UNSEAL_KEY_1=$(echo "$VAULT_INIT" | jq -r '.unseal_keys_b64[0]')
+        UNSEAL_KEY_2=$(echo "$VAULT_INIT" | jq -r '.unseal_keys_b64[1]')
+        UNSEAL_KEY_3=$(echo "$VAULT_INIT" | jq -r '.unseal_keys_b64[2]')
+    else
+        print_error "Vault is initialized but vault-keys.json not found!"
+        print_error "Please provide the Vault root token and unseal keys manually."
+        echo ""
+        prompt_input "Enter Vault root token" "" ROOT_TOKEN
+        prompt_input "Enter unseal key 1" "" UNSEAL_KEY_1
+        prompt_input "Enter unseal key 2" "" UNSEAL_KEY_2
+        prompt_input "Enter unseal key 3" "" UNSEAL_KEY_3
+    fi
+else
+    # Initialize Vault
+    print_info "Initializing Vault..."
+    VAULT_INIT=$(docker exec tasktracker-vault vault operator init -key-shares=5 -key-threshold=3 -format=json)
 
-# Unseal Vault
-print_info "Unsealing Vault..."
-docker exec tasktracker-vault vault operator unseal "$UNSEAL_KEY_1" >/dev/null
-docker exec tasktracker-vault vault operator unseal "$UNSEAL_KEY_2" >/dev/null
-docker exec tasktracker-vault vault operator unseal "$UNSEAL_KEY_3" >/dev/null
-print_success "Vault unsealed"
+    # Extract tokens and keys
+    ROOT_TOKEN=$(echo "$VAULT_INIT" | jq -r '.root_token')
+    UNSEAL_KEY_1=$(echo "$VAULT_INIT" | jq -r '.unseal_keys_b64[0]')
+    UNSEAL_KEY_2=$(echo "$VAULT_INIT" | jq -r '.unseal_keys_b64[1]')
+    UNSEAL_KEY_3=$(echo "$VAULT_INIT" | jq -r '.unseal_keys_b64[2]')
+
+    # Save Vault keys
+    echo "$VAULT_INIT" > "$VAULT_KEYS_FILE"
+    chmod 600 "$VAULT_KEYS_FILE"
+
+    print_success "Vault initialized"
+fi
+
+# Check if Vault needs to be unsealed
+IS_SEALED=$(echo "$VAULT_STATUS" | jq -r '.sealed')
+if [ "$IS_SEALED" = "true" ]; then
+    # Unseal Vault
+    print_info "Unsealing Vault..."
+    docker exec tasktracker-vault vault operator unseal "$UNSEAL_KEY_1" >/dev/null
+    docker exec tasktracker-vault vault operator unseal "$UNSEAL_KEY_2" >/dev/null
+    docker exec tasktracker-vault vault operator unseal "$UNSEAL_KEY_3" >/dev/null
+    print_success "Vault unsealed"
+else
+    print_success "Vault is already unsealed"
+fi
 
 # Configure Vault
 print_info "Configuring Vault secrets..."
@@ -293,18 +348,52 @@ print_info "Configuring Vault secrets..."
 docker exec -e VAULT_TOKEN="$ROOT_TOKEN" tasktracker-vault \
     vault secrets enable -path=secret kv-v2 2>/dev/null || true
 
-# Store secrets in Vault
-docker exec -e VAULT_TOKEN="$ROOT_TOKEN" tasktracker-vault \
-    vault kv put secret/projecttracker/database \
-    mongodb_password="$MONGODB_PASSWORD" \
-    redis_password=$(openssl rand -base64 16)
+# Check if secrets already exist
+SECRETS_EXIST=$(docker exec -e VAULT_TOKEN="$ROOT_TOKEN" tasktracker-vault \
+    vault kv get -format=json secret/projecttracker/database 2>/dev/null || echo "null")
 
-docker exec -e VAULT_TOKEN="$ROOT_TOKEN" tasktracker-vault \
-    vault kv put secret/projecttracker/app \
-    jwt_secret="$JWT_SECRET" \
-    session_secret="$SESSION_SECRET" \
-    domain="$DOMAIN" \
-    admin_email="$ADMIN_EMAIL"
+if [ "$SECRETS_EXIST" = "null" ]; then
+    print_info "Creating new secrets in Vault..."
+    
+    # Store secrets in Vault
+    docker exec -e VAULT_TOKEN="$ROOT_TOKEN" tasktracker-vault \
+        vault kv put secret/projecttracker/database \
+        mongodb_password="$MONGODB_PASSWORD" \
+        redis_password=$(openssl rand -base64 16)
+
+    docker exec -e VAULT_TOKEN="$ROOT_TOKEN" tasktracker-vault \
+        vault kv put secret/projecttracker/app \
+        jwt_secret="$JWT_SECRET" \
+        session_secret="$SESSION_SECRET" \
+        domain="$DOMAIN" \
+        admin_email="$ADMIN_EMAIL"
+    
+    print_success "New secrets stored in Vault"
+else
+    print_warning "Secrets already exist in Vault"
+    
+    read -p "Do you want to update the secrets? (y/N): " update_secrets
+    if [[ $update_secrets =~ ^[Yy]$ ]]; then
+        docker exec -e VAULT_TOKEN="$ROOT_TOKEN" tasktracker-vault \
+            vault kv put secret/projecttracker/database \
+            mongodb_password="$MONGODB_PASSWORD" \
+            redis_password=$(openssl rand -base64 16)
+
+        docker exec -e VAULT_TOKEN="$ROOT_TOKEN" tasktracker-vault \
+            vault kv put secret/projecttracker/app \
+            jwt_secret="$JWT_SECRET" \
+            session_secret="$SESSION_SECRET" \
+            domain="$DOMAIN" \
+            admin_email="$ADMIN_EMAIL"
+        
+        print_success "Secrets updated in Vault"
+    else
+        print_info "Keeping existing secrets"
+        # Retrieve existing MongoDB password if not updating
+        MONGODB_PASSWORD=$(docker exec -e VAULT_TOKEN="$ROOT_TOKEN" tasktracker-vault \
+            vault kv get -format=json secret/projecttracker/database | jq -r '.data.data.mongodb_password')
+    fi
+fi
 
 # Create application policy
 docker exec -e VAULT_TOKEN="$ROOT_TOKEN" tasktracker-vault vault policy write projecttracker-policy - <<POLICY
@@ -414,34 +503,24 @@ fi
 # Check Traefik logs for SSL certificate
 print_info "Checking SSL certificate status..."
 sleep 5
-print_warning "SSL/HTTPS skipped for this deployment (HTTP only)"
-print_info "Services are accessible via HTTP on their respective ports"
-print_info "To enable HTTPS later: Configure DNS and rerun this script"
+if docker compose logs traefik | grep -q "Obtained certificate"; then
+    print_success "SSL certificate obtained from Let's Encrypt!"
+else
+    print_warning "SSL certificate not obtained yet. Check logs with: docker compose logs traefik"
+fi
 
 print_header "DEPLOYMENT COMPLETE! 🎉"
 
 echo ""
 print_success "Project Tracker has been deployed successfully!"
 echo ""
-print_info "Access your application via HTTP:"
-echo "  Server IP: ${SERVER_IP}"
-echo ""
-print_info "Application URLs (check docker-compose.yml for exact ports):"
-echo "  Admin Panel:    http://${SERVER_IP}:3001 (or as configured)"
-echo "  Engineer Panel: http://${SERVER_IP}:3002 (or as configured)"
-echo "  Backend API:    http://${SERVER_IP}:5000"
+print_info "Access your application at: https://${DOMAIN}"
 echo ""
 print_info "Default login credentials:"
 echo "  Username: admin"
 echo "  Password: admin123"
 echo ""
 print_warning "IMPORTANT: Change the default password immediately after first login!"
-echo ""
-print_warning "NOTE: This is an HTTP-only deployment (no SSL/HTTPS)"
-print_info "To enable HTTPS:"
-echo "  1. Configure DNS: ${DOMAIN} → ${SERVER_IP}"
-echo "  2. Wait for DNS propagation"
-echo "  3. Rerun this script"
 echo ""
 print_info "Important credentials (save these securely):"
 echo "  MongoDB Password: $MONGODB_PASSWORD"
@@ -489,16 +568,12 @@ echo ""
 
 print_success "=== DEPLOYMENT SUCCESSFUL! ==="
 echo ""
-print_info "Access your application via HTTP:"
-echo "   ${GREEN}http://${SERVER_IP}:3001${NC} (Admin)"
-echo "   ${GREEN}http://${SERVER_IP}:3002${NC} (Engineer)"
-echo "   ${GREEN}http://${SERVER_IP}:5000${NC} (API)"
+print_info "Access your application:"
+echo "   ${GREEN}https://${DOMAIN}${NC}"
 echo ""
 print_info "Configuration saved to: deployment-config.txt"
 echo ""
-print_warning "IMPORTANT NOTES:"
-echo "   1. This is HTTP-only (no SSL) - suitable for testing"
-echo "   2. For production HTTPS: Configure DNS then rerun this script"
+print_warning "IMPORTANT SECURITY NOTES:"
 echo "   1. Vault unseal keys saved to: infrastructure/docker/vault-keys.json"
 echo "   2. ${YELLOW}BACKUP THIS FILE IMMEDIATELY to a secure location${NC}"
 echo "   3. ${YELLOW}Store unseal keys in a password manager or offline safe${NC}"
