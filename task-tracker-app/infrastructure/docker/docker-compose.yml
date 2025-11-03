@@ -180,6 +180,8 @@ services:
     image: ghcr.io/coroot/coroot:latest
     container_name: tasktracker-coroot
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"  # Only accessible from localhost, not publicly exposed
     volumes:
       - coroot_data:/data
       - coroot_cache:/tmp/coroot-cache
@@ -192,15 +194,6 @@ services:
       - coroot-clickhouse
     networks:
       - tasktracker-network
-    labels:
-      - "traefik.enable=true"
-      # HTTPS router for Coroot dashboard
-      - "traefik.http.routers.coroot-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/coroot`)"
-      - "traefik.http.routers.coroot-secure.entrypoints=websecure"
-      - "traefik.http.routers.coroot-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.middlewares.coroot-stripprefix.stripprefix.prefixes=/coroot"
-      - "traefik.http.routers.coroot-secure.middlewares=coroot-stripprefix"
-      - "traefik.http.services.coroot.loadbalancer.server.port=8080"
 
   # Coroot Node Agent for collecting metrics
   coroot-node-agent:
