@@ -175,76 +175,61 @@ services:
       - "traefik.http.routers.engineer-secure.tls.certresolver=letsencrypt"
       - "traefik.http.services.engineer.loadbalancer.server.port=3001"
 
-  # Coroot for Monitoring and Observability
-  coroot:
-    image: ghcr.io/coroot/coroot:latest
-    container_name: tasktracker-coroot
+  # SigNoz - Observability Platform (Logs, Metrics, Traces)
+  signoz-clickhouse:
+    image: clickhouse/clickhouse-server:23.11-alpine
+    container_name: signoz-clickhouse
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:8081:8080"  # Changed to 8081 to avoid conflict with Traefik dashboard
     volumes:
-      - coroot_data:/data
-      - coroot_cache:/tmp/coroot-cache
+      - signoz_clickhouse_data:/var/lib/clickhouse/
     environment:
-      - BOOTSTRAP_PROMETHEUS_URL=http://coroot-prometheus:9090
-      - BOOTSTRAP_REFRESH_INTERVAL=15s
-      - BOOTSTRAP_CLICKHOUSE_ADDRESS=coroot-clickhouse:9000
-    depends_on:
-      - coroot-prometheus
-      - coroot-clickhouse
+      - CLICKHOUSE_DB=signoz
     networks:
       - tasktracker-network
 
-  # Coroot Node Agent for collecting metrics
-  coroot-node-agent:
-    image: ghcr.io/coroot/coroot-node-agent:latest
-    container_name: tasktracker-coroot-node-agent
-    restart: unless-stopped
-    privileged: true
-    pid: host
-    volumes:
-      - /sys/kernel/tracing:/sys/kernel/tracing:rw
-      - /sys/kernel/debug:/sys/kernel/debug:rw
-      - /sys/fs/cgroup:/host/sys/fs/cgroup:ro
-      - /:/host/root:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://coroot:8080
-      - PROMETHEUS_SCRAPE_INTERVAL=15s
-    depends_on:
-      - coroot
-    networks:
-      - tasktracker-network
-
-  # Prometheus for metrics storage
-  coroot-prometheus:
-    image: prom/prometheus:latest
-    container_name: tasktracker-coroot-prometheus
+  signoz-query-service:
+    image: signoz/query-service:0.45.0
+    container_name: signoz-query-service
     restart: unless-stopped
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.enable-remote-write-receiver'
-      - '--enable-feature=exemplar-storage'
-      - '--enable-feature=native-histograms'
+      - "-config=/root/config/prometheus.yml"
     volumes:
-      - ./coroot-prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./signoz-config.yaml:/root/config/prometheus.yml
+    environment:
+      - ClickHouseUrl=tcp://signoz-clickhouse:9000
+      - STORAGE=clickhouse
+      - GODEBUG=netdns=go
+      - TELEMETRY_ENABLED=true
+      - DEPLOYMENT_TYPE=docker-standalone-amd
+    depends_on:
+      - signoz-clickhouse
     networks:
       - tasktracker-network
 
-  # ClickHouse for logs and traces
-  coroot-clickhouse:
-    image: clickhouse/clickhouse-server:latest
-    container_name: tasktracker-coroot-clickhouse
+  signoz-otel-collector:
+    image: signoz/signoz-otel-collector:0.88.11
+    container_name: signoz-otel-collector
     restart: unless-stopped
-    environment:
-      - CLICKHOUSE_DB=default
-      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    command:
+      - "--config=/etc/otel-collector-config.yaml"
     volumes:
-      - clickhouse_data:/var/lib/clickhouse
-      - ./clickhouse-config.xml:/etc/clickhouse-server/users.d/custom.xml:ro
+      - ./signoz-otel-collector-config.yaml:/etc/otel-collector-config.yaml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    environment:
+      - OTEL_RESOURCE_ATTRIBUTES=host.name=tasktracker-production
+    depends_on:
+      - signoz-clickhouse
+    networks:
+      - tasktracker-network
+
+  signoz-frontend:
+    image: signoz/frontend:0.45.0
+    container_name: signoz-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3301:3301"
+    depends_on:
+      - signoz-query-service
     networks:
       - tasktracker-network
 
@@ -289,13 +274,7 @@ volumes:
     driver: local
   vault_logs:
     driver: local
-  coroot_data:
-    driver: local
-  coroot_cache:
-    driver: local
-  prometheus_data:
-    driver: local
-  clickhouse_data:
+  signoz_clickhouse_data:
     driver: local
 
 networks:
