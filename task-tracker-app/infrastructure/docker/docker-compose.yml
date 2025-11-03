@@ -191,10 +191,7 @@ services:
     image: signoz/query-service:0.45.0
     container_name: signoz-query-service
     restart: unless-stopped
-    command:
-      - "-config=/root/config/prometheus.yml"
     volumes:
-      - ./signoz-config.yaml:/root/config/prometheus.yml
       - signoz_data:/var/lib/signoz
     environment:
       - ClickHouseUrl=tcp://signoz-clickhouse:9000
