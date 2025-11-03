@@ -54,9 +54,11 @@ router.get('/', auth, async (req, res) => {
     const projects = await projectsQuery;
     
     // Calculate progress for each project
+    console.log(`📊 Calculating progress for ${projects.length} projects...`);
     const projectsWithProgress = await Promise.all(
       projects.map(async (project) => {
         const progress = await project.calculateSurfaceAreaProgress();
+        console.log(`Project ${project.title}: ${progress.completedElements}/${progress.totalElements} elements, ${progress.completedSurfaceArea.toFixed(2)}/${progress.totalSurfaceArea.toFixed(2)} sqm`);
         const projectObj = project.toJSON();
         projectObj.progress = progress;
         return projectObj;
