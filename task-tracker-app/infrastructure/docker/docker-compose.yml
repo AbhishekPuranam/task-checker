@@ -208,10 +208,10 @@ services:
       - /sys/fs/cgroup:/host/sys/fs/cgroup:ro
       - /:/host/root:ro
     environment:
-      - COLLECTOR_ENDPOINT=http://coroot-prometheus:9090
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://coroot:8080
       - SCRAPE_INTERVAL=15s
     depends_on:
-      - coroot-prometheus
+      - coroot
     networks:
       - tasktracker-network
 
@@ -243,52 +243,6 @@ services:
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - ./clickhouse-config.xml:/etc/clickhouse-server/users.d/custom.xml:ro
-    networks:
-      - tasktracker-network
-
-  # Loki for log aggregation
-  loki:
-    image: grafana/loki:latest
-    container_name: tasktracker-loki
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:3100:3100"
-    command: -config.file=/etc/loki/local-config.yaml
-    volumes:
-      - loki_data:/loki
-    networks:
-      - tasktracker-network
-
-  # Grafana for visualization (metrics + logs)
-  grafana:
-    image: grafana/grafana:latest
-    container_name: tasktracker-grafana
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-    volumes:
-      - grafana_data:/var/lib/grafana
-    depends_on:
-      - loki
-      - coroot-prometheus
-    networks:
-      - tasktracker-network
-
-  # Promtail for collecting Docker logs and sending to Loki
-  promtail:
-    image: grafana/promtail:latest
-    container_name: tasktracker-promtail
-    restart: unless-stopped
-    volumes:
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./promtail-config.yml:/etc/promtail/config.yml:ro
-    command: -config.file=/etc/promtail/config.yml
-    depends_on:
-      - loki
     networks:
       - tasktracker-network
 
@@ -340,10 +294,6 @@ volumes:
   prometheus_data:
     driver: local
   clickhouse_data:
-    driver: local
-  loki_data:
-    driver: local
-  grafana_data:
     driver: local
 
 networks:
