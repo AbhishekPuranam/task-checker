@@ -46,11 +46,11 @@ exporters:
     dsn: tcp://signoz-clickhouse:9000/signoz
     timeout: 10s
 
-  clickhousemetricsexporter:
+  clickhousemetricswrite:
     endpoint: tcp://signoz-clickhouse:9000/signoz
     timeout: 10s
 
-  clickhousetracesexporter:
+  clickhousetraces:
     dsn: tcp://signoz-clickhouse:9000/?database=signoz
     timeout: 10s
 
@@ -64,9 +64,9 @@ service:
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [clickhousemetricsexporter]
+      exporters: [clickhousemetricswrite]
     
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [clickhousetracesexporter]
+      exporters: [clickhousetraces]
