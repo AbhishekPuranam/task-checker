@@ -1,0 +1,32 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'tasktracker-production'
+    environment: 'production'
+
+scrape_configs:
+  # Self monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Docker containers metrics (if they expose metrics)
+  - job_name: 'docker-containers'
+    static_configs:
+      - targets: []
+        labels:
+          service: 'docker'
+
+  # MongoDB exporter (optional - would need separate exporter)
+  # - job_name: 'mongodb'
+  #   static_configs:
+  #     - targets: ['mongodb-exporter:9216']
+
+  # Redis exporter (optional - would need separate exporter)
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+
+# Remote write configuration (for coroot-node-agent)
+# This is enabled via --web.enable-remote-write-receiver flag
