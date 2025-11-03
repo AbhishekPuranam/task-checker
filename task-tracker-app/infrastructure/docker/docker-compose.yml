@@ -188,10 +188,8 @@ services:
     environment:
       - BOOTSTRAP_PROMETHEUS_URL=http://coroot-prometheus:9090
       - BOOTSTRAP_REFRESH_INTERVAL=15s
-      - BOOTSTRAP_CLICKHOUSE_ADDRESS=coroot-clickhouse:9000
     depends_on:
       - coroot-prometheus
-      - coroot-clickhouse
     networks:
       - tasktracker-network
 
@@ -233,14 +231,61 @@ services:
       - tasktracker-network
 
   # ClickHouse for logs and traces
-  coroot-clickhouse:
-    image: clickhouse/clickhouse-server:latest
-    container_name: tasktracker-coroot-clickhouse
+  # Disabled due to authentication issues - Coroot works with Prometheus only
+  # coroot-clickhouse:
+  #   image: clickhouse/clickhouse-server:latest
+  #   container_name: tasktracker-coroot-clickhouse
+  #   restart: unless-stopped
+  #   environment:
+  #     - CLICKHOUSE_DB=default
+  #   volumes:
+  #     - clickhouse_data:/var/lib/clickhouse
+  #   networks:
+  #     - tasktracker-network
+
+  # Loki for log aggregation
+  loki:
+    image: grafana/loki:latest
+    container_name: tasktracker-loki
     restart: unless-stopped
-    environment:
-      - CLICKHOUSE_DB=default
+    ports:
+      - "127.0.0.1:3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
     volumes:
-      - clickhouse_data:/var/lib/clickhouse
+      - loki_data:/loki
+    networks:
+      - tasktracker-network
+
+  # Grafana for visualization (metrics + logs)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: tasktracker-grafana
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - loki
+      - coroot-prometheus
+    networks:
+      - tasktracker-network
+
+  # Promtail for collecting Docker logs and sending to Loki
+  promtail:
+    image: grafana/promtail:latest
+    container_name: tasktracker-promtail
+    restart: unless-stopped
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./promtail-config.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
     networks:
       - tasktracker-network
 
@@ -292,6 +337,10 @@ volumes:
   prometheus_data:
     driver: local
   clickhouse_data:
+    driver: local
+  loki_data:
+    driver: local
+  grafana_data:
     driver: local
 
 networks:
