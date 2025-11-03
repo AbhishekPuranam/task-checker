@@ -182,6 +182,7 @@ taskSchema.virtual('colorCode').get(function() {
 // Surface area progress calculation methods
 taskSchema.methods.calculateSurfaceAreaProgress = async function() {
   const StructuralElement = mongoose.model('StructuralElement');
+  const Job = mongoose.model('Job');
   
   try {
     // Get all structural elements for this project
@@ -201,23 +202,32 @@ taskSchema.methods.calculateSurfaceAreaProgress = async function() {
       sum + (element.surfaceAreaSqm || 0), 0
     );
     
-    // Log first 10 element statuses for debugging
-    console.log(`  📝 Sample element statuses (first 10):`);
-    elements.slice(0, 10).forEach(el => {
-      console.log(`    - ${el.structureNumber}: status="${el.status}" (type: ${typeof el.status})`);
-    });
+    // Get all jobs for this project
+    const jobs = await Job.find({ project: this._id });
     
-    const completedElements = elements.filter(element => {
-      const isComplete = element.status === 'completed' || element.status === 'complete';
-      if (isComplete) {
-        console.log(`  ✅ Element ${element.structureNumber} is ${element.status} - ${element.surfaceAreaSqm} sqm`);
+    // Calculate completed elements based on job completion
+    let completedSurfaceArea = 0;
+    let completedCount = 0;
+    
+    for (const element of elements) {
+      // Find jobs for this element
+      const elementJobs = jobs.filter(job => {
+        const jobElementId = job.structuralElement?._id?.toString() || job.structuralElement?.toString();
+        const elementId = element._id.toString();
+        return jobElementId === elementId;
+      });
+      
+      // Element is complete if it has jobs and all jobs are completed
+      if (elementJobs.length > 0) {
+        const allJobsCompleted = elementJobs.every(job => job.status === 'completed');
+        
+        if (allJobsCompleted) {
+          completedSurfaceArea += (element.surfaceAreaSqm || 0);
+          completedCount++;
+          console.log(`  ✅ Element ${element.structureNumber} complete - ${element.surfaceAreaSqm} sqm (${elementJobs.length} jobs)`);
+        }
       }
-      return isComplete;
-    });
-    
-    const completedSurfaceArea = completedElements.reduce((sum, element) => 
-      sum + (element.surfaceAreaSqm || 0), 0
-    );
+    }
     
     const progressPercentage = totalSurfaceArea > 0 
       ? Math.round((completedSurfaceArea / totalSurfaceArea) * 100)
@@ -228,7 +238,7 @@ taskSchema.methods.calculateSurfaceAreaProgress = async function() {
       completedSurfaceArea,
       progressPercentage,
       totalElements: elements.length,
-      completedElements: completedElements.length
+      completedElements: completedCount
     };
   } catch (error) {
     console.error('Error calculating surface area progress:', error);
