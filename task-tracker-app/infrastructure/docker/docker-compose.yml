@@ -207,9 +207,10 @@ services:
       - /sys/kernel/debug:/sys/kernel/debug:rw
       - /sys/fs/cgroup:/host/sys/fs/cgroup:ro
       - /:/host/root:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://coroot:8080
-      - SCRAPE_INTERVAL=15s
+      - PROMETHEUS_SCRAPE_INTERVAL=15s
     depends_on:
       - coroot
     networks:
@@ -229,6 +230,7 @@ services:
     volumes:
       - ./coroot-prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - tasktracker-network
 

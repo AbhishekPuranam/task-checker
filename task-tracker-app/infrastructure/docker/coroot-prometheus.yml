@@ -11,22 +11,16 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  # Docker containers metrics (if they expose metrics)
-  - job_name: 'docker-containers'
-    static_configs:
-      - targets: []
-        labels:
-          service: 'docker'
-
-  # MongoDB exporter (optional - would need separate exporter)
-  # - job_name: 'mongodb'
-  #   static_configs:
-  #     - targets: ['mongodb-exporter:9216']
-
-  # Redis exporter (optional - would need separate exporter)
-  # - job_name: 'redis'
-  #   static_configs:
-  #     - targets: ['redis-exporter:9121']
+  # Docker containers auto-discovery
+  - job_name: 'docker'
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        target_label: container
+      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
+        target_label: service
 
 # Remote write configuration (for coroot-node-agent)
 # This is enabled via --web.enable-remote-write-receiver flag
