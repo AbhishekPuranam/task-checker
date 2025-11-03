@@ -201,6 +201,12 @@ taskSchema.methods.calculateSurfaceAreaProgress = async function() {
       sum + (element.surfaceAreaSqm || 0), 0
     );
     
+    // Log first 10 element statuses for debugging
+    console.log(`  📝 Sample element statuses (first 10):`);
+    elements.slice(0, 10).forEach(el => {
+      console.log(`    - ${el.structureNumber}: status="${el.status}" (type: ${typeof el.status})`);
+    });
+    
     const completedElements = elements.filter(element => {
       const isComplete = element.status === 'completed' || element.status === 'complete';
       if (isComplete) {
