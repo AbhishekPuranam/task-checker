@@ -6,10 +6,26 @@ api:
 entryPoints:
   web:
     address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
   
-  # Uncomment for HTTPS in production
-  # websecure:
-  #   address: ":443"
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: abhishekpuranam@gmail.com  # Change this to your email
+      storage: /letsencrypt/acme.json
+      httpChallenge:
+        entryPoint: web
 
 providers:
   docker:

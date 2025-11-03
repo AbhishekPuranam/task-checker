@@ -81,8 +81,13 @@ services:
       - tasktracker-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.backend.rule=PathPrefix(`/api`)"
+      # HTTP router
+      - "traefik.http.routers.backend.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api`)"
       - "traefik.http.routers.backend.entrypoints=web"
+      # HTTPS router
+      - "traefik.http.routers.backend-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend-secure.entrypoints=websecure"
+      - "traefik.http.routers.backend-secure.tls.certresolver=letsencrypt"
       - "traefik.http.services.backend.loadbalancer.server.port=5000"
 
   # Auth Service
@@ -109,9 +114,15 @@ services:
       - tasktracker-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.auth.rule=Path(`/`) || Path(`/login`) || PathPrefix(`/api/auth`)"
+      # HTTP router
+      - "traefik.http.routers.auth.rule=Host(`projects.sapcindia.com`) && (Path(`/`) || Path(`/login`) || PathPrefix(`/api/auth`))"
       - "traefik.http.routers.auth.entrypoints=web"
       - "traefik.http.routers.auth.priority=100"
+      # HTTPS router
+      - "traefik.http.routers.auth-secure.rule=Host(`projects.sapcindia.com`) && (Path(`/`) || Path(`/login`) || PathPrefix(`/api/auth`))"
+      - "traefik.http.routers.auth-secure.entrypoints=websecure"
+      - "traefik.http.routers.auth-secure.priority=100"
+      - "traefik.http.routers.auth-secure.tls.certresolver=letsencrypt"
       - "traefik.http.services.auth.loadbalancer.server.port=4000"
 
   # Admin Client
@@ -130,8 +141,13 @@ services:
       - tasktracker-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.admin.rule=PathPrefix(`/admin`)"
+      # HTTP router
+      - "traefik.http.routers.admin.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/admin`)"
       - "traefik.http.routers.admin.entrypoints=web"
+      # HTTPS router
+      - "traefik.http.routers.admin-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/admin`)"
+      - "traefik.http.routers.admin-secure.entrypoints=websecure"
+      - "traefik.http.routers.admin-secure.tls.certresolver=letsencrypt"
       - "traefik.http.services.admin.loadbalancer.server.port=3002"
 
   # Engineer Client
@@ -150,8 +166,13 @@ services:
       - tasktracker-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.engineer.rule=PathPrefix(`/engineer`)"
+      # HTTP router
+      - "traefik.http.routers.engineer.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/engineer`)"
       - "traefik.http.routers.engineer.entrypoints=web"
+      # HTTPS router
+      - "traefik.http.routers.engineer-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/engineer`)"
+      - "traefik.http.routers.engineer-secure.entrypoints=websecure"
+      - "traefik.http.routers.engineer-secure.tls.certresolver=letsencrypt"
       - "traefik.http.services.engineer.loadbalancer.server.port=3001"
 
   # Traefik Reverse Proxy
