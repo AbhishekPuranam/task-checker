@@ -201,9 +201,13 @@ taskSchema.methods.calculateSurfaceAreaProgress = async function() {
       sum + (element.surfaceAreaSqm || 0), 0
     );
     
-    const completedElements = elements.filter(element => 
-      element.status === 'completed' || element.status === 'complete'
-    );
+    const completedElements = elements.filter(element => {
+      const isComplete = element.status === 'completed' || element.status === 'complete';
+      if (isComplete) {
+        console.log(`  ✅ Element ${element.structureNumber} is ${element.status} - ${element.surfaceAreaSqm} sqm`);
+      }
+      return isComplete;
+    });
     
     const completedSurfaceArea = completedElements.reduce((sum, element) => 
       sum + (element.surfaceAreaSqm || 0), 0
