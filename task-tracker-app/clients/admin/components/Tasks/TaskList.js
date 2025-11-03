@@ -96,94 +96,43 @@ const ProjectList = () => {
 
     try {
       const response = await api.get('/projects');
-      setProjects(response.data.tasks || []);
+      const projectsData = response.data.tasks || [];
+      setProjects(projectsData);
       
-      // Fetch surface area totals and progress for each project
+      // Use progress data from backend if available, otherwise calculate on frontend
       const totals = {};
       const progress = {};
-      await Promise.all(
-        (response.data.tasks || []).map(async (project) => {
-          try {
-            // Fetch structural elements for this project to get area data
-          const elementsResponse = await api.get(`/structural-elements?project=${project._id}&limit=10000`);
-            const elements = elementsResponse.data.elements || [];
-            
-            // Calculate total surface area
-            const total = elements.reduce((sum, element) => {
-              return sum + (element.surfaceAreaSqm || 0);
-            }, 0);
-            totals[project._id] = total;
-            
-            // Calculate progress metrics
-            let completedSurfaceArea = 0;
-            let completedElements = 0;
-            const totalElements = elements.length;
-            
-            // Fetch jobs for this project to determine completion
-            const jobsResponse = await api.get(`/jobs?project=${project._id}`);
-            const jobs = jobsResponse.data.jobs || [];
-            
-            // Find elements with completed jobs (using same logic as StructuralElementsList)
-            for (const element of elements) {
-              const elementJobs = jobs.filter(job => {
-                const elementId = job.structuralElement?._id || job.structuralElement;
-                return elementId === element._id;
-              });
-              
-              if (elementJobs.length > 0) {
-                // Calculate completion percentage based on jobs
-                const completedJobs = elementJobs.filter(job => job.status === 'completed').length;
-                const totalJobs = elementJobs.length;
-                const completionPercentage = (completedJobs / totalJobs) * 100;
-                
-                // Calculate average progress percentage
-                const avgProgress = elementJobs.reduce((sum, job) => sum + (job.progressPercentage || 0), 0) / elementJobs.length;
-                
-                // Element is complete when all jobs are completed AND have 100% progress
-                if (completionPercentage === 100 && avgProgress === 100) {
-                  completedSurfaceArea += (element.surfaceAreaSqm || 0);
-                  completedElements++;
-                }
-              }
-            }
-            
-            // Calculate percentages
-            const surfaceAreaPercentage = total > 0 ? ((completedSurfaceArea / total) * 100) : 0;
-            const elementsPercentage = totalElements > 0 ? ((completedElements / totalElements) * 100) : 0;
-            
-            // Determine actual status
-            let actualStatus = project.status;
-            if (totalElements > 0 && completedElements < totalElements) {
-              actualStatus = 'in-progress';
-            } else if (totalElements > 0 && completedElements === totalElements) {
-              actualStatus = 'completed';
-            }
-            
-            progress[project._id] = {
-              totalSurfaceArea: total,
-              completedSurfaceArea,
-              surfaceAreaPercentage,
-              completedElements,
-              totalElements,
-              elementsPercentage,
-              status: actualStatus
-            };
-            
-          } catch (error) {
-            console.error(`Error fetching data for project ${project._id}:`, error);
-            totals[project._id] = 0;
-            progress[project._id] = {
-              totalSurfaceArea: 0,
-              completedSurfaceArea: 0,
-              surfaceAreaPercentage: 0,
-              completedElements: 0,
-              totalElements: 0,
-              elementsPercentage: 0,
-              status: project.status
-            };
-          }
-        })
-      );
+      
+      for (const project of projectsData) {
+        if (project.progress) {
+          // Use backend-calculated progress
+          totals[project._id] = project.progress.totalSurfaceArea || 0;
+          progress[project._id] = {
+            totalSurfaceArea: project.progress.totalSurfaceArea || 0,
+            completedSurfaceArea: project.progress.completedSurfaceArea || 0,
+            surfaceAreaPercentage: project.progress.progressPercentage || 0,
+            completedElements: project.progress.completedElements || 0,
+            totalElements: project.progress.totalElements || 0,
+            elementsPercentage: project.progress.totalElements > 0 
+              ? ((project.progress.completedElements / project.progress.totalElements) * 100) 
+              : 0,
+            status: project.status
+          };
+        } else {
+          // Fallback: Set empty progress
+          totals[project._id] = 0;
+          progress[project._id] = {
+            totalSurfaceArea: 0,
+            completedSurfaceArea: 0,
+            surfaceAreaPercentage: 0,
+            completedElements: 0,
+            totalElements: 0,
+            elementsPercentage: 0,
+            status: project.status
+          };
+        }
+      }
+      
       setSurfaceAreaTotals(totals);
       setProjectProgress(progress);
       

@@ -53,7 +53,17 @@ router.get('/', auth, async (req, res) => {
     
     const projects = await projectsQuery;
     
-    res.json({ tasks: projects });
+    // Calculate progress for each project
+    const projectsWithProgress = await Promise.all(
+      projects.map(async (project) => {
+        const progress = await project.calculateSurfaceAreaProgress();
+        const projectObj = project.toJSON();
+        projectObj.progress = progress;
+        return projectObj;
+      })
+    );
+    
+    res.json({ tasks: projectsWithProgress });
   } catch (error) {
     console.error('Error fetching projects:', error);
     res.status(500).json({ message: 'Server error' });
