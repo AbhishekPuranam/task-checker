@@ -47,11 +47,11 @@ exporters:
     timeout: 10s
 
   clickhousemetricswrite:
-    endpoint: tcp://signoz-clickhouse:9000/signoz
+    endpoint: tcp://signoz-clickhouse:9000/?database=signoz
     timeout: 10s
 
   clickhousetraces:
-    dsn: tcp://signoz-clickhouse:9000/?database=signoz
+    endpoint: tcp://signoz-clickhouse:9000/?database=signoz
     timeout: 10s
 
 service:
