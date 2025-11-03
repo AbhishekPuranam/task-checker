@@ -33,6 +33,7 @@ import {
 import {
   Add as AddIcon,
   Edit as EditIcon,
+  Delete as DeleteIcon,
   PersonAdd,
   AdminPanelSettings,
   Engineering,
@@ -46,8 +47,10 @@ const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [userToDelete, setUserToDelete] = useState(null);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     name: '',
@@ -149,6 +152,43 @@ const UserManagement = () => {
     } catch (error) {
       setError(error.response?.data?.message || 'Operation failed');
     }
+  };
+
+  const handleDelete = (user) => {
+    setUserToDelete(user);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!userToDelete) return;
+
+    // Prevent deleting yourself
+    if (userToDelete._id === user?.id) {
+      setError('You cannot delete your own account');
+      setDeleteDialogOpen(false);
+      setUserToDelete(null);
+      return;
+    }
+
+    try {
+      await api.delete(`/users/${userToDelete._id}`);
+      
+      // Refresh the user list
+      fetchUsers();
+      
+      setDeleteDialogOpen(false);
+      setUserToDelete(null);
+    } catch (err) {
+      console.error('Error deleting user:', err);
+      setError(err.response?.data?.message || 'Failed to delete user');
+      setDeleteDialogOpen(false);
+      setUserToDelete(null);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setUserToDelete(null);
   };
 
   const getRoleColor = (role) => {
@@ -448,6 +488,20 @@ const UserManagement = () => {
                       >
                         <EditIcon fontSize="small" />
                       </IconButton>
+                      <IconButton
+                        onClick={() => handleDelete(user)}
+                        sx={{
+                          color: '#d32f2f',
+                          backgroundColor: 'rgba(211, 47, 47, 0.1)',
+                          '&:hover': {
+                            backgroundColor: 'rgba(211, 47, 47, 0.2)',
+                            transform: 'scale(1.1)'
+                          },
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -565,6 +619,23 @@ const UserManagement = () => {
             <Button onClick={handleClose}>Cancel</Button>
             <Button onClick={handleSubmit} variant="contained">
               {editMode ? 'Update' : 'Create'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel}>
+          <DialogTitle>Confirm Delete</DialogTitle>
+          <DialogContent>
+            <Typography>
+              Are you sure you want to delete user <strong>{userToDelete?.username}</strong>?
+              This action cannot be undone.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleDeleteCancel}>Cancel</Button>
+            <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+              Delete
             </Button>
           </DialogActions>
         </Dialog>

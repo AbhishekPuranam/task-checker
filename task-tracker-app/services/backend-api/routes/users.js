@@ -173,6 +173,38 @@ router.put('/:id', adminAuth, async (req, res) => {
   }
 });
 
+// Delete user (admin only)
+router.delete('/:id', adminAuth, async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    // Prevent admin from deleting themselves
+    if (userId === req.user.id) {
+      return res.status(400).json({ message: 'You cannot delete your own account' });
+    }
+
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    await User.findByIdAndDelete(userId);
+
+    res.json({ 
+      message: 'User deleted successfully',
+      deletedUser: {
+        id: user._id,
+        username: user.username,
+        name: user.name
+      }
+    });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Update user status (admin only)
 router.put('/:id/status', adminAuth, async (req, res) => {
   try {
