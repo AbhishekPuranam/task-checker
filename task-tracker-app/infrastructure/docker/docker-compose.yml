@@ -175,59 +175,35 @@ services:
       - "traefik.http.routers.engineer-secure.tls.certresolver=letsencrypt"
       - "traefik.http.services.engineer.loadbalancer.server.port=3001"
 
-  # SigNoz - Observability Platform (Logs, Metrics, Traces)
-  signoz-clickhouse:
-    image: clickhouse/clickhouse-server:23.11-alpine
-    container_name: signoz-clickhouse
-    restart: unless-stopped
-    volumes:
-      - signoz_clickhouse_data:/var/lib/clickhouse/
-    environment:
-      - CLICKHOUSE_DB=signoz
-    networks:
-      - tasktracker-network
-
-  signoz-query-service:
-    image: signoz/query-service:0.45.0
-    container_name: signoz-query-service
-    restart: unless-stopped
-    volumes:
-      - signoz_data:/var/lib/signoz
-    environment:
-      - ClickHouseUrl=tcp://signoz-clickhouse:9000
-      - STORAGE=clickhouse
-      - GODEBUG=netdns=go
-      - TELEMETRY_ENABLED=true
-      - DEPLOYMENT_TYPE=docker-standalone-amd
-    depends_on:
-      - signoz-clickhouse
-    networks:
-      - tasktracker-network
-
-  signoz-otel-collector:
-    image: signoz/signoz-otel-collector:0.88.11
-    container_name: signoz-otel-collector
-    restart: unless-stopped
-    command:
-      - "--config=/etc/otel-collector-config.yaml"
-    volumes:
-      - ./signoz-otel-collector-config.yaml:/etc/otel-collector-config.yaml
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-    environment:
-      - OTEL_RESOURCE_ATTRIBUTES=host.name=tasktracker-production
-    depends_on:
-      - signoz-clickhouse
-    networks:
-      - tasktracker-network
-
-  signoz-frontend:
-    image: signoz/frontend:0.45.0
-    container_name: signoz-frontend
+  # Netdata - Real-time Monitoring & Observability
+  netdata:
+    image: netdata/netdata:latest
+    container_name: tasktracker-netdata
+    hostname: tasktracker-production
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3301:3301"
-    depends_on:
-      - signoz-query-service
+      - "127.0.0.1:19999:19999"
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - netdata_config:/etc/netdata
+      - netdata_lib:/var/lib/netdata
+      - netdata_cache:/var/cache/netdata
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+      - /var/log:/host/var/log:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - NETDATA_CLAIM_TOKEN=${NETDATA_CLAIM_TOKEN:-}
+      - NETDATA_CLAIM_URL=https://app.netdata.cloud
+      - DOCKER_HOST=/var/run/docker.sock
     networks:
       - tasktracker-network
 
@@ -272,9 +248,11 @@ volumes:
     driver: local
   vault_logs:
     driver: local
-  signoz_clickhouse_data:
+  netdata_config:
     driver: local
-  signoz_data:
+  netdata_lib:
+    driver: local
+  netdata_cache:
     driver: local
 
 networks:
