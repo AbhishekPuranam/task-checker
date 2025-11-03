@@ -1,7 +1,7 @@
 # Traefik Static Configuration
 api:
   dashboard: true
-  insecure: true  # Enable dashboard on :8080 (disable in production)
+  insecure: false  # Disable insecure dashboard access in production
 
 entryPoints:
   web:
