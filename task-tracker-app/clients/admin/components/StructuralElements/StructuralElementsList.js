@@ -1494,7 +1494,13 @@ const StructuralElementsList = ({ projectSlug }) => {
             </Typography>
             <Button 
               variant="contained" 
-              href="/login"
+              onClick={() => {
+                // Store the current URL to redirect back after login
+                if (typeof window !== 'undefined') {
+                  sessionStorage.setItem('redirect_after_login', window.location.pathname);
+                  window.location.href = '/login';
+                }
+              }}
               size="large"
             >
               Go to Login

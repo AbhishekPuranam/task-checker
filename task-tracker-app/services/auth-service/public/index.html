@@ -260,18 +260,29 @@
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('user', JSON.stringify(data.user));
 
+                // Check if there's a stored redirect URL from before login
+                const storedRedirect = sessionStorage.getItem('redirect_after_login');
+                let finalRedirectUrl = data.redirectUrl;
+                
+                if (storedRedirect) {
+                    console.log('Found stored redirect URL:', storedRedirect);
+                    finalRedirectUrl = storedRedirect;
+                    // Clear it after use
+                    sessionStorage.removeItem('redirect_after_login');
+                }
+
                 // Show success message
                 const roleName = data.user.role === 'admin' ? 'Admin Dashboard' : 'Jobs View';
-                showSuccess(`Welcome ${data.user.name}! Redirecting to ${roleName}...`);
+                showSuccess(`Welcome ${data.user.name}! Redirecting...`);
 
                 // Cookie is already set by server, redirect securely WITHOUT token in URL
-                if (data.redirectUrl) {
-                    console.log('Cookie set, redirecting securely to:', data.redirectUrl);
+                if (finalRedirectUrl) {
+                    console.log('Cookie set, redirecting securely to:', finalRedirectUrl);
                     
                     // Open redirect page in same window
                     // The application will read token from sessionStorage, not URL
                     setTimeout(() => {
-                        window.location.href = data.redirectUrl;
+                        window.location.href = finalRedirectUrl;
                     }, 800);
                 } else {
                     console.error('ERROR: No redirect URL in response');
