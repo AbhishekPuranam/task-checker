@@ -79,7 +79,7 @@ const structuralElementSchema = new mongoose.Schema({
   // Status tracking
   status: {
     type: String,
-    enum: ['active', 'completed', 'on_hold', 'cancelled'],
+    enum: ['active', 'complete', 'completed', 'non clearance', 'on_hold', 'cancelled'],
     default: 'active'
   },
   // Admin who created this entry

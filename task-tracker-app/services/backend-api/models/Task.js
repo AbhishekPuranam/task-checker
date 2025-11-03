@@ -202,7 +202,7 @@ taskSchema.methods.calculateSurfaceAreaProgress = async function() {
     );
     
     const completedElements = elements.filter(element => 
-      element.status === 'completed'
+      element.status === 'completed' || element.status === 'complete'
     );
     
     const completedSurfaceArea = completedElements.reduce((sum, element) => 
