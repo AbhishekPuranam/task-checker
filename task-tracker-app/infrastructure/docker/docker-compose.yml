@@ -195,6 +195,7 @@ services:
       - "-config=/root/config/prometheus.yml"
     volumes:
       - ./signoz-config.yaml:/root/config/prometheus.yml
+      - signoz_data:/var/lib/signoz
     environment:
       - ClickHouseUrl=tcp://signoz-clickhouse:9000
       - STORAGE=clickhouse
@@ -275,6 +276,8 @@ volumes:
   vault_logs:
     driver: local
   signoz_clickhouse_data:
+    driver: local
+  signoz_data:
     driver: local
 
 networks:
