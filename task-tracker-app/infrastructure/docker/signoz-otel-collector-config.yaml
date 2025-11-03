@@ -44,15 +44,12 @@ processors:
 exporters:
   clickhouselogsexporter:
     dsn: tcp://signoz-clickhouse:9000/signoz
-    timeout: 10s
 
   clickhousemetricswrite:
     endpoint: tcp://signoz-clickhouse:9000/?database=signoz
-    timeout: 10s
 
   clickhousetraces:
-    endpoint: tcp://signoz-clickhouse:9000/?database=signoz
-    timeout: 10s
+    datasource: tcp://signoz-clickhouse:9000/?database=signoz
 
 service:
   pipelines:
