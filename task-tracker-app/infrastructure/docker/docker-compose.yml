@@ -188,8 +188,10 @@ services:
     environment:
       - BOOTSTRAP_PROMETHEUS_URL=http://coroot-prometheus:9090
       - BOOTSTRAP_REFRESH_INTERVAL=15s
+      - BOOTSTRAP_CLICKHOUSE_ADDRESS=coroot-clickhouse:9000
     depends_on:
       - coroot-prometheus
+      - coroot-clickhouse
     networks:
       - tasktracker-network
 
@@ -231,17 +233,18 @@ services:
       - tasktracker-network
 
   # ClickHouse for logs and traces
-  # Disabled due to authentication issues - Coroot works with Prometheus only
-  # coroot-clickhouse:
-  #   image: clickhouse/clickhouse-server:latest
-  #   container_name: tasktracker-coroot-clickhouse
-  #   restart: unless-stopped
-  #   environment:
-  #     - CLICKHOUSE_DB=default
-  #   volumes:
-  #     - clickhouse_data:/var/lib/clickhouse
-  #   networks:
-  #     - tasktracker-network
+  coroot-clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: tasktracker-coroot-clickhouse
+    restart: unless-stopped
+    environment:
+      - CLICKHOUSE_DB=default
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./clickhouse-config.xml:/etc/clickhouse-server/users.d/custom.xml:ro
+    networks:
+      - tasktracker-network
 
   # Loki for log aggregation
   loki:
