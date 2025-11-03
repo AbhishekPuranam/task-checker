@@ -208,7 +208,7 @@ services:
       - /sys/fs/cgroup:/host/sys/fs/cgroup:ro
       - /:/host/root:ro
     environment:
-      - COLLECTOR_ENDPOINT=http://coroot-prometheus:9090/write
+      - COLLECTOR_ENDPOINT=http://coroot-prometheus:9090/api/v1/write
       - SCRAPE_INTERVAL=15s
     depends_on:
       - coroot-prometheus
