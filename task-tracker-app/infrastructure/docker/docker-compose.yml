@@ -181,7 +181,7 @@ services:
     container_name: tasktracker-coroot
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8080:8080"  # Only accessible from localhost, not publicly exposed
+      - "127.0.0.1:8081:8080"  # Changed to 8081 to avoid conflict with Traefik dashboard
     volumes:
       - coroot_data:/data
       - coroot_cache:/tmp/coroot-cache
@@ -208,7 +208,7 @@ services:
       - /sys/fs/cgroup:/host/sys/fs/cgroup:ro
       - /:/host/root:ro
     environment:
-      - COLLECTOR_ENDPOINT=http://coroot-prometheus:9090/api/v1/write
+      - COLLECTOR_ENDPOINT=http://coroot-prometheus:9090
       - SCRAPE_INTERVAL=15s
     depends_on:
       - coroot-prometheus
