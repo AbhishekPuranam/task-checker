@@ -56,7 +56,7 @@ router.get('/', auth, async (req, res) => {
     // Calculate progress for each project with timeout
     console.log(`📊 Calculating progress for ${projects.length} projects...`);
     
-    const calculateWithTimeout = async (project, timeoutMs = 5000) => {
+    const calculateWithTimeout = async (project, timeoutMs = 2000) => {
       return Promise.race([
         project.calculateSurfaceAreaProgress(),
         new Promise((_, reject) => 
