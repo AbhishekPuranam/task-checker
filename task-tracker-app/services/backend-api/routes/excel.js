@@ -130,7 +130,7 @@ function transformExcelRow(row, projectId, userId, project) {
 }
 
 // Create jobs for Fire Proofing Workflow
-async function createFireProofingJobs(structuralElement, userId) {
+async function createFireProofingJobs(structuralElement, userId, session = null) {
   if (!structuralElement.fireProofingWorkflow) {
     return [];
   }
@@ -366,7 +366,7 @@ async function createFireProofingJobs(structuralElement, userId) {
         orderIndex: i + 1 // Set orderIndex based on template position (1-based)
       });
 
-      const savedJob = await job.save();
+      const savedJob = await job.save({ session });
       createdJobs.push(savedJob);
     } catch (error) {
       console.error(`Error creating job for ${structuralElement.structureNumber}:`, error);
@@ -450,12 +450,16 @@ router.post('/preview', auth, upload.single('excel'), async (req, res) => {
   }
 });
 
-// Upload and process Excel file
+// Upload and process Excel file synchronously with progress tracking
 router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, res) => {
   console.log('=== Excel upload request received ===');
   console.log('Project ID:', req.params.projectId);
   console.log('File uploaded:', !!req.file);
   console.log('User:', req.user.email);
+  
+  const { DatabaseTransaction } = require('../utils/transaction');
+  const { CacheTransaction, invalidateCache } = require('../middleware/cache');
+  const { addProgressJob } = require('../utils/queue');
   
   try {
     const { projectId } = req.params;
@@ -478,7 +482,7 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
     console.log(`📁 File uploaded to: ${req.file.path}`);
     console.log(`📊 File size: ${req.file.size} bytes`);
     
-    // Verify file exists before queueing
+    // Verify file exists
     if (!fs.existsSync(req.file.path)) {
       console.error(`❌ File does not exist at: ${req.file.path}`);
       return res.status(500).json({ message: 'File upload failed - file not found after upload' });
@@ -486,25 +490,155 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
     
     console.log(`✅ File verified to exist at: ${req.file.path}`);
 
-    // Add job to queue for background processing
-    const job = await addExcelJob({
-      filePath: req.file.path,
-      projectId,
-      userId: req.user.id,
-      userEmail: req.user.email,
-      filename: req.file.originalname,
-      priority: req.user.role === 'admin' ? 1 : 2, // Admin uploads get higher priority
-    });
+    // Parse Excel file
+    console.log(`📄 Parsing Excel file...`);
+    const excelData = parseExcelFile(req.file.path);
+    console.log(`✅ Parsed ${excelData.length} rows from Excel`);
+    
+    if (!excelData || excelData.length === 0) {
+      // Clean up file
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ message: 'Excel file is empty or invalid' });
+    }
 
-    console.log(`✅ Excel upload queued with job ID: ${job.id}`);
+    // Transform and validate data
+    console.log(`🔍 Validating data...`);
+    const structuralElements = [];
+    const errors = [];
+    
+    for (let i = 0; i < excelData.length; i++) {
+      try {
+        const transformedData = transformExcelRow(excelData[i], projectId, req.user.id, project);
+        
+        if (!transformedData.structureNumber) {
+          errors.push({ row: i + 2, message: 'Structure Number is required' });
+          continue;
+        }
+        
+        structuralElements.push(transformedData);
+      } catch (error) {
+        errors.push({ row: i + 2, message: error.message });
+      }
+    }
+    
+    if (errors.length > 0 && structuralElements.length === 0) {
+      // Clean up file
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ 
+        message: `All rows contain errors. First error: ${errors[0].message}`,
+        errors: errors.slice(0, 10)
+      });
+    }
+    
+    console.log(`✅ Validation complete - ${structuralElements.length} valid, ${errors.length} errors`);
 
-    // Return immediately with job ID for progress tracking
-    res.json({
-      message: 'Excel file uploaded successfully and queued for processing',
-      jobId: job.id,
-      status: 'queued',
-      filename: req.file.originalname
-    });
+    // Start transaction
+    const dbTransaction = new DatabaseTransaction();
+    const cacheTransaction = new CacheTransaction(projectId);
+    
+    try {
+      await dbTransaction.start();
+      const session = dbTransaction.getSession();
+      
+      await cacheTransaction.start();
+      const cachePatterns = CacheTransaction.getProjectCachePatterns(projectId);
+      for (const pattern of cachePatterns) {
+        await cacheTransaction.stageInvalidation(pattern);
+      }
+      
+      console.log(`💾 Saving ${structuralElements.length} elements with transaction protection...`);
+      
+      let savedCount = 0;
+      let duplicateCount = 0;
+      let totalJobsCreated = 0;
+      
+      // Process in smaller batches to avoid timeout
+      for (let idx = 0; idx < structuralElements.length; idx++) {
+        const elementData = structuralElements[idx];
+        
+        // Check for duplicate
+        const existingElement = await StructuralElement.findOne({
+          project: projectId,
+          structureNumber: elementData.structureNumber,
+          drawingNo: elementData.drawingNo,
+          level: elementData.level,
+          memberType: elementData.memberType,
+          gridNo: elementData.gridNo,
+          partMarkNo: elementData.partMarkNo
+        }).session(session);
+        
+        if (existingElement) {
+          console.log(`⚠️  Skipping duplicate: ${elementData.structureNumber}`);
+          duplicateCount++;
+          continue;
+        }
+        
+        const structuralElement = new StructuralElement(elementData);
+        const saved = await structuralElement.save({ session });
+        dbTransaction.trackStructuralElement(saved._id);
+        
+        // Create fire proofing jobs if workflow assigned
+        if (saved.fireProofingWorkflow) {
+          const createdJobs = await createFireProofingJobs(saved, req.user.id, session);
+          totalJobsCreated += createdJobs.length;
+          createdJobs.forEach(job => dbTransaction.trackJob(job._id));
+        }
+        
+        savedCount++;
+        
+        // Log progress every 100 elements
+        if (savedCount % 100 === 0) {
+          console.log(`📊 Progress: ${savedCount}/${structuralElements.length} elements processed`);
+        }
+      }
+      
+      console.log(`✅ Saved ${savedCount} elements, ${duplicateCount} duplicates, ${totalJobsCreated} jobs created`);
+      
+      // Update project count
+      await Task.findByIdAndUpdate(
+        projectId,
+        { $inc: { structuralElementsCount: savedCount } },
+        { session }
+      );
+      
+      // Commit transaction
+      await dbTransaction.commit();
+      console.log(`✅ Transaction committed successfully`);
+      
+      // Invalidate caches
+      await cacheTransaction.commit();
+      
+      // Trigger progress calculation
+      if (savedCount > 0) {
+        console.log(`📊 Triggering progress calculation for project ${projectId}`);
+        addProgressJob(projectId.toString()).catch(err => 
+          console.error('Failed to queue progress job:', err)
+        );
+      }
+      
+      // Clean up file
+      fs.unlinkSync(req.file.path);
+      
+      // Return success response
+      res.json({
+        success: true,
+        message: `Successfully imported ${savedCount} structural elements and created ${totalJobsCreated} jobs`,
+        savedElements: savedCount,
+        duplicateElements: duplicateCount,
+        jobsCreated: totalJobsCreated,
+        errors: errors.slice(0, 10),
+        totalRows: excelData.length
+      });
+      
+    } catch (txError) {
+      console.error(`❌ Transaction failed:`, txError);
+      
+      // Rollback
+      await dbTransaction.rollback();
+      await cacheTransaction.rollback();
+      
+      throw txError;
+    }
 
   } catch (error) {
     console.error('Excel upload error:', error);
