@@ -530,21 +530,15 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
       });
     }
     
-    console.log(`✅ Validation complete - ${structuralElements.length} valid, ${errors.length} errors`);
+        console.log(`✅ Validation complete - ${structuralElements.length} valid, ${errors.length} errors`);
 
-    // Start transaction (requires MongoDB replica set)
+    // Start transaction for atomic operations
+    const { DatabaseTransaction } = require('../utils/transaction');
     const dbTransaction = new DatabaseTransaction();
-    const cacheTransaction = new CacheTransaction(projectId);
     
     try {
       await dbTransaction.start();
       const session = dbTransaction.getSession();
-      
-      await cacheTransaction.start();
-      const cachePatterns = CacheTransaction.getProjectCachePatterns(projectId);
-      for (const pattern of cachePatterns) {
-        await cacheTransaction.stageInvalidation(pattern);
-      }
       
       console.log(`💾 Saving ${structuralElements.length} elements with transaction protection...`);
       
@@ -552,7 +546,7 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
       let duplicateCount = 0;
       let totalJobsCreated = 0;
       
-      // Process elements
+      // Process elements within transaction
       for (let idx = 0; idx < structuralElements.length; idx++) {
         const elementData = structuralElements[idx];
         
@@ -594,19 +588,21 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
       
       console.log(`✅ Saved ${savedCount} elements, ${duplicateCount} duplicates, ${totalJobsCreated} jobs created`);
       
-      // Update project count
+      // Update project count within transaction
       await Task.findByIdAndUpdate(
         projectId,
         { $inc: { structuralElementsCount: savedCount } },
         { session }
       );
       
-      // Commit transaction
+      // Commit transaction - all or nothing!
       await dbTransaction.commit();
-      console.log(`✅ Transaction committed successfully`);
+      console.log(`✅ Transaction committed successfully - ${savedCount} elements and ${totalJobsCreated} jobs saved atomically`);
       
-      // Invalidate caches
-      await cacheTransaction.commit();
+      // Invalidate caches after successful commit
+      await invalidateCache(`cache:jobs:project:${projectId}:*`);
+      await invalidateCache(`cache:stats:project:${projectId}:*`);
+      await invalidateCache(`cache:structural:summary:${projectId}:*`);
       
       // Trigger progress calculation
       if (savedCount > 0) {
@@ -633,9 +629,9 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
     } catch (txError) {
       console.error(`❌ Transaction failed:`, txError);
       
-      // Rollback
+      // Automatic rollback - nothing was saved!
       await dbTransaction.rollback();
-      await cacheTransaction.rollback();
+      console.log(`🔙 Transaction rolled back - no data was saved to database`);
       
       throw txError;
     }
