@@ -154,11 +154,15 @@ router.get('/by-name/:projectName', auth, async (req, res) => {
     
     // If still not found, try case-insensitive regex search with flexible spacing/dashes
     if (!project) {
-      // Escape special regex characters and allow spaces or dashes between words
-      const escapedName = projectName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      project = await Task.findOne({ 
-        title: { $regex: new RegExp(`^${escapedName.replace(/[-\s]+/g, '[\\s-]+')}$`, 'i') }
-      });
+      // Normalize the projectName by removing all spaces and dashes, then match against normalized titles
+      // This handles cases like "ncc-aiims" matching "NCC -AIIMS" or "NCC-AIIMS" or "NCC AIIMS"
+      const normalized = projectName.replace(/[-\s]+/g, '').toLowerCase();
+      
+      // Find all projects and check normalized versions
+      const allProjects = await Task.find({});
+      project = allProjects.find(p => 
+        p.title.replace(/[-\s]+/g, '').toLowerCase() === normalized
+      );
     }
     
     if (!project) {
