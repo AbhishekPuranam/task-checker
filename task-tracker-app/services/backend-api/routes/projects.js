@@ -128,9 +128,11 @@ router.get('/:id', auth, async (req, res) => {
 router.get('/by-name/:projectName', auth, async (req, res) => {
   try {
     const projectName = decodeURIComponent(req.params.projectName);
+    console.log(`🔍 Looking for project: "${projectName}"`);
     
     // First try exact match
     let project = await Task.findOne({ title: projectName });
+    if (project) console.log('✅ Found exact match');
     
     // If not found and projectName looks like a slug, try multiple slug-to-title conversions
     if (!project && projectName.includes('-')) {
@@ -146,29 +148,41 @@ router.get('/by-name/:projectName', auth, async (req, res) => {
         projectName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
       ];
       
+      console.log('📝 Trying variations:', variations);
       for (const variation of variations) {
         project = await Task.findOne({ title: variation });
-        if (project) break;
+        if (project) {
+          console.log(`✅ Found with variation: "${variation}"`);
+          break;
+        }
       }
     }
     
     // If still not found, try case-insensitive regex search with flexible spacing/dashes
     if (!project) {
+      console.log('🔄 Trying normalized matching...');
       // Normalize the projectName by removing all spaces and dashes, then match against normalized titles
       // This handles cases like "ncc-aiims" matching "NCC -AIIMS" or "NCC-AIIMS" or "NCC AIIMS"
       const normalized = projectName.replace(/[-\s]+/g, '').toLowerCase();
+      console.log(`📊 Normalized search term: "${normalized}"`);
       
       // Find all projects and check normalized versions
       const allProjects = await Task.find({});
-      project = allProjects.find(p => 
-        p.title.replace(/[-\s]+/g, '').toLowerCase() === normalized
-      );
+      console.log(`📋 Checking ${allProjects.length} projects...`);
+      project = allProjects.find(p => {
+        const normalizedTitle = p.title.replace(/[-\s]+/g, '').toLowerCase();
+        const match = normalizedTitle === normalized;
+        if (match) console.log(`✅ Match found: "${p.title}" (normalized: "${normalizedTitle}")`);
+        return match;
+      });
     }
     
     if (!project) {
+      console.log('❌ Project not found after all attempts');
       return res.status(404).json({ message: 'Project not found' });
     }
     
+    console.log(`✅ Returning project: ${project.title}`);
     res.json(project);
   } catch (error) {
     console.error('Error fetching project by name:', error);
