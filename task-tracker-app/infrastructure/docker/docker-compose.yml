@@ -33,7 +33,7 @@ services:
     volumes:
       - mongodb_data:/data/db
       - ../../scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
-  - /opt/task-checker/task-tracker-app/secrets/mongodb-keyfile:/data/mongodb-keyfile:ro
+      - /opt/task-checker/task-tracker-app/secrets/mongodb-keyfile:/data/mongodb-keyfile:ro
     secrets:
       - mongodb_password
     networks:
