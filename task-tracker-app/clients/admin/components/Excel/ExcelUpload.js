@@ -252,6 +252,12 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
   };
 
   const handleClose = () => {
+    // Prevent closing while upload is in progress
+    if (uploading && !uploadResult) {
+      toast.error('Please wait for the upload to complete before closing. Jobs are still being created.');
+      return;
+    }
+    
     // Clean up progress polling
     if (progressInterval) {
       clearInterval(progressInterval);
@@ -275,14 +281,26 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
   return (
     <Dialog 
       open={open} 
-      onClose={handleClose} 
+      onClose={(event, reason) => {
+        // Prevent closing via backdrop click or escape key while uploading
+        if ((reason === 'backdropClick' || reason === 'escapeKeyDown') && uploading && !uploadResult) {
+          toast.error('Please wait for the upload to complete before closing. Jobs are still being created.');
+          return;
+        }
+        handleClose();
+      }}
       maxWidth="md" 
       fullWidth
       PaperProps={{ sx: { minHeight: '500px' } }}
     >
       <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h6">Upload Structural Elements</Typography>
-        <IconButton onClick={handleClose} size="small">
+        <IconButton 
+          onClick={handleClose} 
+          size="small"
+          disabled={uploading && !uploadResult}
+          title={uploading && !uploadResult ? 'Please wait for upload to complete' : 'Close'}
+        >
           <Close />
         </IconButton>
       </DialogTitle>
@@ -369,6 +387,15 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
 
           {(uploading || uploadProgress) && (
             <Box sx={{ mb: 2 }}>
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                <Typography variant="body2" fontWeight={600}>
+                  ⏳ Upload in progress - Please wait
+                </Typography>
+                <Typography variant="caption">
+                  Jobs are being created in the background. Do not close this dialog until the process completes.
+                  {uploadProgress?.jobsCreated > 0 && ` (${uploadProgress.jobsCreated} jobs created so far)`}
+                </Typography>
+              </Alert>
               <LinearProgress 
                 variant={uploadProgress && uploadProgress.percent !== undefined ? "determinate" : "indeterminate"}
                 value={uploadProgress?.percent || 0}
@@ -542,8 +569,12 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={handleClose} color="inherit">
-          Close
+        <Button 
+          onClick={handleClose} 
+          color="inherit"
+          disabled={uploading && !uploadResult}
+        >
+          {uploading && !uploadResult ? 'Processing...' : 'Close'}
         </Button>
         {selectedFile && !uploadResult && (
           <Button onClick={handleUpload} variant="contained" disabled={uploading}>
