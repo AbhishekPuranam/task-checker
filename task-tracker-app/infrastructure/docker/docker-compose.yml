@@ -20,11 +20,12 @@ services:
     networks:
       - tasktracker-network
 
-  # MongoDB Database
+  # MongoDB Database (Replica Set for Transactions)
   mongodb:
     image: mongo:7.0
     container_name: tasktracker-mongodb
     restart: unless-stopped
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/mongodb_password
@@ -36,6 +37,12 @@ services:
       - mongodb_password
     networks:
       - tasktracker-network
+    healthcheck:
+      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongodb:27017'}]}) }" | mongosh --port 27017 --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
   # Redis for session storage
   redis:

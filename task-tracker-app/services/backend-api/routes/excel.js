@@ -532,13 +532,21 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
     
     console.log(`✅ Validation complete - ${structuralElements.length} valid, ${errors.length} errors`);
 
-    // Process without transactions (MongoDB standalone doesn't support transactions)
-    // Keep track of what we create for potential rollback
-    const createdElements = [];
-    const createdJobs = [];
+    // Start transaction (requires MongoDB replica set)
+    const dbTransaction = new DatabaseTransaction();
+    const cacheTransaction = new CacheTransaction(projectId);
     
     try {
-      console.log(`💾 Saving ${structuralElements.length} elements...`);
+      await dbTransaction.start();
+      const session = dbTransaction.getSession();
+      
+      await cacheTransaction.start();
+      const cachePatterns = CacheTransaction.getProjectCachePatterns(projectId);
+      for (const pattern of cachePatterns) {
+        await cacheTransaction.stageInvalidation(pattern);
+      }
+      
+      console.log(`💾 Saving ${structuralElements.length} elements with transaction protection...`);
       
       let savedCount = 0;
       let duplicateCount = 0;
@@ -557,7 +565,7 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
           memberType: elementData.memberType,
           gridNo: elementData.gridNo,
           partMarkNo: elementData.partMarkNo
-        });
+        }).session(session);
         
         if (existingElement) {
           console.log(`⚠️  Skipping duplicate: ${elementData.structureNumber}`);
@@ -566,14 +574,14 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
         }
         
         const structuralElement = new StructuralElement(elementData);
-        const saved = await structuralElement.save();
-        createdElements.push(saved._id);
+        const saved = await structuralElement.save({ session });
+        dbTransaction.trackStructuralElement(saved._id);
         
         // Create fire proofing jobs if workflow assigned
         if (saved.fireProofingWorkflow) {
-          const jobs = await createFireProofingJobs(saved, req.user.id, null);
+          const jobs = await createFireProofingJobs(saved, req.user.id, session);
           totalJobsCreated += jobs.length;
-          jobs.forEach(job => createdJobs.push(job._id));
+          jobs.forEach(job => dbTransaction.trackJob(job._id));
         }
         
         savedCount++;
@@ -589,13 +597,16 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
       // Update project count
       await Task.findByIdAndUpdate(
         projectId,
-        { $inc: { structuralElementsCount: savedCount } }
+        { $inc: { structuralElementsCount: savedCount } },
+        { session }
       );
       
+      // Commit transaction
+      await dbTransaction.commit();
+      console.log(`✅ Transaction committed successfully`);
+      
       // Invalidate caches
-      await invalidateCache(`cache:jobs:project:${projectId}:*`);
-      await invalidateCache(`cache:stats:project:${projectId}:*`);
-      await invalidateCache(`cache:structural:summary:${projectId}:*`);
+      await cacheTransaction.commit();
       
       // Trigger progress calculation
       if (savedCount > 0) {
@@ -619,20 +630,14 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
         totalRows: excelData.length
       });
       
-    } catch (saveError) {
-      console.error(`❌ Error during save:`, saveError);
+    } catch (txError) {
+      console.error(`❌ Transaction failed:`, txError);
       
-      // Attempt rollback - delete what we created
-      console.log(`🔙 Rolling back - deleting ${createdElements.length} elements and ${createdJobs.length} jobs`);
+      // Rollback
+      await dbTransaction.rollback();
+      await cacheTransaction.rollback();
       
-      if (createdJobs.length > 0) {
-        await Job.deleteMany({ _id: { $in: createdJobs } });
-      }
-      if (createdElements.length > 0) {
-        await StructuralElement.deleteMany({ _id: { $in: createdElements } });
-      }
-      
-      throw saveError;
+      throw txError;
     }
 
   } catch (error) {
