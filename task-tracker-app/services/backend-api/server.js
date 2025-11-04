@@ -30,6 +30,7 @@ const reportRoutes = require('./routes/reports');
 const excelRoutes = require('./routes/excel');
 const jobRoutes = require('./routes/jobs');
 const projectRoutes = require('./routes/projects');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 const server = http.createServer(app);
@@ -260,6 +261,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/excel', excelRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check endpoint (must be before catch-all route)
 app.get('/health', (req, res) => {

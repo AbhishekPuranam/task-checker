@@ -101,9 +101,111 @@ const statsCacheKeyGenerator = (req) => {
   return `cache:stats:project:${projectId}:user:${userId}`;
 };
 
+/**
+ * Cache transaction manager for coordinating cache operations with database transactions
+ */
+class CacheTransaction {
+  constructor(projectId) {
+    this.projectId = projectId;
+    this.invalidatedKeys = [];
+    this.backupData = new Map();
+    this.isActive = false;
+  }
+
+  /**
+   * Start cache transaction - backup current cache state
+   */
+  async start() {
+    this.isActive = true;
+    console.log(`🔄 [CACHE-TX] Started cache transaction for project ${this.projectId}`);
+  }
+
+  /**
+   * Backup cache data before invalidation
+   */
+  async backupKey(pattern) {
+    try {
+      const data = await cache.get(pattern);
+      if (data) {
+        this.backupData.set(pattern, data);
+        console.log(`💾 [CACHE-TX] Backed up cache key: ${pattern}`);
+      }
+    } catch (error) {
+      console.error(`⚠️ [CACHE-TX] Failed to backup cache key ${pattern}:`, error.message);
+    }
+  }
+
+  /**
+   * Stage cache invalidation (don't execute yet)
+   */
+  async stageInvalidation(pattern) {
+    if (!this.invalidatedKeys.includes(pattern)) {
+      this.invalidatedKeys.push(pattern);
+      console.log(`📝 [CACHE-TX] Staged invalidation for: ${pattern}`);
+    }
+  }
+
+  /**
+   * Commit - execute all staged invalidations
+   */
+  async commit() {
+    if (!this.isActive) {
+      return;
+    }
+
+    console.log(`✅ [CACHE-TX] Committing - Invalidating ${this.invalidatedKeys.length} cache patterns`);
+    
+    for (const pattern of this.invalidatedKeys) {
+      await invalidateCache(pattern);
+    }
+    
+    this.backupData.clear();
+    this.isActive = false;
+    console.log(`✅ [CACHE-TX] Cache transaction committed`);
+  }
+
+  /**
+   * Rollback - restore backed up cache data
+   */
+  async rollback() {
+    if (!this.isActive) {
+      return;
+    }
+
+    console.log(`🔙 [CACHE-TX] Rolling back - Restoring ${this.backupData.size} cache entries`);
+    
+    for (const [key, data] of this.backupData.entries()) {
+      try {
+        await cache.set(key, data, 300); // Restore with 5-minute TTL
+        console.log(`♻️ [CACHE-TX] Restored cache key: ${key}`);
+      } catch (error) {
+        console.error(`⚠️ [CACHE-TX] Failed to restore cache key ${key}:`, error.message);
+      }
+    }
+    
+    this.backupData.clear();
+    this.invalidatedKeys = [];
+    this.isActive = false;
+    console.log(`🔙 [CACHE-TX] Cache transaction rolled back`);
+  }
+
+  /**
+   * Get patterns that will be invalidated for a project
+   */
+  static getProjectCachePatterns(projectId) {
+    return [
+      `cache:jobs:project:${projectId}:*`,
+      `cache:stats:project:${projectId}:*`,
+      `cache:/api/structural-elements/${projectId}*`,
+      `cache:/api/projects/${projectId}*`
+    ];
+  }
+}
+
 module.exports = {
   cacheMiddleware,
   invalidateCache,
   jobsCacheKeyGenerator,
-  statsCacheKeyGenerator
+  statsCacheKeyGenerator,
+  CacheTransaction
 };

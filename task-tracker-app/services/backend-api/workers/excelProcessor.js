@@ -2,8 +2,9 @@ const { Worker } = require('bullmq');
 const fs = require('fs');
 const StructuralElement = require('../models/StructuralElement');
 const Task = require('../models/Task');
-const { invalidateCache } = require('../middleware/cache');
+const { invalidateCache, CacheTransaction } = require('../middleware/cache');
 const { addProgressJob } = require('../utils/queue');
+const { DatabaseTransaction } = require('../utils/transaction');
 
 // Import Excel processing functions from excel route
 // We'll need to extract these to a shared module
@@ -59,7 +60,7 @@ function transformExcelRow(row, projectId, userId, project) {
 /**
  * Create fire proofing jobs for a structural element
  */
-async function createFireProofingJobs(structuralElement, userId) {
+async function createFireProofingJobs(structuralElement, userId, session = null) {
   const Job = require('../models/Job');
   
   const workflowJobs = {
@@ -146,7 +147,7 @@ async function createFireProofingJobs(structuralElement, userId) {
       createdBy: userId,
     });
 
-    const saved = await job.save();
+    const saved = await job.save({ session });
     createdJobs.push(saved);
   }
 
@@ -178,7 +179,24 @@ function createExcelWorker() {
       
       console.log(`📊 [WORKER] Job ${job.id} data:`, { filePath, projectId, userId, userEmail });
       
+      // Initialize transaction and cache transaction
+      const dbTransaction = new DatabaseTransaction();
+      const cacheTransaction = new CacheTransaction(projectId);
+      
       try {
+        // Start database transaction
+        await dbTransaction.start();
+        const session = dbTransaction.getSession();
+        
+        // Start cache transaction
+        await cacheTransaction.start();
+        
+        // Stage cache patterns for invalidation
+        const cachePatterns = CacheTransaction.getProjectCachePatterns(projectId);
+        for (const pattern of cachePatterns) {
+          await cacheTransaction.stageInvalidation(pattern);
+        }
+        
         // Stage 1: Parse Excel (0-10%)
         await job.updateProgress({ stage: 'parsing', percent: 0, message: 'Parsing Excel file...' });
         
@@ -202,7 +220,7 @@ function createExcelWorker() {
         await job.updateProgress({ stage: 'loading', percent: 10, message: 'Loading project...' });
         
         console.log(`🔍 [WORKER] Loading project: ${projectId}`);
-        const project = await Task.findById(projectId);
+        const project = await Task.findById(projectId).session(session);
         if (!project) {
           throw new Error('Project not found');
         }
@@ -249,12 +267,12 @@ function createExcelWorker() {
         await job.updateProgress({ 
           stage: 'saving', 
           percent: 40, 
-          message: `Saving ${structuralElements.length} elements...`,
+          message: `Saving ${structuralElements.length} elements within transaction...`,
           validated: structuralElements.length,
           errors: errors.length
         });
         
-        // Stage 4: Save to database (40-90%)
+        // Stage 4: Save to database within transaction (40-90%)
         let savedCount = 0;
         let duplicateCount = 0;
         let totalJobsCreated = 0;
@@ -267,7 +285,7 @@ function createExcelWorker() {
             await job.updateProgress({
               stage: 'saving',
               percent,
-              message: `Processing element ${idx + 1} of ${structuralElements.length}`,
+              message: `Processing element ${idx + 1} of ${structuralElements.length} (TX protected)`,
               saved: savedCount,
               jobsCreated: totalJobsCreated
             });
@@ -293,7 +311,7 @@ function createExcelWorker() {
               fireproofingThickness: elementData.fireproofingThickness,
               surfaceAreaSqm: elementData.surfaceAreaSqm,
               fireProofingWorkflow: elementData.fireProofingWorkflow
-            });
+            }).session(session);
             
             if (existingElement) {
               // Exact duplicate found - all fields match
@@ -303,17 +321,25 @@ function createExcelWorker() {
             }
             
             const structuralElement = new StructuralElement(elementData);
-            const saved = await structuralElement.save();
+            const saved = await structuralElement.save({ session });
+            
+            // Track in transaction
+            dbTransaction.trackStructuralElement(saved._id);
             
             // Create fire proofing jobs if workflow assigned
             if (saved.fireProofingWorkflow) {
               console.log(`🔧 [WORKER] Creating jobs for ${saved.structureNumber} with workflow: ${saved.fireProofingWorkflow}`);
               try {
-                const createdJobs = await createFireProofingJobs(saved, userId);
+                const createdJobs = await createFireProofingJobs(saved, userId, session);
                 totalJobsCreated += createdJobs.length;
+                
+                // Track jobs in transaction
+                createdJobs.forEach(job => dbTransaction.trackJob(job._id));
+                
                 console.log(`✅ [WORKER] Created ${createdJobs.length} jobs for ${saved.structureNumber}`);
               } catch (jobError) {
                 console.error(`❌ [WORKER] Error creating jobs for ${saved.structureNumber}:`, jobError.message);
+                throw jobError; // Fail the entire transaction if job creation fails
               }
             } else {
               console.log(`⚠️  [WORKER] No workflow assigned for ${saved.structureNumber}`);
@@ -322,32 +348,44 @@ function createExcelWorker() {
             savedCount++;
           } catch (error) {
             console.error(`❌ [WORKER] Error saving element ${elementData.structureNumber}:`, error.message);
-            errors.push({
-              row: `Element ${elementData.structureNumber}`,
-              message: error.message
-            });
+            // Any error during save should rollback the entire transaction
+            throw error;
           }
         }
         
         console.log(`✅ [WORKER] Saved ${savedCount} elements, ${duplicateCount} duplicates, ${totalJobsCreated} jobs created`);
         
-        // Stage 5: Finalize (90-100%)
+        // Stage 5: Finalize (90-95%)
         await job.updateProgress({ 
           stage: 'finalizing', 
           percent: 90, 
-          message: 'Finalizing...',
+          message: 'Committing transaction...',
           saved: savedCount,
           jobsCreated: totalJobsCreated
         });
         
-        // Update project count
-        await Task.findByIdAndUpdate(projectId, {
-          $inc: { structuralElementsCount: savedCount }
+        // Update project count within transaction
+        await Task.findByIdAndUpdate(
+          projectId,
+          { $inc: { structuralElementsCount: savedCount } },
+          { session }
+        );
+        
+        // Commit database transaction
+        await dbTransaction.commit();
+        console.log(`✅ [WORKER] Database transaction committed successfully`);
+        
+        // Stage 6: Cache invalidation (95-100%)
+        await job.updateProgress({ 
+          stage: 'finalizing', 
+          percent: 95, 
+          message: 'Invalidating cache...',
+          saved: savedCount,
+          jobsCreated: totalJobsCreated
         });
         
-        // Invalidate cache
-        await invalidateCache(`cache:jobs:project:${projectId}:*`);
-        await invalidateCache(`cache:stats:project:${projectId}`);
+        // Commit cache transaction (invalidate caches now that DB is committed)
+        await cacheTransaction.commit();
         
         // Trigger progress calculation after uploading structural elements
         if (savedCount > 0) {
@@ -385,6 +423,12 @@ function createExcelWorker() {
         
       } catch (error) {
         console.error(`❌ [WORKER] Job ${job.id} failed:`, error);
+        
+        // Rollback database transaction
+        await dbTransaction.rollback();
+        
+        // Rollback cache transaction
+        await cacheTransaction.rollback();
         
         // Clean up file on error
         if (filePath) {
