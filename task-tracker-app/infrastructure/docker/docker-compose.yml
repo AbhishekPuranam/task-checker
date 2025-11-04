@@ -25,7 +25,7 @@ services:
     image: mongo:7.0
     container_name: tasktracker-mongodb
     restart: unless-stopped
-    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017", "--keyFile", "/data/mongodb-keyfile"]
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/mongodb_password
@@ -33,12 +33,13 @@ services:
     volumes:
       - mongodb_data:/data/db
       - ../../scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - mongodb_keyfile:/data/mongodb-keyfile:ro
     secrets:
       - mongodb_password
     networks:
       - tasktracker-network
     healthcheck:
-      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongodb:27017'}]}) }" | mongosh --port 27017 --quiet
+      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongodb:27017'}]}) }" | mongosh -u admin -p $$(cat /run/secrets/mongodb_password) --authenticationDatabase admin --quiet
       interval: 10s
       timeout: 10s
       retries: 5
@@ -246,6 +247,8 @@ secrets:
 
 volumes:
   mongodb_data:
+    driver: local
+  mongodb_keyfile:
     driver: local
   redis_data:
     driver: local
