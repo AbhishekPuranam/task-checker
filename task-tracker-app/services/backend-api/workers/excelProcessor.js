@@ -193,7 +193,9 @@ function createExcelWorker() {
         await job.updateProgress({ 
           stage: 'parsing', 
           percent: 10, 
-          message: `Found ${excelData.length} rows` 
+          message: excelData.length > 10000 
+            ? `Found ${excelData.length} rows - This will take a while. Perfect time for a coffee break! ☕` 
+            : `Found ${excelData.length} rows` 
         });
         
         // Stage 2: Load project (10-15%)
@@ -333,7 +335,9 @@ function createExcelWorker() {
         await job.updateProgress({ 
           stage: 'finalizing', 
           percent: 90, 
-          message: 'Finalizing...' 
+          message: 'Finalizing...',
+          saved: savedCount,
+          jobsCreated: totalJobsCreated
         });
         
         // Update project count
@@ -363,7 +367,9 @@ function createExcelWorker() {
         await job.updateProgress({ 
           stage: 'completed', 
           percent: 100, 
-          message: `Complete! Saved ${savedCount} elements, created ${totalJobsCreated} jobs` 
+          message: savedCount > 10000 
+            ? `✅ Wow! Imported ${savedCount} elements and created ${totalJobsCreated} jobs. Time for coffee! ☕` 
+            : `Complete! Saved ${savedCount} elements, created ${totalJobsCreated} jobs`
         });
         
         console.log(`✅ [WORKER] Job ${job.id} completed successfully`);
