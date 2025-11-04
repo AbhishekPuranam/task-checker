@@ -14,14 +14,19 @@ const { addExcelJob, getJobStatus } = require('../utils/queue');
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = 'uploads/excel';
+    console.log(`📂 [MULTER] Checking upload directory: ${uploadDir}`);
     if (!fs.existsSync(uploadDir)) {
+      console.log(`📂 [MULTER] Creating upload directory: ${uploadDir}`);
       fs.mkdirSync(uploadDir, { recursive: true });
     }
+    console.log(`📂 [MULTER] Upload directory ready: ${uploadDir}`);
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    const filename = file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname);
+    console.log(`📝 [MULTER] Generated filename: ${filename}`);
+    cb(null, filename);
   }
 });
 
