@@ -53,11 +53,30 @@ router.get('/', auth, async (req, res) => {
     
     const projects = await projectsQuery;
     
-    // Calculate progress for each project
+    // Calculate progress for each project with timeout
     console.log(`📊 Calculating progress for ${projects.length} projects...`);
+    
+    const calculateWithTimeout = async (project, timeoutMs = 5000) => {
+      return Promise.race([
+        project.calculateSurfaceAreaProgress(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), timeoutMs)
+        )
+      ]).catch(error => {
+        console.log(`⚠️  Progress calculation timeout for ${project.title}, using empty progress`);
+        return {
+          totalSurfaceArea: 0,
+          completedSurfaceArea: 0,
+          progressPercentage: 0,
+          totalElements: 0,
+          completedElements: 0
+        };
+      });
+    };
+    
     const projectsWithProgress = await Promise.all(
       projects.map(async (project) => {
-        const progress = await project.calculateSurfaceAreaProgress();
+        const progress = await calculateWithTimeout(project);
         console.log(`Project ${project.title}: ${progress.completedElements}/${progress.totalElements} elements, ${progress.completedSurfaceArea.toFixed(2)}/${progress.totalSurfaceArea.toFixed(2)} sqm`);
         const projectObj = project.toJSON();
         projectObj.progress = progress;
