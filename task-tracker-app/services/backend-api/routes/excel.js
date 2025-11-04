@@ -532,27 +532,19 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
     
     console.log(`✅ Validation complete - ${structuralElements.length} valid, ${errors.length} errors`);
 
-    // Start transaction
-    const dbTransaction = new DatabaseTransaction();
-    const cacheTransaction = new CacheTransaction(projectId);
+    // Process without transactions (MongoDB standalone doesn't support transactions)
+    // Keep track of what we create for potential rollback
+    const createdElements = [];
+    const createdJobs = [];
     
     try {
-      await dbTransaction.start();
-      const session = dbTransaction.getSession();
-      
-      await cacheTransaction.start();
-      const cachePatterns = CacheTransaction.getProjectCachePatterns(projectId);
-      for (const pattern of cachePatterns) {
-        await cacheTransaction.stageInvalidation(pattern);
-      }
-      
-      console.log(`💾 Saving ${structuralElements.length} elements with transaction protection...`);
+      console.log(`💾 Saving ${structuralElements.length} elements...`);
       
       let savedCount = 0;
       let duplicateCount = 0;
       let totalJobsCreated = 0;
       
-      // Process in smaller batches to avoid timeout
+      // Process elements
       for (let idx = 0; idx < structuralElements.length; idx++) {
         const elementData = structuralElements[idx];
         
@@ -565,7 +557,7 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
           memberType: elementData.memberType,
           gridNo: elementData.gridNo,
           partMarkNo: elementData.partMarkNo
-        }).session(session);
+        });
         
         if (existingElement) {
           console.log(`⚠️  Skipping duplicate: ${elementData.structureNumber}`);
@@ -574,14 +566,14 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
         }
         
         const structuralElement = new StructuralElement(elementData);
-        const saved = await structuralElement.save({ session });
-        dbTransaction.trackStructuralElement(saved._id);
+        const saved = await structuralElement.save();
+        createdElements.push(saved._id);
         
         // Create fire proofing jobs if workflow assigned
         if (saved.fireProofingWorkflow) {
-          const createdJobs = await createFireProofingJobs(saved, req.user.id, session);
-          totalJobsCreated += createdJobs.length;
-          createdJobs.forEach(job => dbTransaction.trackJob(job._id));
+          const jobs = await createFireProofingJobs(saved, req.user.id, null);
+          totalJobsCreated += jobs.length;
+          jobs.forEach(job => createdJobs.push(job._id));
         }
         
         savedCount++;
@@ -597,16 +589,13 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
       // Update project count
       await Task.findByIdAndUpdate(
         projectId,
-        { $inc: { structuralElementsCount: savedCount } },
-        { session }
+        { $inc: { structuralElementsCount: savedCount } }
       );
       
-      // Commit transaction
-      await dbTransaction.commit();
-      console.log(`✅ Transaction committed successfully`);
-      
       // Invalidate caches
-      await cacheTransaction.commit();
+      await invalidateCache(`cache:jobs:project:${projectId}:*`);
+      await invalidateCache(`cache:stats:project:${projectId}:*`);
+      await invalidateCache(`cache:structural:summary:${projectId}:*`);
       
       // Trigger progress calculation
       if (savedCount > 0) {
@@ -630,14 +619,20 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
         totalRows: excelData.length
       });
       
-    } catch (txError) {
-      console.error(`❌ Transaction failed:`, txError);
+    } catch (saveError) {
+      console.error(`❌ Error during save:`, saveError);
       
-      // Rollback
-      await dbTransaction.rollback();
-      await cacheTransaction.rollback();
+      // Attempt rollback - delete what we created
+      console.log(`🔙 Rolling back - deleting ${createdElements.length} elements and ${createdJobs.length} jobs`);
       
-      throw txError;
+      if (createdJobs.length > 0) {
+        await Job.deleteMany({ _id: { $in: createdJobs } });
+      }
+      if (createdElements.length > 0) {
+        await StructuralElement.deleteMany({ _id: { $in: createdElements } });
+      }
+      
+      throw saveError;
     }
 
   } catch (error) {
