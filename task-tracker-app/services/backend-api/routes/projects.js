@@ -132,19 +132,32 @@ router.get('/by-name/:projectName', auth, async (req, res) => {
     // First try exact match
     let project = await Task.findOne({ title: projectName });
     
-    // If not found and projectName looks like a slug, try to find by converting slug to title
+    // If not found and projectName looks like a slug, try multiple slug-to-title conversions
     if (!project && projectName.includes('-')) {
-      const titleFromSlug = projectName
-        .split('-')
-        .map(word => word.toUpperCase())
-        .join(' ');
-      project = await Task.findOne({ title: titleFromSlug });
+      // Try different case variations
+      const variations = [
+        // Original slug with spaces
+        projectName.replace(/-/g, ' '),
+        // UPPERCASE
+        projectName.replace(/-/g, ' ').toUpperCase(),
+        // Title Case (first letter of each word capitalized)
+        projectName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' '),
+        // Uppercase first letters, lowercase rest
+        projectName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
+      ];
+      
+      for (const variation of variations) {
+        project = await Task.findOne({ title: variation });
+        if (project) break;
+      }
     }
     
-    // If still not found, try case-insensitive search
+    // If still not found, try case-insensitive regex search with flexible spacing/dashes
     if (!project) {
+      // Escape special regex characters and allow spaces or dashes between words
+      const escapedName = projectName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       project = await Task.findOne({ 
-        title: { $regex: new RegExp(`^${projectName.replace(/[-\s]/g, '\\s*')}$`, 'i') }
+        title: { $regex: new RegExp(`^${escapedName.replace(/[-\s]+/g, '[\\s-]+')}$`, 'i') }
       });
     }
     
