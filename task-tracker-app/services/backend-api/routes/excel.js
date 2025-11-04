@@ -470,6 +470,17 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
       return res.status(400).json({ message: 'No Excel file uploaded' });
     }
 
+    console.log(`📁 File uploaded to: ${req.file.path}`);
+    console.log(`📊 File size: ${req.file.size} bytes`);
+    
+    // Verify file exists before queueing
+    if (!fs.existsSync(req.file.path)) {
+      console.error(`❌ File does not exist at: ${req.file.path}`);
+      return res.status(500).json({ message: 'File upload failed - file not found after upload' });
+    }
+    
+    console.log(`✅ File verified to exist at: ${req.file.path}`);
+
     // Add job to queue for background processing
     const job = await addExcelJob({
       filePath: req.file.path,

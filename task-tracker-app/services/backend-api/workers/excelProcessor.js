@@ -201,6 +201,22 @@ function createExcelWorker() {
         await job.updateProgress({ stage: 'parsing', percent: 0, message: 'Parsing Excel file...' });
         
         console.log(`📄 [WORKER] Parsing file: ${filePath}`);
+        console.log(`📄 [WORKER] File exists check: ${require('fs').existsSync(filePath)}`);
+        console.log(`📄 [WORKER] Current working directory: ${process.cwd()}`);
+        
+        if (!require('fs').existsSync(filePath)) {
+          console.error(`❌ [WORKER] File not found at: ${filePath}`);
+          console.log(`📂 [WORKER] Checking uploads directory...`);
+          const uploadsDir = 'uploads/excel';
+          if (require('fs').existsSync(uploadsDir)) {
+            const files = require('fs').readdirSync(uploadsDir);
+            console.log(`📂 [WORKER] Files in ${uploadsDir}:`, files);
+          } else {
+            console.log(`❌ [WORKER] Uploads directory does not exist: ${uploadsDir}`);
+          }
+          throw new Error(`File not found: ${filePath}`);
+        }
+        
         const excelData = parseExcelFile(filePath);
         console.log(`✅ [WORKER] Parsed ${excelData?.length || 0} rows from Excel`);
         
