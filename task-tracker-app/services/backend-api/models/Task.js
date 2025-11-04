@@ -156,7 +156,17 @@ const taskSchema = new mongoose.Schema({
       default: Date.now
     },
     note: String
-  }]
+  }],
+  
+  // Cached progress data (updated by background job)
+  cachedProgress: {
+    totalSurfaceArea: { type: Number, default: 0 },
+    completedSurfaceArea: { type: Number, default: 0 },
+    progressPercentage: { type: Number, default: 0 },
+    totalElements: { type: Number, default: 0 },
+    completedElements: { type: Number, default: 0 },
+    lastCalculated: { type: Date }
+  }
 }, {
   timestamps: true
 });

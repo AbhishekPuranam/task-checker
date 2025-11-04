@@ -3,6 +3,7 @@ const fs = require('fs');
 const StructuralElement = require('../models/StructuralElement');
 const Task = require('../models/Task');
 const { invalidateCache } = require('../middleware/cache');
+const { addProgressJob } = require('../utils/queue');
 
 // Import Excel processing functions from excel route
 // We'll need to extract these to a shared module
@@ -343,6 +344,14 @@ function createExcelWorker() {
         // Invalidate cache
         await invalidateCache(`cache:jobs:project:${projectId}:*`);
         await invalidateCache(`cache:stats:project:${projectId}`);
+        
+        // Trigger progress calculation after uploading structural elements
+        if (savedCount > 0) {
+          console.log(`📊 [WORKER] Triggering progress calculation for project ${projectId} after uploading ${savedCount} elements`);
+          addProgressJob(projectId).catch(err => 
+            console.error('[WORKER] Failed to queue progress job:', err)
+          );
+        }
         
         // Clean up file
         try {

@@ -3,6 +3,7 @@ const { getRedisClient } = require('./redis');
 const fs = require('fs');
 
 let excelQueue = null;
+let progressQueue = null;
 
 /**
  * Get or create the Excel processing queue
@@ -138,9 +139,123 @@ async function closeQueue() {
   if (excelQueue) {
     try {
       await excelQueue.close();
-      console.log('✅ [QUEUE] Queue closed gracefully');
+      console.log('✅ [QUEUE] Excel queue closed gracefully');
     } catch (error) {
-      console.error('❌ [QUEUE] Error closing queue:', error.message);
+      console.error('❌ [QUEUE] Error closing excel queue:', error.message);
+    }
+  }
+  if (progressQueue) {
+    try {
+      await progressQueue.close();
+      console.log('✅ [QUEUE] Progress queue closed gracefully');
+    } catch (error) {
+      console.error('❌ [QUEUE] Error closing progress queue:', error.message);
+    }
+  }
+}
+
+/**
+ * Get or create the Progress calculation queue
+ */
+function getProgressQueue() {
+  if (progressQueue) {
+    return progressQueue;
+  }
+
+  const redisClient = getRedisClient();
+  
+  if (!redisClient) {
+    console.warn('⚠️ [QUEUE] Redis not available, progress queue disabled');
+    return null;
+  }
+
+  try {
+    let redisPassword = '';
+    try {
+      redisPassword = fs.readFileSync('/run/secrets/redis_password', 'utf8').trim();
+    } catch (err) {
+      console.warn('⚠️ Redis password not found in secrets');
+    }
+
+    const redisHost = process.env.REDIS_HOST || 'redis';
+    const redisPort = process.env.REDIS_PORT || '6379';
+    
+    progressQueue = new Queue('progress-calculation', {
+      connection: {
+        host: redisHost,
+        port: parseInt(redisPort),
+        password: redisPassword || undefined,
+      },
+      defaultJobOptions: {
+        attempts: 2,
+        backoff: {
+          type: 'fixed',
+          delay: 1000,
+        },
+        removeOnComplete: {
+          count: 50,
+          age: 3600, // 1 hour
+        },
+        removeOnFail: {
+          count: 100,
+          age: 24 * 3600,
+        },
+      },
+    });
+
+    console.log('✅ [QUEUE] Progress calculation queue initialized');
+    return progressQueue;
+  } catch (error) {
+    console.error('❌ [QUEUE] Failed to initialize progress queue:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Add progress calculation job to queue
+ * @param {string} projectId - Project ID
+ * @returns {Promise<Object>} Job instance
+ */
+async function addProgressJob(projectId) {
+  const queue = getProgressQueue();
+  
+  if (!queue) {
+    console.warn('⚠️ [QUEUE] Progress queue not available, skipping job');
+    return null;
+  }
+
+  try {
+    const job = await queue.add('calculate-progress', { projectId }, {
+      jobId: `progress-${projectId}`, // Deduplicate jobs for same project
+      priority: 5,
+    });
+
+    console.log(`📊 [QUEUE] Added progress calculation job for project ${projectId}`);
+    return job;
+  } catch (error) {
+    console.error('❌ [QUEUE] Failed to add progress job:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Close queue connection gracefully
+ */
+async function closeQueue() {
+  if (excelQueue) {
+    try {
+      await excelQueue.close();
+      console.log('✅ [QUEUE] Excel queue closed gracefully');
+    } catch (error) {
+      console.error('❌ [QUEUE] Error closing excel queue:', error.message);
+    }
+  }
+  if (progressQueue) {
+    try {
+      await progressQueue.close();
+      console.log('✅ [QUEUE] Progress queue closed gracefully');
+    } catch (error) {
+      console.error('❌ [QUEUE] Error closing progress queue:', error.message);
     }
   }
 }
@@ -155,4 +270,6 @@ module.exports = {
   addExcelJob,
   getJobStatus,
   closeQueue,
+  getProgressQueue,
+  addProgressJob,
 };

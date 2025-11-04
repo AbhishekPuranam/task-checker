@@ -5,6 +5,7 @@ const StructuralElement = require('../models/StructuralElement');
 const Task = require('../models/Task');
 const { auth, adminAuth } = require('../middleware/auth');
 const { cacheMiddleware, invalidateCache, jobsCacheKeyGenerator, statsCacheKeyGenerator } = require('../middleware/cache');
+const { addProgressJob } = require('../utils/queue');
 
 // Debug middleware to log all requests
 router.use((req, res, next) => {
@@ -768,6 +769,14 @@ router.put('/:id', auth, async (req, res) => {
     // Invalidate cache for this project
     await invalidateCache(`cache:jobs:project:${updatedJob.project}:*`);
     await invalidateCache(`cache:stats:project:${updatedJob.project}`);
+
+    // Trigger progress calculation if job was just completed
+    if (updates.status === 'completed' && job.status !== 'completed') {
+      console.log(`📊 Job completed, triggering progress calculation for project ${updatedJob.project}`);
+      addProgressJob(updatedJob.project.toString()).catch(err => 
+        console.error('Failed to queue progress job:', err)
+      );
+    }
 
     console.log(`=== UPDATE JOB DEBUG: Job updated successfully, id=${updatedJob._id}, status=${updatedJob.status}`);
     res.json(updatedJob);

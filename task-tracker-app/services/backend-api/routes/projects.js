@@ -5,6 +5,7 @@ const StructuralElement = require('../models/StructuralElement');
 const Job = require('../models/Job');
 const User = require('../models/User');
 const { auth } = require('../middleware/auth');
+const { addProgressJob } = require('../utils/queue');
 
 const router = express.Router();
 
@@ -53,36 +54,34 @@ router.get('/', auth, async (req, res) => {
     
     const projects = await projectsQuery;
     
-    // Calculate progress for each project with timeout
-    console.log(`📊 Calculating progress for ${projects.length} projects...`);
+    // Use cached progress data (calculated on-demand when elements/jobs change)
+    console.log(`📊 Using cached progress for ${projects.length} projects`);
     
-    const calculateWithTimeout = async (project, timeoutMs = 2000) => {
-      return Promise.race([
-        project.calculateSurfaceAreaProgress(),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout')), timeoutMs)
-        )
-      ]).catch(error => {
-        console.log(`⚠️  Progress calculation timeout for ${project.title}, using empty progress`);
-        return {
+    const projectsWithProgress = projects.map(project => {
+      const projectObj = project.toJSON();
+      
+      // Use cached progress if available (calculated when elements/jobs are added/updated)
+      if (project.cachedProgress && project.cachedProgress.lastCalculated) {
+        projectObj.progress = {
+          totalSurfaceArea: project.cachedProgress.totalSurfaceArea || 0,
+          completedSurfaceArea: project.cachedProgress.completedSurfaceArea || 0,
+          progressPercentage: project.cachedProgress.progressPercentage || 0,
+          totalElements: project.cachedProgress.totalElements || 0,
+          completedElements: project.cachedProgress.completedElements || 0,
+        };
+      } else {
+        // No cached data yet (new project with no elements), return empty progress
+        projectObj.progress = {
           totalSurfaceArea: 0,
           completedSurfaceArea: 0,
           progressPercentage: 0,
           totalElements: 0,
-          completedElements: 0
+          completedElements: 0,
         };
-      });
-    };
-    
-    const projectsWithProgress = await Promise.all(
-      projects.map(async (project) => {
-        const progress = await calculateWithTimeout(project);
-        console.log(`Project ${project.title}: ${progress.completedElements}/${progress.totalElements} elements, ${progress.completedSurfaceArea.toFixed(2)}/${progress.totalSurfaceArea.toFixed(2)} sqm`);
-        const projectObj = project.toJSON();
-        projectObj.progress = progress;
-        return projectObj;
-      })
-    );
+      }
+      
+      return projectObj;
+    });
     
     res.json({ tasks: projectsWithProgress });
   } catch (error) {

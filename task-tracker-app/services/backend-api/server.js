@@ -16,6 +16,7 @@ const path = require('path');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const { createExcelWorker } = require('./workers/excelProcessor');
+const { startProgressWorker } = require('./workers/progressCalculator');
 
 // Load environment variables
 dotenv.config();
@@ -292,6 +293,16 @@ try {
   console.warn('⚠️  Excel upload will not work in background mode');
 }
 
+// Start Progress calculation worker
+let progressWorker;
+try {
+  progressWorker = startProgressWorker();
+  console.log('✅ Progress calculation worker started successfully');
+} catch (error) {
+  console.error('❌ Failed to start Progress worker:', error.message);
+  console.warn('⚠️  Progress calculation will not work in background mode');
+}
+
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
@@ -301,6 +312,9 @@ process.on('SIGTERM', async () => {
   console.log('SIGTERM signal received: closing HTTP server');
   if (excelWorker) {
     await excelWorker.close();
+  }
+  if (progressWorker) {
+    await progressWorker.close();
   }
   server.close(() => {
     console.log('HTTP server closed');
