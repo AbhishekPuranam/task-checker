@@ -769,6 +769,12 @@ router.put('/:id', auth, async (req, res) => {
     // Invalidate cache for this project
     await invalidateCache(`cache:jobs:project:${updatedJob.project}:*`);
     await invalidateCache(`cache:stats:project:${updatedJob.project}`);
+    
+    // Invalidate structural element job cache
+    if (updatedJob.structuralElement) {
+      await invalidateCache(`cache:structural:jobs:${updatedJob.structuralElement._id || updatedJob.structuralElement}`);
+      await invalidateCache(`cache:structural:summary:${updatedJob.project}:*`);
+    }
 
     // Trigger progress calculation if job was just completed
     if (updates.status === 'completed' && job.status !== 'completed') {
@@ -961,6 +967,14 @@ router.patch('/:id/progress', auth, async (req, res) => {
     const updatedJob = await Job.findById(id)
       .populate('assignedTo', 'name email')
       .populate('createdBy', 'name email');
+    
+    // Invalidate relevant caches
+    await invalidateCache(`cache:jobs:project:${updatedJob.project}:*`);
+    await invalidateCache(`cache:stats:project:${updatedJob.project}`);
+    if (updatedJob.structuralElement) {
+      await invalidateCache(`cache:structural:jobs:${updatedJob.structuralElement}`);
+      await invalidateCache(`cache:structural:summary:${updatedJob.project}:*`);
+    }
     
     res.json(updatedJob);
   } catch (error) {

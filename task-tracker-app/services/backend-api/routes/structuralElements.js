@@ -1,6 +1,7 @@
 const express = require('express');
 const StructuralElement = require('../models/StructuralElement');
 const { auth, adminAuth } = require('../middleware/auth');
+const { cacheMiddleware } = require('../middleware/cache');
 const multer = require('multer');
 const path = require('path');
 
@@ -329,6 +330,134 @@ router.get('/list/active', auth, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+/**
+ * Get structural elements for a project with job summary (collapsed view)
+ * This returns minimal data for initial render - job counts only
+ */
+router.get('/project/:projectId/summary', 
+  auth, 
+  cacheMiddleware(300, (req) => `cache:structural:summary:${req.params.projectId}:page:${req.query.page || 1}:limit:${req.query.limit || 50}`),
+  async (req, res) => {
+    try {
+      const { projectId } = req.params;
+      const { page = 1, limit = 50, search, sortBy = 'serialNo', sortOrder = 'asc' } = req.query;
+      
+      const filter = { project: projectId };
+      
+      if (search) {
+        filter.$or = [
+          { structureNumber: { $regex: search, $options: 'i' } },
+          { drawingNo: { $regex: search, $options: 'i' } },
+          { partMarkNo: { $regex: search, $options: 'i' } },
+          { gridNo: { $regex: search, $options: 'i' } },
+          { memberType: { $regex: search, $options: 'i' } }
+        ];
+      }
+      
+      const sort = {};
+      sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+      
+      // Get elements with minimal data
+      const elements = await StructuralElement.find(filter)
+        .select('structureNumber drawingNo level memberType gridNo partMarkNo sectionSizes lengthMm qty surfaceAreaSqm fireProofingWorkflow')
+        .sort(sort)
+        .limit(parseInt(limit))
+        .skip((parseInt(page) - 1) * parseInt(limit))
+        .lean();
+      
+      const total = await StructuralElement.countDocuments(filter);
+      
+      // Get job counts for each element using aggregation (much faster)
+      const Job = require('../models/Job');
+      const elementIds = elements.map(e => e._id);
+      
+      const jobStats = await Job.aggregate([
+        { $match: { structuralElement: { $in: elementIds } } },
+        {
+          $group: {
+            _id: '$structuralElement',
+            totalJobs: { $sum: 1 },
+            completedJobs: {
+              $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] }
+            },
+            activeJobs: {
+              $sum: { $cond: [{ $eq: ['$status', 'in-progress'] }, 1, 0] }
+            },
+            pendingJobs: {
+              $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] }
+            }
+          }
+        }
+      ]);
+      
+      // Create a map for quick lookup
+      const statsMap = new Map(
+        jobStats.map(stat => [stat._id.toString(), stat])
+      );
+      
+      // Add job counts to elements
+      const elementsWithStats = elements.map(element => {
+        const stats = statsMap.get(element._id.toString()) || {
+          totalJobs: 0,
+          completedJobs: 0,
+          activeJobs: 0,
+          pendingJobs: 0
+        };
+        
+        return {
+          ...element,
+          jobSummary: {
+            total: stats.totalJobs,
+            completed: stats.completedJobs,
+            active: stats.activeJobs,
+            pending: stats.pendingJobs
+          }
+        };
+      });
+      
+      res.json({
+        elements: elementsWithStats,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(total / parseInt(limit)),
+          total,
+          hasNext: (parseInt(page) * parseInt(limit)) < total,
+          hasPrev: parseInt(page) > 1
+        }
+      });
+    } catch (error) {
+      console.error('❌ Error fetching structural elements summary:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  }
+);
+
+/**
+ * Get full job details for a structural element (expanded view)
+ * Called when user expands a row - cached separately
+ */
+router.get('/:elementId/jobs', 
+  auth,
+  cacheMiddleware(180, (req) => `cache:structural:jobs:${req.params.elementId}`),
+  async (req, res) => {
+    try {
+      const { elementId } = req.params;
+      
+      const Job = require('../models/Job');
+      const jobs = await Job.find({ structuralElement: elementId })
+        .select('jobTitle jobType status orderIndex fireProofingType createdAt updatedAt assignedTo progress')
+        .populate('assignedTo', 'name email')
+        .sort({ orderIndex: 1 })
+        .lean();
+      
+      res.json({ jobs });
+    } catch (error) {
+      console.error('❌ Error fetching jobs for element:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  }
+);
 
 // Bulk import structural elements (admin only)
 router.post('/bulk-import', adminAuth, async (req, res) => {
