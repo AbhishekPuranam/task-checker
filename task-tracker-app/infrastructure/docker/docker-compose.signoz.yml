@@ -11,6 +11,7 @@ services:
     volumes:
       - clickhouse_data:/var/lib/clickhouse/
       - ./signoz/clickhouse-config.xml:/etc/clickhouse-server/config.d/custom-config.xml:ro
+      - /sys:/host-sys:ro
     environment:
       - CLICKHOUSE_DB=signoz_traces
     ulimits:
