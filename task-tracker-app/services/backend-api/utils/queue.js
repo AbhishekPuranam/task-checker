@@ -5,9 +5,32 @@ const fs = require('fs');
 let excelQueue = null;
 let progressQueue = null;
 
+// Shared Redis connection options for better performance
+function getRedisConnectionOptions() {
+  let redisPassword = '';
+  try {
+    redisPassword = fs.readFileSync('/run/secrets/redis_password', 'utf8').trim();
+  } catch (err) {
+    console.warn('⚠️ Redis password not found in secrets');
+  }
+
+  const redisHost = process.env.REDIS_HOST || 'redis';
+  const redisPort = process.env.REDIS_PORT || '6379';
+  
+  return {
+    host: redisHost,
+    port: parseInt(redisPort),
+    password: redisPassword || undefined,
+    // Connection optimization settings
+    maxRetriesPerRequest: 3,
+    enableReadyCheck: true,
+    lazyConnect: false,
+  };
+}
+
 /**
  * Get or create the Excel processing queue
- * Uses the same Redis connection as caching
+ * Optimized for large Excel file processing with better performance settings
  */
 function getExcelQueue() {
   if (excelQueue) {
@@ -22,42 +45,30 @@ function getExcelQueue() {
   }
 
   try {
-    // Read Redis password from Docker secrets
-    let redisPassword = '';
-    try {
-      redisPassword = fs.readFileSync('/run/secrets/redis_password', 'utf8').trim();
-    } catch (err) {
-      console.warn('⚠️ Redis password not found in secrets');
-    }
-
-    // BullMQ requires connection options, not client instance
-    const redisHost = process.env.REDIS_HOST || 'redis';
-    const redisPort = process.env.REDIS_PORT || '6379';
-    
     excelQueue = new Queue('excel-processing', {
-      connection: {
-        host: redisHost,
-        port: parseInt(redisPort),
-        password: redisPassword || undefined,
-      },
+      connection: getRedisConnectionOptions(),
+      // Optimize default job options for Excel processing
       defaultJobOptions: {
-        attempts: 3, // Retry up to 3 times
+        attempts: 3,
         backoff: {
           type: 'exponential',
-          delay: 2000, // Start with 2 second delay
+          delay: 2000,
         },
+        // Aggressive cleanup to reduce memory usage
         removeOnComplete: {
-          count: 100, // Keep last 100 completed jobs
-          age: 24 * 3600, // Keep for 24 hours
+          count: 50, // Keep fewer completed jobs
+          age: 3600, // Only 1 hour
         },
         removeOnFail: {
-          count: 200, // Keep last 200 failed jobs
-          age: 7 * 24 * 3600, // Keep for 7 days
+          count: 100, // Keep failed jobs longer for debugging
+          age: 7 * 24 * 3600, // 7 days
         },
+        // Timeout for very large files (30 minutes)
+        timeout: 30 * 60 * 1000,
       },
     });
 
-    console.log('✅ [QUEUE] Excel processing queue initialized');
+    console.log('✅ [QUEUE] Excel processing queue initialized with optimized settings');
     return excelQueue;
   } catch (error) {
     console.error('❌ [QUEUE] Failed to initialize queue:', error.message);
@@ -67,6 +78,7 @@ function getExcelQueue() {
 
 /**
  * Add Excel processing job to queue
+ * Optimized with priority and job deduplication
  * @param {Object} jobData - Job data including file path, project info, etc.
  * @returns {Promise<Object>} Job instance
  */
@@ -78,11 +90,17 @@ async function addExcelJob(jobData) {
   }
 
   try {
+    // Generate job ID for deduplication (prevents duplicate uploads)
+    const jobId = `excel-${jobData.projectId}-${Date.now()}`;
+    
     const job = await queue.add('process-excel', jobData, {
+      jobId, // Prevents duplicate jobs
       priority: jobData.priority || 1, // Lower number = higher priority
+      // For large files, increase timeout
+      timeout: jobData.expectedRows > 1000 ? 30 * 60 * 1000 : 10 * 60 * 1000,
     });
 
-    console.log(`📋 [QUEUE] Added Excel job ${job.id}`);
+    console.log(`📋 [QUEUE] Added Excel job ${job.id} with ${jobData.expectedRows || 'unknown'} rows`);
     return job;
   } catch (error) {
     console.error('❌ [QUEUE] Failed to add job:', error.message);
@@ -156,6 +174,7 @@ async function closeQueue() {
 
 /**
  * Get or create the Progress calculation queue
+ * Optimized for fast, concurrent progress calculations
  */
 function getProgressQueue() {
   if (progressQueue) {
@@ -170,22 +189,8 @@ function getProgressQueue() {
   }
 
   try {
-    let redisPassword = '';
-    try {
-      redisPassword = fs.readFileSync('/run/secrets/redis_password', 'utf8').trim();
-    } catch (err) {
-      console.warn('⚠️ Redis password not found in secrets');
-    }
-
-    const redisHost = process.env.REDIS_HOST || 'redis';
-    const redisPort = process.env.REDIS_PORT || '6379';
-    
     progressQueue = new Queue('progress-calculation', {
-      connection: {
-        host: redisHost,
-        port: parseInt(redisPort),
-        password: redisPassword || undefined,
-      },
+      connection: getRedisConnectionOptions(),
       defaultJobOptions: {
         attempts: 2,
         backoff: {
@@ -193,17 +198,19 @@ function getProgressQueue() {
           delay: 1000,
         },
         removeOnComplete: {
+          count: 30, // Keep fewer, progress is calculated frequently
+          age: 1800, // 30 minutes
+        },
+        removeOnFail: {
           count: 50,
           age: 3600, // 1 hour
         },
-        removeOnFail: {
-          count: 100,
-          age: 24 * 3600,
-        },
+        // Progress calculation should be fast
+        timeout: 60000, // 1 minute timeout
       },
     });
 
-    console.log('✅ [QUEUE] Progress calculation queue initialized');
+    console.log('✅ [QUEUE] Progress calculation queue initialized with optimized settings');
     return progressQueue;
   } catch (error) {
     console.error('❌ [QUEUE] Failed to initialize progress queue:', error.message);

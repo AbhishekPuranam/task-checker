@@ -156,6 +156,7 @@ async function createFireProofingJobs(structuralElement, userId, session = null)
 
 /**
  * Create and start Excel processing worker
+ * Optimized for high-performance Excel processing with batching
  */
 function createExcelWorker() {
   // Read Redis password from Docker secrets
@@ -170,9 +171,14 @@ function createExcelWorker() {
   const redisHost = process.env.REDIS_HOST || 'redis';
   const redisPort = process.env.REDIS_PORT || '6379';
   
+  // Performance tuning based on system resources
+  const BATCH_SIZE = parseInt(process.env.EXCEL_BATCH_SIZE) || 50; // Process in smaller batches to reduce progress update overhead
+  const MAX_CONCURRENCY = parseInt(process.env.EXCEL_CONCURRENCY) || 2; // Conservative concurrency
+  
   const worker = new Worker(
     'excel-processing',
     async (job) => {
+      const startTime = Date.now();
       console.log(`🔄 [WORKER] Processing job ${job.id}`);
       
       const { filePath, projectId, userId, userEmail } = job.data;
@@ -224,12 +230,17 @@ function createExcelWorker() {
           throw new Error('Excel file is empty or invalid');
         }
         
+        const totalRows = excelData.length;
+        const processingMessage = totalRows > 10000 
+          ? `Found ${totalRows} rows - This will take a while. Perfect time for a coffee break! ☕` 
+          : totalRows > 5000
+            ? `Found ${totalRows} rows - Processing in batches for optimal performance 🚀`
+            : `Found ${totalRows} rows`;
+        
         await job.updateProgress({ 
           stage: 'parsing', 
           percent: 10, 
-          message: excelData.length > 10000 
-            ? `Found ${excelData.length} rows - This will take a while. Perfect time for a coffee break! ☕` 
-            : `Found ${excelData.length} rows` 
+          message: processingMessage
         });
         
         // Stage 2: Load project (10-15%)
@@ -248,8 +259,11 @@ function createExcelWorker() {
         const structuralElements = [];
         const errors = [];
         
+        // Update progress every 5% or every 100 rows (whichever is more frequent)
+        const progressInterval = Math.max(Math.floor(totalRows * 0.05), 100);
+        
         for (let i = 0; i < excelData.length; i++) {
-          if (i % 10 === 0 || i === excelData.length - 1) {
+          if (i % progressInterval === 0 || i === excelData.length - 1) {
             const percent = 15 + (i / excelData.length) * 25;
             await job.updateProgress({
               stage: 'validating',
@@ -283,93 +297,107 @@ function createExcelWorker() {
         await job.updateProgress({ 
           stage: 'saving', 
           percent: 40, 
-          message: `Saving ${structuralElements.length} elements within transaction...`,
+          message: `Saving ${structuralElements.length} elements in batches of ${BATCH_SIZE}...`,
           validated: structuralElements.length,
           errors: errors.length
         });
         
-        // Stage 4: Save to database within transaction (40-90%)
+        // Stage 4: Save to database within transaction using batching (40-90%)
         let savedCount = 0;
         let duplicateCount = 0;
         let totalJobsCreated = 0;
         
-        for (let idx = 0; idx < structuralElements.length; idx++) {
-          const elementData = structuralElements[idx];
+        // Process in batches for better performance
+        for (let batchStart = 0; batchStart < structuralElements.length; batchStart += BATCH_SIZE) {
+          const batchEnd = Math.min(batchStart + BATCH_SIZE, structuralElements.length);
+          const batch = structuralElements.slice(batchStart, batchEnd);
           
-          if (idx % 5 === 0 || idx === structuralElements.length - 1) {
-            const percent = 40 + (idx / structuralElements.length) * 50;
-            await job.updateProgress({
-              stage: 'saving',
-              percent,
-              message: `Processing element ${idx + 1} of ${structuralElements.length} (TX protected)`,
-              saved: savedCount,
-              jobsCreated: totalJobsCreated
-            });
-          }
+          console.log(`📦 [WORKER] Processing batch ${Math.floor(batchStart / BATCH_SIZE) + 1}/${Math.ceil(structuralElements.length / BATCH_SIZE)} (${batch.length} elements)`);
           
-          try {
-            // Check for duplicate - must match ALL fields
-            const existingElement = await StructuralElement.findOne({
-              project: projectId,
-              structureNumber: elementData.structureNumber,
-              drawingNo: elementData.drawingNo,
-              level: elementData.level,
-              memberType: elementData.memberType,
-              gridNo: elementData.gridNo,
-              partMarkNo: elementData.partMarkNo,
-              sectionSizes: elementData.sectionSizes,
-              lengthMm: elementData.lengthMm,
-              qty: elementData.qty,
-              sectionDepthMm: elementData.sectionDepthMm,
-              flangeWidthMm: elementData.flangeWidthMm,
-              webThicknessMm: elementData.webThicknessMm,
-              flangeThicknessMm: elementData.flangeThicknessMm,
-              fireproofingThickness: elementData.fireproofingThickness,
-              surfaceAreaSqm: elementData.surfaceAreaSqm,
-              fireProofingWorkflow: elementData.fireProofingWorkflow
-            }).session(session);
+          for (let idx = 0; idx < batch.length; idx++) {
+            const overallIdx = batchStart + idx;
+            const elementData = batch[idx];
             
-            if (existingElement) {
-              // Exact duplicate found - all fields match
-              console.log(`⚠️  [WORKER] Skipping exact duplicate: ${elementData.structureNumber}`);
-              duplicateCount++;
-              continue;
+            // Update progress less frequently for large datasets
+            if (overallIdx % 50 === 0 || overallIdx === structuralElements.length - 1) {
+              const percent = 40 + (overallIdx / structuralElements.length) * 50;
+              await job.updateProgress({
+                stage: 'saving',
+                percent,
+                message: `Processing element ${overallIdx + 1}/${structuralElements.length} [Batch ${Math.floor(batchStart / BATCH_SIZE) + 1}]`,
+                saved: savedCount,
+                jobsCreated: totalJobsCreated
+              });
             }
             
-            const structuralElement = new StructuralElement(elementData);
-            const saved = await structuralElement.save({ session });
-            
-            // Track in transaction
-            dbTransaction.trackStructuralElement(saved._id);
-            
-            // Create fire proofing jobs if workflow assigned
-            if (saved.fireProofingWorkflow) {
-              console.log(`🔧 [WORKER] Creating jobs for ${saved.structureNumber} with workflow: ${saved.fireProofingWorkflow}`);
-              try {
-                const createdJobs = await createFireProofingJobs(saved, userId, session);
-                totalJobsCreated += createdJobs.length;
-                
-                // Track jobs in transaction
-                createdJobs.forEach(job => dbTransaction.trackJob(job._id));
-                
-                console.log(`✅ [WORKER] Created ${createdJobs.length} jobs for ${saved.structureNumber}`);
-              } catch (jobError) {
-                console.error(`❌ [WORKER] Error creating jobs for ${saved.structureNumber}:`, jobError.message);
-                throw jobError; // Fail the entire transaction if job creation fails
+            try {
+              // Check for duplicate - must match ALL fields
+              const existingElement = await StructuralElement.findOne({
+                project: projectId,
+                structureNumber: elementData.structureNumber,
+                drawingNo: elementData.drawingNo,
+                level: elementData.level,
+                memberType: elementData.memberType,
+                gridNo: elementData.gridNo,
+                partMarkNo: elementData.partMarkNo,
+                sectionSizes: elementData.sectionSizes,
+                lengthMm: elementData.lengthMm,
+                qty: elementData.qty,
+                sectionDepthMm: elementData.sectionDepthMm,
+                flangeWidthMm: elementData.flangeWidthMm,
+                webThicknessMm: elementData.webThicknessMm,
+                flangeThicknessMm: elementData.flangeThicknessMm,
+                fireproofingThickness: elementData.fireproofingThickness,
+                surfaceAreaSqm: elementData.surfaceAreaSqm,
+                fireProofingWorkflow: elementData.fireProofingWorkflow
+              }).session(session);
+              
+              if (existingElement) {
+                // Exact duplicate found - all fields match
+                console.log(`⚠️  [WORKER] Skipping exact duplicate: ${elementData.structureNumber}`);
+                duplicateCount++;
+                continue;
               }
-            } else {
-              console.log(`⚠️  [WORKER] No workflow assigned for ${saved.structureNumber}`);
+              
+              const structuralElement = new StructuralElement(elementData);
+              const saved = await structuralElement.save({ session });
+              
+              // Track in transaction
+              dbTransaction.trackStructuralElement(saved._id);
+              
+              // Create fire proofing jobs if workflow assigned
+              if (saved.fireProofingWorkflow) {
+                console.log(`🔧 [WORKER] Creating jobs for ${saved.structureNumber} with workflow: ${saved.fireProofingWorkflow}`);
+                try {
+                  const createdJobs = await createFireProofingJobs(saved, userId, session);
+                  totalJobsCreated += createdJobs.length;
+                  
+                  // Track jobs in transaction
+                  createdJobs.forEach(job => dbTransaction.trackJob(job._id));
+                  
+                  console.log(`✅ [WORKER] Created ${createdJobs.length} jobs for ${saved.structureNumber}`);
+                } catch (jobError) {
+                  console.error(`❌ [WORKER] Error creating jobs for ${saved.structureNumber}:`, jobError.message);
+                  throw jobError; // Fail the entire transaction if job creation fails
+                }
+              } else {
+                console.log(`⚠️  [WORKER] No workflow assigned for ${saved.structureNumber}`);
+              }
+              
+              savedCount++;
+            } catch (error) {
+              console.error(`❌ [WORKER] Error saving element ${elementData.structureNumber}:`, error.message);
+              // Any error during save should rollback the entire transaction
+              throw error;
             }
-            
-            savedCount++;
-          } catch (error) {
-            console.error(`❌ [WORKER] Error saving element ${elementData.structureNumber}:`, error.message);
-            // Any error during save should rollback the entire transaction
-            throw error;
           }
+          
+          // Log batch completion
+          console.log(`✅ [WORKER] Batch ${Math.floor(batchStart / BATCH_SIZE) + 1} complete - ${savedCount} saved so far`);
         }
         
-        console.log(`✅ [WORKER] Saved ${savedCount} elements, ${duplicateCount} duplicates, ${totalJobsCreated} jobs created`);
+        const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
+        console.log(`✅ [WORKER] Saved ${savedCount} elements, ${duplicateCount} duplicates, ${totalJobsCreated} jobs created in ${processingTime}s`);
         
         // Stage 5: Finalize (90-95%)
         await job.updateProgress({ 
@@ -418,15 +446,17 @@ function createExcelWorker() {
           console.error('Error deleting file:', error);
         }
         
+        const successMessage = totalRows > 10000 
+          ? `✅ Wow! Imported ${savedCount} elements and created ${totalJobsCreated} jobs in ${processingTime}s. Time well spent! ☕` 
+          : `Complete! Saved ${savedCount} elements, created ${totalJobsCreated} jobs in ${processingTime}s`;
+        
         await job.updateProgress({ 
           stage: 'completed', 
           percent: 100, 
-          message: savedCount > 10000 
-            ? `✅ Wow! Imported ${savedCount} elements and created ${totalJobsCreated} jobs. Time for coffee! ☕` 
-            : `Complete! Saved ${savedCount} elements, created ${totalJobsCreated} jobs`
+          message: successMessage
         });
         
-        console.log(`✅ [WORKER] Job ${job.id} completed successfully`);
+        console.log(`✅ [WORKER] Job ${job.id} completed successfully in ${processingTime}s`);
         
         return {
           success: true,
@@ -434,7 +464,8 @@ function createExcelWorker() {
           duplicateElements: duplicateCount,
           jobsCreated: totalJobsCreated,
           errors: errors.slice(0, 5),
-          totalRows: excelData.length
+          totalRows: excelData.length,
+          processingTime: `${processingTime}s`
         };
         
       } catch (error) {
@@ -464,27 +495,33 @@ function createExcelWorker() {
         port: parseInt(redisPort),
         password: redisPassword || undefined,
       },
-      concurrency: 2, // Process 2 Excel files simultaneously
+      // Optimize concurrency based on available resources
+      concurrency: MAX_CONCURRENCY,
+      // Rate limiting to prevent overwhelming the system
       limiter: {
-        max: 5, // Max 5 jobs
+        max: 10, // Max 10 jobs
         duration: 60000, // per 60 seconds
       },
     }
   );
 
-  worker.on('completed', (job) => {
-    console.log(`✅ [WORKER] Job ${job.id} has completed`);
+  worker.on('completed', (job, returnvalue) => {
+    console.log(`✅ [WORKER] Job ${job.id} completed:`, returnvalue);
   });
 
   worker.on('failed', (job, err) => {
-    console.error(`❌ [WORKER] Job ${job.id} has failed with error:`, err.message);
+    console.error(`❌ [WORKER] Job ${job?.id} failed:`, err.message);
   });
 
   worker.on('error', (err) => {
     console.error('❌ [WORKER] Worker error:', err);
   });
 
-  console.log('✅ [WORKER] Excel processing worker started');
+  worker.on('stalled', (jobId) => {
+    console.warn(`⚠️  [WORKER] Job ${jobId} has stalled and will be reprocessed`);
+  });
+
+  console.log(`✅ [WORKER] Excel processing worker started with concurrency: ${MAX_CONCURRENCY}, batch size: ${BATCH_SIZE}`);
   
   return worker;
 }
