@@ -490,8 +490,13 @@ const StructuralElementsList = ({ projectSlug }) => {
     
     try {
       setLoading(true);
-      // Fetch all elements for accurate metrics
-      const response = await api.get(`/structural-elements?project=${projectId}&limit=50000`);
+      
+      // First, get the total count
+      const countResponse = await api.get(`/structural-elements?project=${projectId}&limit=1`);
+      const totalCount = countResponse.data.total || 0;
+      
+      // Fetch all elements using the actual count as limit
+      const response = await api.get(`/structural-elements?project=${projectId}&limit=${totalCount}`);
       
       // Calculate status for each element
       const elementsWithStatus = response.data.elements.map((element) => {
