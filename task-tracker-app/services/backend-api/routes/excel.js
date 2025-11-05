@@ -30,17 +30,21 @@ function safeDeleteFile(filePath) {
   if (!filePath) return;
   
   if (!isPathSafe(filePath)) {
-    console.error(`⚠️  Security: Attempted to delete file outside upload directory: ${filePath}`);
+    console.error('⚠️  Security: Attempted to delete file outside upload directory');
     return;
   }
   
   try {
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
-      console.log(`✅ Deleted file: ${filePath}`);
+      // Log only the filename, not the full path, for security
+      const filename = path.basename(filePath);
+      console.log(`✅ Deleted file: ${filename}`);
     }
   } catch (error) {
-    console.error(`❌ Error deleting file ${filePath}:`, error.message);
+    // Log only the filename, not the full path
+    const filename = path.basename(filePath);
+    console.error(`❌ Error deleting file ${filename}:`, error.message);
   }
 }
 
