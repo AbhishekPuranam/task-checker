@@ -101,41 +101,45 @@ const StructuralElementsList = ({ projectSlug }) => {
       searchTerm: '',
       memberTypeFilter: '',
       fireProofingWorkflowFilter: '',
-      expanded: true,
+      expanded: false,
       groupBy: '',
       page: 0,
       rowsPerPage: 10,
-      expandedGroups: {}
+      expandedGroups: {},
+      loading: false
     },
     'no jobs': {
       searchTerm: '',
       memberTypeFilter: '',
       fireProofingWorkflowFilter: '',
-      expanded: true,
+      expanded: false,
       groupBy: '',
       page: 0,
       rowsPerPage: 10,
-      expandedGroups: {}
+      expandedGroups: {},
+      loading: false
     },
     'active': {
       searchTerm: '',
       memberTypeFilter: '',
       fireProofingWorkflowFilter: '',
-      expanded: true,
+      expanded: false,
       groupBy: '',
       page: 0,
       rowsPerPage: 10,
-      expandedGroups: {}
+      expandedGroups: {},
+      loading: false
     },
     'complete': {
       searchTerm: '',
       memberTypeFilter: '',
       fireProofingWorkflowFilter: '',
-      expanded: true,
+      expanded: false,
       groupBy: '',
       page: 0,
       rowsPerPage: 10,
-      expandedGroups: {}
+      expandedGroups: {},
+      loading: false
     }
   });
   
@@ -475,20 +479,44 @@ const StructuralElementsList = ({ projectSlug }) => {
     }
   };
 
-  const fetchElements = async () => {
+  // Stage 1: Fetch only element counts by status
+  const fetchElementCounts = async () => {
     if (!projectId) {
       return;
     }
     
     try {
       setLoading(true);
-      // Fetch ALL elements for the project - backend now includes job counts
-      const response = await api.get(`/structural-elements?project=${projectId}&limit=10000`);
       
-      // Backend now provides jobCounts, progressPercentage, and currentPendingJob
-      // No need to fetch jobs separately anymore!
+      // Fetch just the counts - lightweight API call
+      const response = await api.get(`/structural-elements?project=${projectId}&limit=1`);
+      setTotalElements(response.data.total || 0);
       
-      // Calculate status for each element based on backend job data
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching element counts:', error);
+      toast.error('Failed to load element counts');
+      setLoading(false);
+    }
+  };
+
+  // Stage 2: Fetch elements for a specific status when section is expanded
+  const fetchElementsForStatus = async (statusName) => {
+    if (!projectId) {
+      return;
+    }
+    
+    try {
+      // Mark this section as loading
+      setSectionFilters(prev => ({
+        ...prev,
+        [statusName]: { ...prev[statusName], loading: true }
+      }));
+      
+      // Fetch all elements with job counts
+      const response = await api.get(`/structural-elements?project=${projectId}&limit=50000`);
+      
+      // Calculate status for each element
       const elementsWithStatus = response.data.elements.map((element) => {
         try {
           const jobCounts = element.jobCounts || { totalJobs: 0, completedJobs: 0, activeJobs: 0, pendingJobs: 0 };
@@ -505,7 +533,7 @@ const StructuralElementsList = ({ projectSlug }) => {
           } else if (activeJobs > 0 || completedJobs > 0) {
             calculatedStatus = 'active';
           } else {
-            calculatedStatus = 'active'; // Has pending jobs
+            calculatedStatus = 'active';
           }
 
           return {
@@ -515,40 +543,33 @@ const StructuralElementsList = ({ projectSlug }) => {
             totalJobs: totalJobs,
             completionPercentage: Math.round(progressPercentage),
             avgProgress: Math.round(progressPercentage),
-            jobCounts: jobCounts, // Include backend job counts
-            currentPendingJob: element.currentPendingJob // Include current pending job from backend
+            jobCounts: jobCounts,
+            currentPendingJob: element.currentPendingJob
           };
         } catch (error) {
           console.error(`Error calculating status for element ${element._id}:`, error);
           return {
             ...element,
-            status: 'no jobs' // Default if error
+            status: 'no jobs'
           };
         }
       });
       
       setElements(elementsWithStatus);
-      setTotalElements(elementsWithStatus.length);
       
-      // Range calculations removed - no longer needed without global filters
+      // Mark section as loaded
+      setSectionFilters(prev => ({
+        ...prev,
+        [statusName]: { ...prev[statusName], loading: false }
+      }));
       
-      // Auto-correct project status if needed (after elements are loaded)
-      setTimeout(() => {
-        if (project && elementsWithStatus.length > 0) {
-          const completedElements = elementsWithStatus.filter(el => el.status === 'complete');
-          const shouldBeComplete = completedElements.length === elementsWithStatus.length;
-          
-          if (project.status === 'completed' && !shouldBeComplete) {
-            console.warn('🔧 Auto-correcting project status - not all elements complete');
-            handleCorrectProjectStatus();
-          }
-        }
-      }, 1000);
     } catch (error) {
-      console.error('Error fetching elements:', error);
-      toast.error('Failed to load structural elements');
-    } finally {
-      setLoading(false);
+      console.error('Error fetching elements for status:', error);
+      toast.error('Failed to load elements');
+      setSectionFilters(prev => ({
+        ...prev,
+        [statusName]: { ...prev[statusName], loading: false }
+      }));
     }
   };
 
@@ -594,7 +615,7 @@ const StructuralElementsList = ({ projectSlug }) => {
   // Fetch elements once we have the projectId
   useEffect(() => {
     if (projectId && token) {
-      fetchElements();
+      fetchElementCounts(); // Stage 1: Just get counts
       fetchJobTypesData();
     }
   }, [projectId, token]);
@@ -1284,7 +1305,10 @@ const StructuralElementsList = ({ projectSlug }) => {
         );
       case 'currentPendingJob':
         return (() => {
-          if (!element.jobs || element.jobs.length === 0) {
+          const jobCounts = element.jobCounts || { totalJobs: 0, completedJobs: 0, activeJobs: 0, pendingJobs: 0 };
+          
+          // If no jobs at all
+          if (jobCounts.totalJobs === 0) {
             return (
               <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
                 No jobs
@@ -1292,14 +1316,8 @@ const StructuralElementsList = ({ projectSlug }) => {
             );
           }
           
-          // Sort jobs by orderIndex and find the first pending job in the correct sequence
-          // Include not_applicable jobs as they are similar to pending
-          const sortedJobs = [...element.jobs].sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
-          const pendingJob = sortedJobs.find(job => 
-            job.status === 'pending' || job.status === 'in_progress' || job.status === 'not_applicable'
-          );
-          
-          if (!pendingJob) {
+          // If all jobs are complete
+          if (jobCounts.completedJobs === jobCounts.totalJobs) {
             return (
               <Typography variant="body2" color="success.main" sx={{ fontWeight: 500 }}>
                 All jobs complete
@@ -1307,19 +1325,29 @@ const StructuralElementsList = ({ projectSlug }) => {
             );
           }
           
+          // Display current pending job from backend
+          if (element.currentPendingJob) {
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor: 'warning.main',
+                  animation: 'pulse 2s infinite'
+                }} />
+                <Typography variant="body2" color="warning.dark" sx={{ fontWeight: 500 }}>
+                  {element.currentPendingJob.title}
+                </Typography>
+              </Box>
+            );
+          }
+          
+          // Fallback if no pending job but there are active/incomplete jobs
           return (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box sx={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                backgroundColor: 'warning.main',
-                animation: 'pulse 2s infinite'
-              }} />
-              <Typography variant="body2" color="warning.dark" sx={{ fontWeight: 500 }}>
-                {pendingJob.jobTitle}
-              </Typography>
-            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+              No pending job
+            </Typography>
           );
         })();
       case 'progress':
@@ -1868,7 +1896,7 @@ const StructuralElementsList = ({ projectSlug }) => {
               })
             }}>
               <Typography variant="body2" fontWeight="bold">
-                {loading ? '...' : `${elements.length} Elements`}
+                {loading ? '...' : `${totalElements} Elements`}
               </Typography>
             </Box>
           </Box>
@@ -1876,7 +1904,7 @@ const StructuralElementsList = ({ projectSlug }) => {
 
         {/* Global filter panel removed - now using individual section filters */}
 
-        {elements.length === 0 && !loading ? (
+        {totalElements === 0 && !loading ? (
           <Alert severity="info" sx={{ mb: 3 }}>
             No structural elements found. Add elements individually or upload an Excel file to get started.
           </Alert>
@@ -1962,7 +1990,12 @@ const StructuralElementsList = ({ projectSlug }) => {
                     });
                   };
                   
-                  return sectionElements.length > 0 ? (
+                  // Only render sections that have elements (hide empty sections)
+                  if (sectionElements.length === 0) {
+                    return null;
+                  }
+                  
+                  return (
                     <Paper 
                       key={statusName}
                       sx={{ 
@@ -1992,13 +2025,23 @@ const StructuralElementsList = ({ projectSlug }) => {
                             transform: 'translateY(-1px)'
                           }
                         }}
-                        onClick={() => setSectionFilters(prev => ({
-                          ...prev,
-                          [statusName]: {
-                            ...prev[statusName],
-                            expanded: !prev[statusName].expanded
+                        onClick={() => {
+                          const isCurrentlyExpanded = sectionFilters[statusName].expanded;
+                          
+                          // Toggle expansion
+                          setSectionFilters(prev => ({
+                            ...prev,
+                            [statusName]: {
+                              ...prev[statusName],
+                              expanded: !isCurrentlyExpanded
+                            }
+                          }));
+                          
+                          // Lazy load: If expanding and elements not loaded yet, fetch them
+                          if (!isCurrentlyExpanded && elements.length === 0) {
+                            fetchElementsForStatus(statusName);
                           }
-                        }))}
+                        }}
                       >
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -2071,19 +2114,29 @@ const StructuralElementsList = ({ projectSlug }) => {
                       {/* Section Content */}
                       <Collapse in={sectionFilters[statusName].expanded} timeout={300}>
                         <Box sx={{ p: 2, backgroundColor: 'white' }}>
-                          {/* Section Filters */}
-                          <Box sx={{ 
-                            mb: 2, 
-                            p: 2, 
-                            backgroundColor: 'grey.50',
-                            borderRadius: 1,
-                            border: '1px solid',
-                            borderColor: 'divider'
-                          }}>
-                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: statusColor }}>
-                              Filter & Group {statusTitle}
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                          {/* Show loading indicator while fetching elements */}
+                          {sectionFilters[statusName].loading ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+                              <CircularProgress sx={{ color: statusColor }} />
+                              <Typography variant="body1" sx={{ ml: 2, color: statusColor }}>
+                                Loading elements...
+                              </Typography>
+                            </Box>
+                          ) : (
+                            <>
+                              {/* Section Filters */}
+                              <Box sx={{ 
+                                mb: 2, 
+                                p: 2, 
+                                backgroundColor: 'grey.50',
+                                borderRadius: 1,
+                                border: '1px solid',
+                                borderColor: 'divider'
+                              }}>
+                                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: statusColor }}>
+                                  Filter & Group {statusTitle}
+                                </Typography>
+                                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
                               <TextField
                                 label="Search"
                                 value={sectionFilter.searchTerm}
@@ -2169,10 +2222,10 @@ const StructuralElementsList = ({ projectSlug }) => {
                               >
                                 Clear All
                               </Button>
-                            </Box>
-                          </Box>
+                                </Box>
+                              </Box>
 
-                          {/* Elements Table - Grouped or Regular View */}
+                              {/* Elements Table - Grouped or Regular View */}
                           {sectionFilter.groupBy ? (
                             // Grouped View
                             <Box>
@@ -2408,20 +2461,22 @@ const StructuralElementsList = ({ projectSlug }) => {
                                   }
                                 }}
                               />
+                              
+                              {filteredSectionElements.length === 0 && !sectionFilters[statusName].loading && (
+                                <Box sx={{ textAlign: 'center', py: 4 }}>
+                                  <Typography variant="body2" color="text.secondary">
+                                    No elements match the current filters
+                                  </Typography>
+                                </Box>
+                              )}
                             </>
                           )}
-                          
-                          {filteredSectionElements.length === 0 && (
-                            <Box sx={{ textAlign: 'center', py: 4 }}>
-                              <Typography variant="body2" color="text.secondary">
-                                No elements match the current filters
-                              </Typography>
-                            </Box>
+                            </>
                           )}
                         </Box>
                       </Collapse>
                     </Paper>
-                  ) : null;
+                  );
                 };
 
                 // Render all status sections
