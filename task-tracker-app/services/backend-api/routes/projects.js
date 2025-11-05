@@ -248,6 +248,9 @@ router.post('/', auth, async (req, res) => {
     
     await project.save();
     
+    // Invalidate all project list caches when a new project is created
+    await invalidateCache('cache:projects:*');
+    
     res.status(201).json({
       message: 'Project created successfully',
       project: project
@@ -282,6 +285,10 @@ router.put('/:id', auth, async (req, res) => {
     
     await project.save();
     
+    // Invalidate all project list caches when a project is updated
+    await invalidateCache('cache:projects:*');
+    await invalidateCache(`cache:project:${req.params.id}:*`);
+    
     res.json({
       message: 'Project updated successfully',
       project: project
@@ -306,6 +313,13 @@ router.delete('/:id', auth, async (req, res) => {
     await Job.deleteMany({ project: req.params.id });
     
     await Task.findByIdAndDelete(req.params.id);
+    
+    // Invalidate all project-related caches when a project is deleted
+    await invalidateCache('cache:projects:*');
+    await invalidateCache(`cache:project:${req.params.id}:*`);
+    await invalidateCache(`cache:structural:*:project:${req.params.id}:*`);
+    await invalidateCache(`cache:jobs:project:${req.params.id}:*`);
+    await invalidateCache(`cache:stats:project:${req.params.id}:*`);
     
     res.json({ message: 'Project and all related data deleted successfully' });
   } catch (error) {
