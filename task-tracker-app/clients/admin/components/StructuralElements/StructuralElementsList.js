@@ -943,15 +943,18 @@ const StructuralElementsList = ({ projectSlug }) => {
               }
             };
             
-            // If element status changed to/from complete, trigger surface area recalculation
-            if (calculatedStatus === 'complete' || element.status === 'complete') {
-              setTimeout(() => calculateSurfaceMetrics(), 0);
-            }
-            
             return updatedElement;
           }
           return element;
         });
+        
+        // If element status changed to/from complete, trigger surface area recalculation with updated elements
+        const changedElement = updatedElements.find(el => el._id === selectedElement._id);
+        const originalElement = prevElements.find(el => el._id === selectedElement._id);
+        if (changedElement && originalElement && 
+            (changedElement.status === 'complete' || originalElement.status === 'complete')) {
+          setTimeout(() => calculateSurfaceMetrics(updatedElements), 0);
+        }
         
         return updatedElements;
       });
