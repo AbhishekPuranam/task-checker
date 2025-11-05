@@ -2,6 +2,7 @@ const express = require('express');
 const StructuralElement = require('../models/StructuralElement');
 const { auth, adminAuth } = require('../middleware/auth');
 const { cacheMiddleware, invalidateCache } = require('../middleware/cache');
+const { addProgressJob } = require('../utils/queue');
 const multer = require('multer');
 const path = require('path');
 
@@ -269,8 +270,12 @@ router.post('/', auth, upload.array('attachments', 5), async (req, res) => {
 
     await element.save();
     
-    // Invalidate structural elements cache for this project
+    // Invalidate caches for this project
     await invalidateCache(`cache:structural:elements:project:${project}:*`);
+    await invalidateCache(`cache:projects:*`); // Invalidate all project listings
+    
+    // Trigger progress calculation
+    addProgressJob(project).catch(err => console.error('Failed to trigger progress job:', err));
     
     // Populate the element before sending response
     await element.populate('createdBy', 'name email role');
@@ -321,8 +326,12 @@ router.put('/:id', adminAuth, async (req, res) => {
     const oldStatus = element.status;
     await element.save();
     
-    // Invalidate structural elements cache for this project
+    // Invalidate caches for this project
     await invalidateCache(`cache:structural:elements:project:${element.project}:*`);
+    await invalidateCache(`cache:projects:*`); // Invalidate all project listings
+    
+    // Trigger progress calculation
+    addProgressJob(element.project.toString()).catch(err => console.error('Failed to trigger progress job:', err));
     
     // If status changed, update project status
     if (req.body.status && req.body.status !== oldStatus) {
@@ -362,8 +371,12 @@ router.delete('/:id', adminAuth, async (req, res) => {
     const projectId = element.project;
     await StructuralElement.findByIdAndDelete(req.params.id);
 
-    // Invalidate structural elements cache for this project
+    // Invalidate caches for this project
     await invalidateCache(`cache:structural:elements:project:${projectId}:*`);
+    await invalidateCache(`cache:projects:*`); // Invalidate all project listings
+    
+    // Trigger progress calculation
+    addProgressJob(projectId.toString()).catch(err => console.error('Failed to trigger progress job:', err));
 
     // Emit socket event for real-time updates
     req.io.emit('structural-element-deleted', req.params.id);
@@ -400,8 +413,11 @@ router.post('/bulk-delete', adminAuth, async (req, res) => {
     });
 
     // Invalidate cache for all affected projects
+    await invalidateCache(`cache:projects:*`); // Invalidate all project listings
     for (const projectId of projectIds) {
       await invalidateCache(`cache:structural:elements:project:${projectId}:*`);
+      // Trigger progress calculation
+      addProgressJob(projectId).catch(err => console.error('Failed to trigger progress job:', err));
     }
 
     // Emit socket event for real-time updates
@@ -580,9 +596,12 @@ router.post('/bulk-import', adminAuth, async (req, res) => {
     });
 
     // Invalidate cache for all affected projects
+    await invalidateCache(`cache:projects:*`); // Invalidate all project listings
     const projectIds = [...new Set(elements.map(el => el.project?.toString()).filter(Boolean))];
     for (const projectId of projectIds) {
       await invalidateCache(`cache:structural:elements:project:${projectId}:*`);
+      // Trigger progress calculation
+      addProgressJob(projectId).catch(err => console.error('Failed to trigger progress job:', err));
     }
 
     res.json({ 

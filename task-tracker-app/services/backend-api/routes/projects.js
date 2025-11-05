@@ -5,12 +5,21 @@ const StructuralElement = require('../models/StructuralElement');
 const Job = require('../models/Job');
 const User = require('../models/User');
 const { auth } = require('../middleware/auth');
+const { cacheMiddleware, invalidateCache } = require('../middleware/cache');
 const { addProgressJob } = require('../utils/queue');
 
 const router = express.Router();
 
 // Get all projects (with role-based filtering)
-router.get('/', auth, async (req, res) => {
+router.get('/', 
+  auth,
+  cacheMiddleware(300, (req) => {
+    const userId = req.user?.id || 'anon';
+    const role = req.user?.role || 'anon';
+    const { limit, sortBy = 'createdAt', sortOrder = 'desc', search } = req.query;
+    return `cache:projects:user:${userId}:role:${role}:limit:${limit || 'all'}:sort:${sortBy}:${sortOrder}:search:${search || 'none'}`;
+  }),
+  async (req, res) => {
   try {
     const { limit, sortBy = 'createdAt', sortOrder = 'desc', search } = req.query;
     
