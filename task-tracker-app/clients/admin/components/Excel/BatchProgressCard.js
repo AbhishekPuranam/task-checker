@@ -152,50 +152,70 @@ const BatchProgressCard = ({ uploadSession, onRefresh }) => {
       {/* Summary Stats */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid item xs={6} sm={3}>
-          <Box sx={{ textAlign: 'center' }}>
-            <Typography variant="h4" color="success.main">
-              {summary.successfulBatches}
-            </Typography>
-            <Typography variant="caption">Success</Typography>
-          </Box>
-        </Grid>
-        <Grid item xs={6} sm={3}>
-          <Box sx={{ textAlign: 'center' }}>
-            <Typography variant="h4" color="error.main">
-              {summary.failedBatches}
-            </Typography>
-            <Typography variant="caption">Failed</Typography>
-          </Box>
-        </Grid>
-        <Grid item xs={6} sm={3}>
-          <Box sx={{ textAlign: 'center' }}>
-            <Typography variant="h4" color="info.main">
+          <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'success.lighter', borderRadius: 1 }}>
+            <Typography variant="h4" color="success.main" fontWeight="bold">
               {summary.totalElementsCreated}
             </Typography>
-            <Typography variant="caption">Elements</Typography>
+            <Typography variant="caption" color="text.secondary">Elements Created</Typography>
           </Box>
         </Grid>
         <Grid item xs={6} sm={3}>
-          <Box sx={{ textAlign: 'center' }}>
-            <Typography variant="h4" color="primary.main">
+          <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'primary.lighter', borderRadius: 1 }}>
+            <Typography variant="h4" color="primary.main" fontWeight="bold">
               {summary.totalJobsCreated}
             </Typography>
-            <Typography variant="caption">Jobs</Typography>
+            <Typography variant="caption" color="text.secondary">Jobs Created</Typography>
+          </Box>
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <Box sx={{ textAlign: 'center', p: 1, bgcolor: 'info.lighter', borderRadius: 1 }}>
+            <Typography variant="h4" color="success.dark" fontWeight="bold">
+              {summary.successfulBatches}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">Batches Success</Typography>
+          </Box>
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <Box sx={{ textAlign: 'center', p: 1, bgcolor: summary.failedBatches > 0 ? 'error.lighter' : 'grey.100', borderRadius: 1 }}>
+            <Typography variant="h4" color={summary.failedBatches > 0 ? 'error.main' : 'text.secondary'} fontWeight="bold">
+              {summary.failedBatches}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">Batches Failed</Typography>
           </Box>
         </Grid>
       </Grid>
 
       {/* Progress Bar */}
       <Box sx={{ mb: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+          <Typography variant="body2" fontWeight="medium">
+            Processing Progress
+          </Typography>
+          <Typography variant="body2" color="primary.main" fontWeight="medium">
+            {Math.round((summary.successfulBatches / uploadSession.totalBatches) * 100)}%
+          </Typography>
+        </Box>
         <LinearProgress
           variant="determinate"
           value={(summary.successfulBatches / uploadSession.totalBatches) * 100}
-          sx={{ height: 8, borderRadius: 1 }}
+          sx={{ 
+            height: 10, 
+            borderRadius: 1,
+            backgroundColor: 'grey.200',
+            '& .MuiLinearProgress-bar': {
+              borderRadius: 1,
+            }
+          }}
         />
-        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-          {summary.successfulBatches}/{uploadSession.totalBatches} batches completed
-          {summary.duplicatesSkipped > 0 && ` (${summary.duplicatesSkipped} duplicates skipped)`}
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+          <Typography variant="caption" color="text.secondary">
+            {summary.totalElementsCreated} elements created
+            {summary.duplicatesSkipped > 0 && ` • ${summary.duplicatesSkipped} duplicates skipped`}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {summary.successfulBatches}/{uploadSession.totalBatches} complete
+          </Typography>
+        </Box>
       </Box>
 
       {/* Actions */}
@@ -204,8 +224,9 @@ const BatchProgressCard = ({ uploadSession, onRefresh }) => {
           size="small"
           startIcon={<Info />}
           onClick={() => setShowBatchDetails(true)}
+          variant="outlined"
         >
-          View Batches
+          View Details
         </Button>
 
         {failedBatches.length > 0 && (
@@ -216,8 +237,9 @@ const BatchProgressCard = ({ uploadSession, onRefresh }) => {
               onClick={handleRetryFailed}
               disabled={retrying}
               color="warning"
+              variant="contained"
             >
-              Retry Failed ({failedBatches.length})
+              Retry Failed Batches
             </Button>
             <Button
               size="small"
@@ -226,20 +248,22 @@ const BatchProgressCard = ({ uploadSession, onRefresh }) => {
               color="error"
               variant="outlined"
             >
-              Cleanup Failed
+              Remove Failed Data
             </Button>
           </>
         )}
 
-        <Button
-          size="small"
-          startIcon={<Delete />}
-          onClick={handleDeleteSession}
-          color="error"
-          variant="text"
-        >
-          Delete All
-        </Button>
+        {status === 'completed' && (
+          <Button
+            size="small"
+            startIcon={<Delete />}
+            onClick={handleDeleteSession}
+            color="error"
+            variant="text"
+          >
+            Delete Upload
+          </Button>
+        )}
       </Box>
 
       {/* Batch Details Dialog */}
@@ -250,9 +274,12 @@ const BatchProgressCard = ({ uploadSession, onRefresh }) => {
         fullWidth
       >
         <DialogTitle>
-          Batch Details - {uploadSession.fileName}
+          Upload Details
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            {uploadSession.fileName}
+          </Typography>
           <Typography variant="caption" display="block" color="text.secondary">
-            {uploadSession.totalBatches} total batches
+            {summary.totalElementsCreated} elements • {summary.totalJobsCreated} jobs • {uploadSession.totalBatches} batches processed
           </Typography>
         </DialogTitle>
         <DialogContent dividers>
