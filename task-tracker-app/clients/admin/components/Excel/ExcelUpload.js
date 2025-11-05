@@ -149,8 +149,8 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
         setIsBatchMode(true);
         toast.success('File uploaded! Processing in batches...');
         
-        // Start polling for upload session status
-        const interval = setInterval(() => pollUploadSession(response.data.uploadId), 2000);
+        // Start polling for upload session status - pass interval ID to pollUploadSession
+        const interval = setInterval(() => pollUploadSession(response.data.uploadId, interval), 2000);
         setProgressInterval(interval);
       } else if (response.data.jobId) {
         // Legacy mode with BullMQ
@@ -158,8 +158,8 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
         setIsBatchMode(false);
         toast.success('File uploaded! Processing in background...');
         
-        // Start polling for job status
-        const interval = setInterval(() => pollJobStatus(response.data.jobId), 1000);
+        // Start polling for job status - pass interval ID to pollJobStatus
+        const interval = setInterval(() => pollJobStatus(response.data.jobId, interval), 1000);
         setProgressInterval(interval);
       }
       
@@ -170,7 +170,7 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
     }
   };
 
-  const pollJobStatus = async (jobId) => {
+  const pollJobStatus = async (jobId, intervalId) => {
     try {
       const response = await api.get(`/excel/job-status/${jobId}`);
       const status = response.data;
@@ -190,10 +190,8 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
       
       // Check if job is complete
       if (status.state === 'completed') {
-        if (progressInterval) {
-          clearInterval(progressInterval);
-          setProgressInterval(null);
-        }
+        clearInterval(intervalId);
+        setProgressInterval(null);
         
         setUploading(false);
         
@@ -227,10 +225,8 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
       
       // Check if job failed
       if (status.state === 'failed') {
-        if (progressInterval) {
-          clearInterval(progressInterval);
-          setProgressInterval(null);
-        }
+        clearInterval(intervalId);
+        setProgressInterval(null);
         
         setUploading(false);
         toast.error(status.error || 'Excel processing failed');
@@ -242,7 +238,7 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
     }
   };
 
-  const pollUploadSession = async (uploadId) => {
+  const pollUploadSession = async (uploadId, intervalId) => {
     try {
       const response = await api.get(`/upload-sessions/${uploadId}`);
       const session = response.data;
@@ -269,10 +265,8 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
       
       // Check if all batches are complete
       if (session.status === 'completed' || session.status === 'failed') {
-        if (progressInterval) {
-          clearInterval(progressInterval);
-          setProgressInterval(null);
-        }
+        clearInterval(intervalId);
+        setProgressInterval(null);
         
         setUploading(false);
         
