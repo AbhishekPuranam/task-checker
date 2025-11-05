@@ -15,7 +15,6 @@ services:
       - '--bootstrap-prometheus-url=http://prometheus:9090'
       - '--bootstrap-refresh-interval=15s'
       - '--bootstrap-clickhouse-address=clickhouse:9000'
-      - '--bootstrap-clickhouse-protocol=grpc'
     depends_on:
       - clickhouse
       - prometheus
