@@ -28,7 +28,7 @@ services:
     command: ["-config.file=/etc/tempo.yaml"]
     volumes:
       - ./tempo-config.yaml:/etc/tempo.yaml
-      - tempo_data:/tmp/tempo
+      - tempo_data:/var/tempo
     ports:
       - "4317"  # OTLP gRPC
       - "4318"  # OTLP HTTP
