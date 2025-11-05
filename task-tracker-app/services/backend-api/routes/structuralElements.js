@@ -106,6 +106,9 @@ router.get('/', auth, async (req, res) => {
           },
           pendingJobs: {
             $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] }
+          },
+          nonClearanceJobs: {
+            $sum: { $cond: [{ $eq: ['$status', 'not_applicable'] }, 1, 0] }
           }
         }
       }
@@ -138,7 +141,8 @@ router.get('/', auth, async (req, res) => {
         totalJobs: 0,
         completedJobs: 0,
         activeJobs: 0,
-        pendingJobs: 0
+        pendingJobs: 0,
+        nonClearanceJobs: 0
       };
       
       const currentPendingJob = pendingJobsMap.get(element._id.toString());
@@ -146,10 +150,11 @@ router.get('/', auth, async (req, res) => {
       return {
         ...element,
         jobCounts: {
-          total: stats.totalJobs,
-          completed: stats.completedJobs,
-          active: stats.activeJobs,
-          pending: stats.pendingJobs
+          totalJobs: stats.totalJobs,
+          completedJobs: stats.completedJobs,
+          activeJobs: stats.activeJobs,
+          pendingJobs: stats.pendingJobs,
+          nonClearanceJobs: stats.nonClearanceJobs
         },
         currentPendingJob: currentPendingJob ? {
           title: currentPendingJob.jobTitle,

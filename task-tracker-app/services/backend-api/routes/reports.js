@@ -558,21 +558,36 @@ router.get('/section-report', adminAuth, async (req, res) => {
     console.log('Section export - Element filter:', elementFilter);
     console.log('Section export - Actual project name:', actualProjectName);
     
-    // Fetch structural elements
-    const allElements = await StructuralElement.find(elementFilter)
+    // For 'non clearance' section, first find elements with not_applicable jobs
+    let targetElementIds = [];
+    if (section === 'non clearance') {
+      // Find elements that have jobs with status 'not_applicable'
+      const nonClearanceJobs = await Job.find({ 
+        ...elementFilter,
+        status: 'not_applicable' 
+      }).distinct('structuralElement');
+      targetElementIds = nonClearanceJobs;
+      console.log('Section export - Elements with non-clearance jobs:', targetElementIds.length);
+    }
+    
+    // Fetch structural elements based on section
+    const fetchFilter = targetElementIds.length > 0 
+      ? { ...elementFilter, _id: { $in: targetElementIds } }
+      : elementFilter;
+      
+    const allElements = await StructuralElement.find(fetchFilter)
       .populate('createdBy', 'name email')
       .sort({ serialNo: 1 });
 
     console.log('Section export - Found elements:', allElements.length);
 
-    // Get all jobs for these elements
+    // Get all jobs for these elements (only fetch status field for performance)
     const elementIds = allElements.map(el => el._id);
     console.log('Section export - Element IDs sample:', elementIds.slice(0, 3));
     
     const jobs = await Job.find({ structuralElement: { $in: elementIds } })
-      .populate('createdBy', 'name email')
-      .populate('assignedTo', 'name email')
-      .populate('qualityCheckedBy', 'name email');
+      .select('structuralElement status progressPercentage')
+      .lean();
 
     // Group jobs by structural element
     const jobsByElement = {};

@@ -10,7 +10,7 @@ const getApiUrl = () => {
 // Create axios instance with base configuration
 const api = axios.create({
   baseURL: getApiUrl(),
-  timeout: 10000,
+  timeout: 120000, // 120 seconds for large data sets
   withCredentials: true, // Send cookies with requests
   headers: {
     'Content-Type': 'application/json',

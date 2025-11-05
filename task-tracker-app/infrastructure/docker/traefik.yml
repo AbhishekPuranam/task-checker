@@ -3,6 +3,13 @@ api:
   dashboard: true
   insecure: false  # Disable insecure dashboard access in production
 
+# Global transport configuration with increased timeouts
+serversTransport:
+  forwardingTimeouts:
+    dialTimeout: 30s
+    responseHeaderTimeout: 180s
+    idleConnTimeout: 180s
+
 entryPoints:
   web:
     address: ":80"

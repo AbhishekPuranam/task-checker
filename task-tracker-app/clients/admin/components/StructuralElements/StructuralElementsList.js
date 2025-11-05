@@ -105,8 +105,7 @@ const StructuralElementsList = ({ projectSlug }) => {
       groupBy: '',
       page: 0,
       rowsPerPage: 10,
-      expandedGroups: {},
-      loading: false
+      expandedGroups: {}
     },
     'no jobs': {
       searchTerm: '',
@@ -116,8 +115,7 @@ const StructuralElementsList = ({ projectSlug }) => {
       groupBy: '',
       page: 0,
       rowsPerPage: 10,
-      expandedGroups: {},
-      loading: false
+      expandedGroups: {}
     },
     'active': {
       searchTerm: '',
@@ -127,8 +125,7 @@ const StructuralElementsList = ({ projectSlug }) => {
       groupBy: '',
       page: 0,
       rowsPerPage: 10,
-      expandedGroups: {},
-      loading: false
+      expandedGroups: {}
     },
     'complete': {
       searchTerm: '',
@@ -138,8 +135,7 @@ const StructuralElementsList = ({ projectSlug }) => {
       groupBy: '',
       page: 0,
       rowsPerPage: 10,
-      expandedGroups: {},
-      loading: false
+      expandedGroups: {}
     }
   });
   
@@ -479,55 +475,31 @@ const StructuralElementsList = ({ projectSlug }) => {
     }
   };
 
-  // Stage 1: Fetch only element counts by status
-  const fetchElementCounts = async () => {
+  const fetchElements = async () => {
     if (!projectId) {
       return;
     }
     
     try {
       setLoading(true);
-      
-      // Fetch just the counts - lightweight API call
-      const response = await api.get(`/structural-elements?project=${projectId}&limit=1`);
-      setTotalElements(response.data.total || 0);
-      
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching element counts:', error);
-      toast.error('Failed to load element counts');
-      setLoading(false);
-    }
-  };
-
-  // Stage 2: Fetch elements for a specific status when section is expanded
-  const fetchElementsForStatus = async (statusName) => {
-    if (!projectId) {
-      return;
-    }
-    
-    try {
-      // Mark this section as loading
-      setSectionFilters(prev => ({
-        ...prev,
-        [statusName]: { ...prev[statusName], loading: true }
-      }));
-      
-      // Fetch all elements with job counts
+      // Fetch all elements with their job counts
       const response = await api.get(`/structural-elements?project=${projectId}&limit=50000`);
       
       // Calculate status for each element
       const elementsWithStatus = response.data.elements.map((element) => {
         try {
-          const jobCounts = element.jobCounts || { totalJobs: 0, completedJobs: 0, activeJobs: 0, pendingJobs: 0 };
+          const jobCounts = element.jobCounts || { totalJobs: 0, completedJobs: 0, activeJobs: 0, pendingJobs: 0, nonClearanceJobs: 0 };
           const totalJobs = jobCounts.totalJobs || 0;
           const completedJobs = jobCounts.completedJobs || 0;
           const activeJobs = jobCounts.activeJobs || 0;
+          const nonClearanceJobs = jobCounts.nonClearanceJobs || 0;
           const progressPercentage = element.progressPercentage || 0;
           
           let calculatedStatus;
           if (totalJobs === 0) {
             calculatedStatus = 'no jobs';
+          } else if (nonClearanceJobs > 0) {
+            calculatedStatus = 'non clearance';
           } else if (completedJobs === totalJobs && progressPercentage === 100) {
             calculatedStatus = 'complete';
           } else if (activeJobs > 0 || completedJobs > 0) {
@@ -556,20 +528,13 @@ const StructuralElementsList = ({ projectSlug }) => {
       });
       
       setElements(elementsWithStatus);
+      setTotalElements(elementsWithStatus.length);
       
-      // Mark section as loaded
-      setSectionFilters(prev => ({
-        ...prev,
-        [statusName]: { ...prev[statusName], loading: false }
-      }));
-      
+      setLoading(false);
     } catch (error) {
-      console.error('Error fetching elements for status:', error);
-      toast.error('Failed to load elements');
-      setSectionFilters(prev => ({
-        ...prev,
-        [statusName]: { ...prev[statusName], loading: false }
-      }));
+      console.error('Error fetching element counts:', error);
+      toast.error('Failed to load structural elements');
+      setLoading(false);
     }
   };
 
@@ -615,7 +580,7 @@ const StructuralElementsList = ({ projectSlug }) => {
   // Fetch elements once we have the projectId
   useEffect(() => {
     if (projectId && token) {
-      fetchElementCounts(); // Stage 1: Just get counts
+      fetchElements();
       fetchJobTypesData();
     }
   }, [projectId, token]);
@@ -2026,21 +1991,13 @@ const StructuralElementsList = ({ projectSlug }) => {
                           }
                         }}
                         onClick={() => {
-                          const isCurrentlyExpanded = sectionFilters[statusName].expanded;
-                          
-                          // Toggle expansion
                           setSectionFilters(prev => ({
                             ...prev,
                             [statusName]: {
                               ...prev[statusName],
-                              expanded: !isCurrentlyExpanded
+                              expanded: !prev[statusName].expanded
                             }
                           }));
-                          
-                          // Lazy load: If expanding and elements not loaded yet, fetch them
-                          if (!isCurrentlyExpanded && elements.length === 0) {
-                            fetchElementsForStatus(statusName);
-                          }
                         }}
                       >
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -2114,29 +2071,19 @@ const StructuralElementsList = ({ projectSlug }) => {
                       {/* Section Content */}
                       <Collapse in={sectionFilters[statusName].expanded} timeout={300}>
                         <Box sx={{ p: 2, backgroundColor: 'white' }}>
-                          {/* Show loading indicator while fetching elements */}
-                          {sectionFilters[statusName].loading ? (
-                            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
-                              <CircularProgress sx={{ color: statusColor }} />
-                              <Typography variant="body1" sx={{ ml: 2, color: statusColor }}>
-                                Loading elements...
-                              </Typography>
-                            </Box>
-                          ) : (
-                            <>
-                              {/* Section Filters */}
-                              <Box sx={{ 
-                                mb: 2, 
-                                p: 2, 
-                                backgroundColor: 'grey.50',
-                                borderRadius: 1,
-                                border: '1px solid',
-                                borderColor: 'divider'
-                              }}>
-                                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: statusColor }}>
-                                  Filter & Group {statusTitle}
-                                </Typography>
-                                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                          {/* Section Filters */}
+                          <Box sx={{ 
+                            mb: 2, 
+                            p: 2, 
+                            backgroundColor: 'grey.50',
+                            borderRadius: 1,
+                            border: '1px solid',
+                            borderColor: 'divider'
+                          }}>
+                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: statusColor }}>
+                              Filter & Group {statusTitle}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
                               <TextField
                                 label="Search"
                                 value={sectionFilter.searchTerm}
@@ -2462,15 +2409,13 @@ const StructuralElementsList = ({ projectSlug }) => {
                                 }}
                               />
                               
-                              {filteredSectionElements.length === 0 && !sectionFilters[statusName].loading && (
+                              {filteredSectionElements.length === 0 && (
                                 <Box sx={{ textAlign: 'center', py: 4 }}>
                                   <Typography variant="body2" color="text.secondary">
                                     No elements match the current filters
                                   </Typography>
                                 </Box>
                               )}
-                            </>
-                          )}
                             </>
                           )}
                         </Box>

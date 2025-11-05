@@ -21,7 +21,7 @@ EXPOSE 5000
 CMD ["npm", "run", "dev"]
 
 # Production stage
-FROM node:18-alpine AS production
+FROM node:20-alpine AS production
 
 # Create app directory
 WORKDIR /app
