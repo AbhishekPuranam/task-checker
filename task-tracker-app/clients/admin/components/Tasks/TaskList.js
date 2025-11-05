@@ -550,26 +550,6 @@ const ProjectList = () => {
                           {project.location || 'Location not specified'}
                         </Typography>
                       </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                        <Assessment fontSize="small" color="action" />
-                        <Typography variant="body2" color="text.secondary">
-                          Total Surface Area: {projectProgress[project._id]?.totalSurfaceArea?.toFixed(2) || '0.00'} sqm
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                        <Assessment fontSize="small" color="action" />
-                        <Typography variant="body2" fontWeight="bold" color="primary.main">
-                          Completed: {projectProgress[project._id]?.completedSurfaceArea?.toFixed(2) || '0.00'} sqm 
-                          ({projectProgress[project._id]?.surfaceAreaPercentage?.toFixed(1) || '0.0'}%)
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                        <Assessment fontSize="small" color="action" />
-                        <Typography variant="body2" fontWeight="bold" color="primary.main">
-                          Elements Progress: {projectProgress[project._id]?.completedElements || 0}/
-                          {projectProgress[project._id]?.totalElements || 0}
-                        </Typography>
-                      </Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <CalendarMonth fontSize="small" color="action" />
                         <Typography variant="body2" color="text.secondary">
