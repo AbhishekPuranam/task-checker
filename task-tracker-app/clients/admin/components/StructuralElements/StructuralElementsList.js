@@ -501,6 +501,7 @@ const StructuralElementsList = ({ projectSlug }) => {
           const totalJobs = jobCounts.totalJobs || 0;
           const completedJobs = jobCounts.completedJobs || 0;
           const activeJobs = jobCounts.activeJobs || 0;
+          const pendingJobs = jobCounts.pendingJobs || 0;
           const nonClearanceJobs = jobCounts.nonClearanceJobs || 0;
           const progressPercentage = element.progressPercentage || 0;
           
