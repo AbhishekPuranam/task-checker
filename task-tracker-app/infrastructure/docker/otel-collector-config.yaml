@@ -36,34 +36,29 @@ exporters:
     tls:
       insecure: true
 
-  # Export logs to Loki
-  loki:
-    endpoint: http://loki:3100/loki/api/v1/push
-    labels:
-      attributes:
-        service.name: ""
-        deployment.environment: ""
-      resource:
-        service.name: "service_name"
-        deployment.environment: "env"
+  # Export logs directly to Loki via OTLP HTTP
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+    tls:
+      insecure: true
 
-  # Logging exporter for debugging
-  logging:
-    loglevel: info
+  # Debug exporter for troubleshooting
+  debug:
+    verbosity: normal
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch, resource]
-      exporters: [otlp/tempo, logging]
+      exporters: [otlp/tempo, debug]
     
     logs:
       receivers: [otlp]
-      processors: [memory_limiter, batch, resource, attributes]
-      exporters: [loki, logging]
+      processors: [memory_limiter, batch, resource]
+      exporters: [otlphttp/loki, debug]
     
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, batch, resource]
-      exporters: [logging]
+      exporters: [debug]
