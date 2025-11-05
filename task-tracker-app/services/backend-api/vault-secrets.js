@@ -189,7 +189,7 @@ class VaultSecretManager {
     const password = await this.getSecret('mongodb_password', 'projecttracker/database');
     const host = process.env.MONGODB_HOST || 'mongodb';
     const port = process.env.MONGODB_PORT || '27017';
-    const database = process.env.MONGODB_DATABASE || 'projecttracker';
+    const database = process.env.MONGODB_DATABASE || 'tasktracker';
     
     return `mongodb://admin:${password}@${host}:${port}/${database}?authSource=admin`;
   }
