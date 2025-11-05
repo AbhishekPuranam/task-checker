@@ -450,16 +450,71 @@ router.post('/preview', auth, upload.single('excel'), async (req, res) => {
   }
 });
 
-// Upload and process Excel file synchronously with progress tracking
+// Upload and process Excel file ASYNCHRONOUSLY using BullMQ (recommended for large files)
 router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, res) => {
+  console.log('=== ASYNC Excel upload request received ===');
+  console.log('Project ID:', req.params.projectId);
+  console.log('File uploaded:', !!req.file);
+  console.log('User:', req.user?.email);
+  
+  try {
+    const { projectId } = req.params;
+    
+    // Verify project exists
+    const project = await Task.findById(projectId);
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check if user has permission
+    if (req.user.role !== 'admin' && project.createdBy.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to upload to this project' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'No Excel file uploaded' });
+    }
+
+    console.log(`📁 File uploaded to: ${req.file.path}`);
+    console.log(`📊 File size: ${req.file.size} bytes`);
+    
+    // Queue the job for async processing
+    const job = await addExcelJob({
+      filePath: req.file.path,
+      projectId: projectId,
+      userId: req.user.id,
+      projectName: project.projectName
+    });
+    
+    console.log(`✅ Excel processing job queued: ${job.id}`);
+    
+    // Return immediately with job ID
+    res.json({
+      success: true,
+      message: 'Excel file uploaded successfully. Processing in background...',
+      jobId: job.id,
+      status: 'queued',
+      tip: `Use GET /api/excel/status/${job.id} to check processing status`
+    });
+    
+  } catch (error) {
+    console.error('Error queuing Excel upload:', error);
+    // Clean up file on error
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({ message: 'Error processing Excel file', error: error.message });
+  }
+});
+
+// Upload and process Excel file SYNCHRONOUSLY (for small files, subject to timeout)
+router.post('/upload-sync/:projectId', auth, upload.single('excelFile'), async (req, res) => {
   console.log('=== Excel upload request received ===');
   console.log('Project ID:', req.params.projectId);
   console.log('File uploaded:', !!req.file);
   console.log('User:', req.user.email);
   
-  const { DatabaseTransaction } = require('../utils/transaction');
-  const { CacheTransaction, invalidateCache } = require('../middleware/cache');
-  const { addProgressJob } = require('../utils/queue');
+  console.log('User:', req.user?.email || 'undefined');
   
   try {
     const { projectId } = req.params;
@@ -490,8 +545,8 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
     
     console.log(`✅ File verified to exist at: ${req.file.path}`);
 
-    // Parse Excel file
-    console.log(`📄 Parsing Excel file...`);
+    // Quick validation - parse Excel to check if valid
+    console.log(`📄 Quick validation - parsing Excel file...`);
     const excelData = parseExcelFile(req.file.path);
     console.log(`✅ Parsed ${excelData.length} rows from Excel`);
     
@@ -501,179 +556,56 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
       return res.status(400).json({ message: 'Excel file is empty or invalid' });
     }
 
-    // Transform and validate data
-    console.log(`🔍 Validating data...`);
-    const structuralElements = [];
-    const errors = [];
-    
-    for (let i = 0; i < excelData.length; i++) {
-      try {
-        const transformedData = transformExcelRow(excelData[i], projectId, req.user.id, project);
-        
-        if (!transformedData.structureNumber) {
-          errors.push({ row: i + 2, message: 'Structure Number is required' });
-          continue;
-        }
-        
-        structuralElements.push(transformedData);
-      } catch (error) {
-        errors.push({ row: i + 2, message: error.message });
-      }
-    }
-    
-    if (errors.length > 0 && structuralElements.length === 0) {
-      // Clean up file
-      fs.unlinkSync(req.file.path);
-      return res.status(400).json({ 
-        message: `All rows contain errors. First error: ${errors[0].message}`,
-        errors: errors.slice(0, 10)
-      });
-    }
-    
-        console.log(`✅ Validation complete - ${structuralElements.length} valid, ${errors.length} errors`);
-
-    // Process elements in batches with separate transactions to avoid timeout
-    const { DatabaseTransaction } = require('../utils/transaction');
-    const BATCH_SIZE = 100; // Process 100 elements per transaction batch
-    
-    let savedCount = 0;
-    let duplicateCount = 0;
-    let totalJobsCreated = 0;
-    
-    console.log(`💾 Processing ${structuralElements.length} structural elements...`);
-    
-    try {
-      // Process in batches
-      for (let batchStart = 0; batchStart < structuralElements.length; batchStart += BATCH_SIZE) {
-        const batchEnd = Math.min(batchStart + BATCH_SIZE, structuralElements.length);
-        const batch = structuralElements.slice(batchStart, batchEnd);
-        const batchNum = Math.floor(batchStart / BATCH_SIZE) + 1;
-        const totalBatches = Math.ceil(structuralElements.length / BATCH_SIZE);
-        
-        // Start new transaction for this batch
-        const dbTransaction = new DatabaseTransaction();
-        
-        try {
-          await dbTransaction.start();
-          const session = dbTransaction.getSession();
-          
-          let batchSaved = 0;
-          let batchDuplicates = 0;
-          let batchJobs = 0;
-          
-          // Process elements in this batch
-          for (let idx = 0; idx < batch.length; idx++) {
-            const elementData = batch[idx];
-            
-            // Check for duplicate
-            const existingElement = await StructuralElement.findOne({
-              project: projectId,
-              structureNumber: elementData.structureNumber,
-              drawingNo: elementData.drawingNo,
-              level: elementData.level,
-              memberType: elementData.memberType,
-              gridNo: elementData.gridNo,
-              partMarkNo: elementData.partMarkNo
-            }).session(session);
-            
-            if (existingElement) {
-              batchDuplicates++;
-              continue;
-            }
-            
-            const structuralElement = new StructuralElement(elementData);
-            const saved = await structuralElement.save({ session });
-            dbTransaction.trackStructuralElement(saved._id);
-            
-            // Create fire proofing jobs if workflow assigned
-            if (saved.fireProofingWorkflow) {
-              const jobs = await createFireProofingJobs(saved, req.user.id, session);
-              batchJobs += jobs.length;
-              jobs.forEach(job => dbTransaction.trackJob(job._id));
-            }
-            
-            batchSaved++;
-          }
-          
-          // Commit batch transaction
-          await dbTransaction.commit();
-          
-          savedCount += batchSaved;
-          duplicateCount += batchDuplicates;
-          totalJobsCreated += batchJobs;
-          
-          // Show percentage progress to customer
-          const percentComplete = Math.round(((batchStart + batch.length) / structuralElements.length) * 100);
-          console.log(`📊 Progress: ${percentComplete}% complete (${savedCount + duplicateCount}/${structuralElements.length} processed)`);
-          
-        } catch (batchError) {
-          console.error(`❌ Processing failed at ${Math.round((batchStart / structuralElements.length) * 100)}%:`, batchError.message);
-          await dbTransaction.rollback();
-          throw batchError; // Stop processing on batch failure
-        }
-      }
-      
-      console.log(`✅ Processing complete! ${savedCount} elements saved, ${duplicateCount} duplicates skipped, ${totalJobsCreated} jobs created`);
-      
-      // Update project count (no transaction needed for this simple update)
-      await Task.findByIdAndUpdate(
-        projectId,
-        { $inc: { structuralElementsCount: savedCount } }
-      );
-      
-      // Invalidate caches after successful commit
-      await invalidateCache(`cache:jobs:project:${projectId}:*`);
-      await invalidateCache(`cache:stats:project:${projectId}:*`);
-      await invalidateCache(`cache:structural:summary:${projectId}:*`);
-      
-      // Trigger progress calculation
-      if (savedCount > 0) {
-        console.log(`📊 Triggering progress calculation for project ${projectId}`);
-        addProgressJob(projectId.toString()).catch(err => 
-          console.error('Failed to queue progress job:', err)
-        );
-      }
-      
-      // Clean up file
-      fs.unlinkSync(req.file.path);
-      
-      // Return success response
-      res.json({
-        success: true,
-        message: `Successfully imported ${savedCount} structural elements and created ${totalJobsCreated} jobs`,
-        savedElements: savedCount,
-        duplicateElements: duplicateCount,
-        jobsCreated: totalJobsCreated,
-        errors: errors.slice(0, 10),
-        totalRows: excelData.length
-      });
-      
-    } catch (batchError) {
-      console.error(`❌ Batch processing failed:`, batchError);
-      console.log(`⚠️  Partial data saved: ${savedCount}/${structuralElements.length} elements before failure`);
-      
-      throw batchError;
-    }
-
-  } catch (error) {
-    console.error('Excel upload error:', error);
-    
-    // Clean up uploaded file in case of error
-    if (req.file && req.file.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (deleteError) {
-        console.error('Error deleting uploaded file:', deleteError);
-      }
-    }
-    
-    res.status(500).json({ 
-      message: 'Error processing Excel file', 
-      error: error.message 
+    // Queue the job for async processing with BullMQ
+    console.log(`� Queuing Excel processing job for BullMQ worker...`);
+    const job = await addExcelJob({
+      filePath: req.file.path,
+      projectId: projectId,
+      userId: req.user.id,
+      projectName: project.projectName,
+      totalRows: excelData.length
     });
+    
+    console.log(`✅ Excel processing job queued: ${job.id}`);
+    
+    // Return immediately with job ID - no timeout!
+    res.json({
+      success: true,
+      message: `Excel file uploaded successfully. Processing ${excelData.length} rows in background...`,
+      jobId: job.id,
+      totalRows: excelData.length,
+      status: 'queued',
+      statusEndpoint: `/api/excel/status/${job.id}`
+    });
+    
+  } catch (error) {
+    console.error('Error queuing Excel upload:', error);
+    // Clean up file on error
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({ message: 'Error processing Excel file', error: error.message });
   }
 });
-// Get job status endpoint for progress tracking
+
+// Get Excel job status endpoint (for async uploads)
+router.get('/status/:jobId', auth, async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const status = await getJobStatus(jobId);
+    
+    if (!status) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+    
+    res.json(status);
+  } catch (error) {
+    console.error('Error fetching Excel job status:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Get job status endpoint for progress tracking (legacy)
 router.get('/job-status/:jobId', auth, async (req, res) => {
   try {
     const { jobId } = req.params;
