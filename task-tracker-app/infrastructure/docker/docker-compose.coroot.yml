@@ -89,20 +89,6 @@ services:
     networks:
       - tasktracker-network
 
-  # VictoriaMetrics - lightweight alternative to ClickHouse for traces
-  # Works better in Docker without /sys/block permission issues
-  victoriametrics:
-    image: victoriametrics/victoria-metrics:latest
-    container_name: coroot-victoriametrics
-    restart: unless-stopped
-    volumes:
-      - victoriametrics_data:/victoria-metrics-data
-    command:
-      - '--storageDataPath=/victoria-metrics-data'
-      - '--retentionPeriod=30d'
-    networks:
-      - tasktracker-network
-
 volumes:
   prometheus_data:
     driver: local
