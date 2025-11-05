@@ -1881,7 +1881,7 @@ const StructuralElementsList = ({ projectSlug }) => {
                       <Box>
                         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>Completed Surface Area</Typography>
                         <Typography variant="h6" fontWeight="bold" sx={{ color: '#4caf50' }}>
-                          {surfaceMetrics.loading ? '...' : `${completedSurfaceArea.toFixed(2)} sqm (${completionPercentage.toFixed(1)}%)`}
+                          {surfaceMetrics.loading ? '...' : `${completedSurfaceArea.toFixed(2)} sqm`}
                         </Typography>
                       </Box>
                       <Box>
