@@ -491,15 +491,20 @@ const StructuralElementsList = ({ projectSlug }) => {
     try {
       setLoading(true);
       
-      // First, get the total count
-      const countResponse = await api.get(`/structural-elements?project=${projectId}&limit=1`);
-      const totalCount = countResponse.data.total || 0;
+      // Fetch elements with a high limit to get all elements in one call
+      // The backend returns the total count in the response
+      const response = await api.get(`/structural-elements?project=${projectId}&limit=50000`);
+      const totalCount = response.data.total || 0;
       
-      // Fetch all elements using the actual count as limit
-      const response = await api.get(`/structural-elements?project=${projectId}&limit=${totalCount}`);
+      // If we didn't get all elements (rare case with >50k elements), fetch again with exact count
+      let elements = response.data.elements;
+      if (elements.length < totalCount) {
+        const fullResponse = await api.get(`/structural-elements?project=${projectId}&limit=${totalCount}`);
+        elements = fullResponse.data.elements;
+      }
       
       // Calculate status for each element
-      const elementsWithStatus = response.data.elements.map((element) => {
+      const elementsWithStatus = elements.map((element) => {
         try {
           const jobCounts = element.jobCounts || { totalJobs: 0, completedJobs: 0, activeJobs: 0, pendingJobs: 0, nonClearanceJobs: 0 };
           const totalJobs = jobCounts.totalJobs || 0;
