@@ -1532,60 +1532,76 @@ const StructuralElementsList = ({ projectSlug }) => {
                   </IconButton>
                 </Tooltip>
               </Box>
-            ) : (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                <Box
-                  sx={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 2,
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    animation: 'pulse 2s ease-in-out infinite',
-                    '@keyframes pulse': {
-                      '0%, 100%': { opacity: 1 },
-                      '50%': { opacity: 0.5 }
-                    }
-                  }}
-                >
-                  <Typography sx={{ fontSize: '1.5rem' }}>📋</Typography>
+            ) : null}
+            
+            {/* Loading State - Centered */}
+            {loading && (
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 3,
+                p: 6,
+                mt: 3,
+                minHeight: '400px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                borderRadius: 2,
+                boxShadow: '0 4px 20px rgba(102, 126, 234, 0.3)'
+              }}>
+                <Box sx={{ 
+                  width: 80,
+                  height: 80,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.2)',
+                  animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                  '@keyframes pulse': {
+                    '0%, 100%': { opacity: 1, transform: 'scale(1)' },
+                    '50%': { opacity: 0.7, transform: 'scale(1.05)' }
+                  }
+                }}>
+                  <Typography variant="h3">📋</Typography>
                 </Box>
-                <Box>
-                  <Box sx={{ 
-                    width: 250, 
-                    height: 34, 
-                    bgcolor: '#e0e0e0', 
-                    borderRadius: 1,
-                    mb: 0.5,
-                    animation: 'shimmer 1.5s infinite',
-                    background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
-                    backgroundSize: '200% 100%',
-                    '@keyframes shimmer': {
-                      '0%': { backgroundPosition: '200% 0' },
-                      '100%': { backgroundPosition: '-200% 0' }
-                    }
-                  }} />
-                  <Box sx={{ 
-                    width: 180, 
-                    height: 20, 
-                    bgcolor: '#e0e0e0', 
-                    borderRadius: 1,
-                    animation: 'shimmer 1.5s infinite',
-                    background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
-                    backgroundSize: '200% 100%',
-                    '@keyframes shimmer': {
-                      '0%': { backgroundPosition: '200% 0' },
-                      '100%': { backgroundPosition: '-200% 0' }
-                    }
-                  }} />
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="h4" fontWeight="bold" sx={{ mb: 1 }}>
+                    Loading Elements...
+                  </Typography>
+                  <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.9)' }}>
+                    Please wait while we fetch the structural elements
+                  </Typography>
+                </Box>
+                <Box sx={{ 
+                  display: 'flex',
+                  gap: 1,
+                  mt: 2
+                }}>
+                  {[0, 1, 2].map((i) => (
+                    <Box 
+                      key={i}
+                      sx={{ 
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        backgroundColor: 'rgba(255,255,255,0.8)',
+                        animation: 'bounce 1.4s infinite ease-in-out both',
+                        animationDelay: `${i * 0.16}s`,
+                        '@keyframes bounce': {
+                          '0%, 80%, 100%': { transform: 'scale(0)' },
+                          '40%': { transform: 'scale(1)' }
+                        }
+                      }}
+                    />
+                  ))}
                 </Box>
               </Box>
             )}
             
             {/* Project Completion Summary */}
-            {(elements.length > 0 || loading) && (
+            {(elements.length > 0 || loading) && !loading && (
               <Box sx={{ 
                 mt: 1, 
                 p: 2, 
