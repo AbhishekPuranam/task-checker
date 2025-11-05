@@ -1,0 +1,19 @@
+route:
+  receiver: 'default-receiver'
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 12h
+  group_by: [alertname, severity]
+
+receivers:
+  - name: 'default-receiver'
+    # webhook_configs:
+    #   - url: 'http://alertmanager-webhook:9093/'
+    # You can configure email, Slack, PagerDuty, etc. here
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'service']

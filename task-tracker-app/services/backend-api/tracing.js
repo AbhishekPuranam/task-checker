@@ -7,7 +7,7 @@ const { Resource } = require('@opentelemetry/resources');
 const { SemanticResourceAttributes } = require('@opentelemetry/semantic-conventions');
 
 /**
- * OpenTelemetry Configuration for Coroot Monitoring
+ * OpenTelemetry Configuration for SigNoz APM
  * 
  * This module sets up automatic instrumentation for:
  * - HTTP/HTTPS requests and responses
@@ -18,7 +18,7 @@ const { SemanticResourceAttributes } = require('@opentelemetry/semantic-conventi
  * - Net connections
  * 
  * Environment Variables:
- * - OTEL_EXPORTER_OTLP_ENDPOINT: Coroot collector endpoint (default: http://localhost:4318)
+ * - OTEL_EXPORTER_OTLP_ENDPOINT: SigNoz collector endpoint (default: http://otel-collector:4318)
  * - OTEL_SERVICE_NAME: Service name for telemetry (default: task-tracker-backend)
  * - OTEL_TRACES_ENABLED: Enable trace collection (default: true)
  * - OTEL_METRICS_ENABLED: Enable metrics collection (default: true)
@@ -26,7 +26,7 @@ const { SemanticResourceAttributes } = require('@opentelemetry/semantic-conventi
  */
 
 // Get configuration from environment
-const OTEL_ENDPOINT = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318';
+const OTEL_ENDPOINT = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://otel-collector:4318';
 const SERVICE_NAME = process.env.OTEL_SERVICE_NAME || 'task-tracker-backend';
 const TRACES_ENABLED = process.env.OTEL_TRACES_ENABLED !== 'false';
 const METRICS_ENABLED = process.env.OTEL_METRICS_ENABLED !== 'false';
