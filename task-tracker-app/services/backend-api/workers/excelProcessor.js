@@ -189,6 +189,9 @@ function createExcelWorker() {
       const dbTransaction = new DatabaseTransaction();
       const cacheTransaction = new CacheTransaction(projectId);
       
+      // Declare absoluteFilePath in outer scope so it's available in catch block
+      let absoluteFilePath = filePath;
+      
       try {
         // Start database transaction
         await dbTransaction.start();
@@ -211,7 +214,7 @@ function createExcelWorker() {
         
         // Ensure we have an absolute path
         const path = require('path');
-        let absoluteFilePath = filePath;
+        absoluteFilePath = filePath;
         if (!path.isAbsolute(filePath)) {
           // If relative path, resolve it from the worker's working directory
           absoluteFilePath = path.resolve(process.cwd(), filePath);
