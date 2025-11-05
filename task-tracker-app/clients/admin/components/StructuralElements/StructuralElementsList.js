@@ -2301,12 +2301,15 @@ const StructuralElementsList = ({ projectSlug }) => {
                                   label="Group By"
                                 >
                                   <MenuItem value="">No Grouping</MenuItem>
+                                  <MenuItem value="structureNumber">Structure Number</MenuItem>
                                   <MenuItem value="memberType">Member Type</MenuItem>
                                   <MenuItem value="level">Level</MenuItem>
                                   <MenuItem value="gridNo">Grid No</MenuItem>
+                                  <MenuItem value="partMarkNo">Part Mark No</MenuItem>
                                   <MenuItem value="sectionSizes">Section Size</MenuItem>
                                   <MenuItem value="drawingNo">Drawing No</MenuItem>
                                   <MenuItem value="fireProofingWorkflow">Fire Proofing Workflow</MenuItem>
+                                  <MenuItem value="siteLocation">Site Location</MenuItem>
                                 </Select>
                               </FormControl>
                               <Button
