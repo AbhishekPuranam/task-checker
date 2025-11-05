@@ -100,7 +100,10 @@ router.get('/',
 });
 
 // Get engineers for project assignment (admin only)
-router.get('/engineers', auth, async (req, res) => {
+router.get('/engineers', 
+  auth,
+  cacheMiddleware(300, (req) => `cache:users:engineers`),
+  async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied' });
@@ -116,7 +119,10 @@ router.get('/engineers', auth, async (req, res) => {
 });
 
 // Get projects assigned to current engineer (engineer only)
-router.get('/my-projects', auth, async (req, res) => {
+router.get('/my-projects', 
+  auth,
+  cacheMiddleware(300, (req) => `cache:projects:engineer:${req.user?.id || 'anon'}`),
+  async (req, res) => {
   try {
     if (req.user.role !== 'site-engineer') {
       return res.status(403).json({ message: 'Access denied. Engineers only.' });
@@ -135,7 +141,10 @@ router.get('/my-projects', auth, async (req, res) => {
 });
 
 // Get project by ID
-router.get('/:id', auth, async (req, res) => {
+router.get('/:id', 
+  auth,
+  cacheMiddleware(300, (req) => `cache:project:${req.params.id}`),
+  async (req, res) => {
   try {
     const project = await Task.findById(req.params.id)
       .populate('assignedEngineers', 'name username email');
@@ -152,7 +161,10 @@ router.get('/:id', auth, async (req, res) => {
 });
 
 // Get project by name
-router.get('/by-name/:projectName', auth, async (req, res) => {
+router.get('/by-name/:projectName', 
+  auth,
+  cacheMiddleware(300, (req) => `cache:project:name:${req.params.projectName}`),
+  async (req, res) => {
   try {
     const projectName = decodeURIComponent(req.params.projectName);
     console.log(`🔍 Looking for project: "${projectName}"`);
@@ -329,7 +341,10 @@ router.delete('/:id', auth, async (req, res) => {
 });
 
 // Get project statistics (admin only)
-router.get('/stats/overview', auth, async (req, res) => {
+router.get('/stats/overview', 
+  auth,
+  cacheMiddleware(300, () => `cache:stats:projects:overview`),
+  async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied' });
@@ -360,7 +375,10 @@ router.get('/stats/overview', auth, async (req, res) => {
 });
 
 // Get assigned engineers for a project
-router.get('/:id/assigned-engineers', auth, async (req, res) => {
+router.get('/:id/assigned-engineers', 
+  auth,
+  cacheMiddleware(300, (req) => `cache:project:${req.params.id}:engineers`),
+  async (req, res) => {
   try {
     const project = await Task.findById(req.params.id).populate('assignedEngineers', '_id name username email');
     
@@ -398,6 +416,10 @@ router.put('/:id/assign-engineers', auth, async (req, res) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
+    // Invalidate project and engineer caches
+    await invalidateCache('cache:projects:*');
+    await invalidateCache(`cache:project:${req.params.id}:*`);
+
     res.json(updatedProject);
   } catch (error) {
     console.error('Error assigning engineers:', error);
@@ -423,6 +445,10 @@ router.delete('/:id/remove-engineer/:engineerId', auth, async (req, res) => {
     );
     
     await project.save();
+    
+    // Invalidate project and engineer caches
+    await invalidateCache('cache:projects:*');
+    await invalidateCache(`cache:project:${req.params.id}:*`);
     
     res.json({ message: 'Engineer removed successfully' });
   } catch (error) {

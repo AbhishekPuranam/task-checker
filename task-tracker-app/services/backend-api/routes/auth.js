@@ -7,6 +7,7 @@ const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
 const { auth } = require('../middleware/auth');
+const { cacheMiddleware, invalidateCache } = require('../middleware/cache');
 
 const router = express.Router();
 
@@ -334,7 +335,10 @@ router.post('/login', authLimiter, async (req, res) => {
 });
 
 // Get current user
-router.get('/me', auth, async (req, res) => {
+router.get('/me', 
+  auth,
+  cacheMiddleware(60, (req) => `cache:user:me:${req.user?.id || 'anon'}`),
+  async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     res.json(user);
@@ -478,7 +482,10 @@ router.post('/create-user', auth, async (req, res) => {
 });
 
 // Get all users (Admin only)
-router.get('/users', auth, async (req, res) => {
+router.get('/users', 
+  auth,
+  cacheMiddleware(300, () => `cache:users:all`),
+  async (req, res) => {
   try {
     // Check if the current user is admin
     const currentUser = await User.findById(req.user.id);

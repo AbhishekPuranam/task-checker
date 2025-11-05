@@ -1,12 +1,16 @@
 const express = require('express');
 const User = require('../models/User');
 const { auth, adminAuth } = require('../middleware/auth');
+const { cacheMiddleware, invalidateCache } = require('../middleware/cache');
 const bcrypt = require('bcryptjs');
 
 const router = express.Router();
 
 // Get all users (admin only)
-router.get('/', adminAuth, async (req, res) => {
+router.get('/', 
+  adminAuth,
+  cacheMiddleware(300, () => `cache:users:all`),
+  async (req, res) => {
   try {
     const users = await User.find({ isActive: true })
       .select('-password')
@@ -20,7 +24,10 @@ router.get('/', adminAuth, async (req, res) => {
 });
 
 // Get engineers list (for task assignment)
-router.get('/engineers', auth, async (req, res) => {
+router.get('/engineers', 
+  auth,
+  cacheMiddleware(300, () => `cache:users:engineers`),
+  async (req, res) => {
   try {
     const engineers = await User.find({ 
       role: 'engineer', 
@@ -87,6 +94,9 @@ router.post('/', adminAuth, async (req, res) => {
     });
 
     await user.save();
+
+    // Invalidate user caches
+    await invalidateCache('cache:users:*');
 
     // Return user without password
     const userResponse = user.toObject();
@@ -159,6 +169,10 @@ router.put('/:id', adminAuth, async (req, res) => {
 
     await user.save();
 
+    // Invalidate user caches
+    await invalidateCache('cache:users:*');
+    await invalidateCache(`cache:user:${req.params.id}`);
+
     // Return user without password
     const userResponse = user.toObject();
     delete userResponse.password;
@@ -190,6 +204,10 @@ router.delete('/:id', adminAuth, async (req, res) => {
     }
 
     await User.findByIdAndDelete(userId);
+
+    // Invalidate user caches
+    await invalidateCache('cache:users:*');
+    await invalidateCache(`cache:user:${userId}`);
 
     res.json({ 
       message: 'User deleted successfully',
@@ -228,7 +246,10 @@ router.put('/:id/status', adminAuth, async (req, res) => {
 });
 
 // Get user profile
-router.get('/:id', auth, async (req, res) => {
+router.get('/:id', 
+  auth,
+  cacheMiddleware(300, (req) => `cache:user:${req.params.id}`),
+  async (req, res) => {
   try {
     // Users can only view their own profile unless they're admin
     if (req.user.role !== 'admin' && req.params.id !== req.user.id) {
