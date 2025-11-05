@@ -943,8 +943,8 @@ const StructuralElementsList = ({ projectSlug }) => {
               }
             };
             
-            // If element status changed to complete, trigger surface area recalculation
-            if (calculatedStatus === 'complete' && element.status !== 'complete') {
+            // If element status changed to/from complete, trigger surface area recalculation
+            if (calculatedStatus === 'complete' || element.status === 'complete') {
               setTimeout(() => calculateSurfaceMetrics(), 0);
             }
             
