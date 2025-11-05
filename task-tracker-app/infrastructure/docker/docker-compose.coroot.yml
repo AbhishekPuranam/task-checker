@@ -15,6 +15,7 @@ services:
       - '--bootstrap-prometheus-url=http://prometheus:9090'
       - '--bootstrap-refresh-interval=15s'
       - '--bootstrap-clickhouse-address=clickhouse:9000'
+      - '--bootstrap-clickhouse-protocol=grpc'
     depends_on:
       - clickhouse
       - prometheus
@@ -90,27 +91,19 @@ services:
       - tasktracker-network
 
   clickhouse:
-    image: clickhouse/clickhouse-server:24.3
-    container_name: coroot-clickhouse
+    image: greptime/greptimedb:latest
+    container_name: coroot-greptimedb
     restart: unless-stopped
-    environment:
-      CLICKHOUSE_SKIP_USER_SETUP: "1"
+    command: standalone start --http-addr 0.0.0.0:4000 --rpc-addr 0.0.0.0:4001 --mysql-addr 0.0.0.0:4002 --postgres-addr 0.0.0.0:4003
     volumes:
-      - clickhouse_data:/var/lib/clickhouse
-      - clickhouse_logs:/var/log/clickhouse-server
-    ulimits:
-      nofile:
-        soft: 262144
-        hard: 262144
+      - greptimedb_data:/tmp/greptimedb
     networks:
       - tasktracker-network
 
 volumes:
   prometheus_data:
     driver: local
-  clickhouse_data:
-    driver: local
-  clickhouse_logs:
+  greptimedb_data:
     driver: local
   coroot_data:
     driver: local
