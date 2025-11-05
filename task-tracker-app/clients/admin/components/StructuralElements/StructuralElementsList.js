@@ -711,31 +711,59 @@ const StructuralElementsList = ({ projectSlug }) => {
       const response = await api.put(`/jobs/${editingJob._id}`, jobData);
       console.log('Update response:', response.data); // Debug response
       
-      // Check if project status changed unexpectedly
-      const projectBefore = project;
-      setTimeout(async () => {
-        try {
-          const updatedProject = await api.get(`/projects/by-name/${projectName}`);
-          if (updatedProject.data.status !== projectBefore.status) {
-            console.warn('⚠️ Project status changed automatically:', {
-              before: projectBefore.status,
-              after: updatedProject.data.status,
-              shouldNot: 'change automatically'
-            });
-            // Refresh project data to show current status
-            setProject(updatedProject.data);
-          }
-        } catch (error) {
-          console.error('Error checking project status:', error);
-        }
-      }, 1000); // Check after 1 second
       toast.success('Job updated successfully');
       
-      // Close dialog and refresh jobs and elements table
+      // Close dialog and refresh jobs
       setShowJobEditDialog(false);
       setEditingJob(null);
       fetchElementJobs(selectedElement._id);
-      fetchElements(); // Refresh the main elements table to show updated status
+      
+      // Optimistically update the element's status if status changed
+      const oldStatus = editingJob.status;
+      const newStatus = jobData.status;
+      if (oldStatus !== newStatus) {
+        setElements(prevElements => 
+          prevElements.map(el => {
+            if (el._id === selectedElement._id) {
+              // Recalculate job counts
+              const updatedJobCounts = { ...el.jobCounts };
+              
+              // Decrement old status count
+              if (oldStatus === 'completed') updatedJobCounts.completedJobs = Math.max(0, (updatedJobCounts.completedJobs || 0) - 1);
+              if (oldStatus === 'in_progress') updatedJobCounts.activeJobs = Math.max(0, (updatedJobCounts.activeJobs || 0) - 1);
+              if (oldStatus === 'pending') updatedJobCounts.pendingJobs = Math.max(0, (updatedJobCounts.pendingJobs || 0) - 1);
+              if (oldStatus === 'not_applicable') updatedJobCounts.nonClearanceJobs = Math.max(0, (updatedJobCounts.nonClearanceJobs || 0) - 1);
+              
+              // Increment new status count
+              if (newStatus === 'completed') updatedJobCounts.completedJobs = (updatedJobCounts.completedJobs || 0) + 1;
+              if (newStatus === 'in_progress') updatedJobCounts.activeJobs = (updatedJobCounts.activeJobs || 0) + 1;
+              if (newStatus === 'pending') updatedJobCounts.pendingJobs = (updatedJobCounts.pendingJobs || 0) + 1;
+              if (newStatus === 'not_applicable') updatedJobCounts.nonClearanceJobs = (updatedJobCounts.nonClearanceJobs || 0) + 1;
+              
+              // Recalculate element status
+              let calculatedStatus;
+              if (updatedJobCounts.totalJobs === 0) {
+                calculatedStatus = 'no jobs';
+              } else if (updatedJobCounts.nonClearanceJobs > 0) {
+                calculatedStatus = 'non clearance';
+              } else if (updatedJobCounts.completedJobs === updatedJobCounts.totalJobs) {
+                calculatedStatus = 'complete';
+              } else if (updatedJobCounts.activeJobs > 0 || updatedJobCounts.completedJobs > 0) {
+                calculatedStatus = 'active';
+              } else {
+                calculatedStatus = 'no jobs';
+              }
+              
+              return {
+                ...el,
+                status: calculatedStatus,
+                jobCounts: updatedJobCounts
+              };
+            }
+            return el;
+          })
+        );
+      }
     } catch (error) {
       console.error('Error updating job:', error);
       console.error('Full error response:', error.response); // More detailed error logging
@@ -772,9 +800,43 @@ const StructuralElementsList = ({ projectSlug }) => {
       await api.delete(`/jobs/${jobToDelete._id}`);
       toast.success('Job deleted successfully');
       
-      // Refresh jobs list and elements table
+      // Refresh jobs list
       fetchElementJobs(selectedElement._id);
-      fetchElements(); // Refresh the main elements table to show updated status
+      // Don't fetch all elements - too slow! Update the element's job counts manually
+      setElements(prevElements => 
+        prevElements.map(el => {
+          if (el._id === selectedElement._id) {
+            const updatedJobCounts = {
+              totalJobs: (el.jobCounts?.totalJobs || 0) - 1,
+              completedJobs: jobToDelete.status === 'completed' ? (el.jobCounts?.completedJobs || 0) - 1 : el.jobCounts?.completedJobs || 0,
+              activeJobs: jobToDelete.status === 'in_progress' ? (el.jobCounts?.activeJobs || 0) - 1 : el.jobCounts?.activeJobs || 0,
+              pendingJobs: jobToDelete.status === 'pending' ? (el.jobCounts?.pendingJobs || 0) - 1 : el.jobCounts?.pendingJobs || 0,
+              nonClearanceJobs: jobToDelete.status === 'not_applicable' ? (el.jobCounts?.nonClearanceJobs || 0) - 1 : el.jobCounts?.nonClearanceJobs || 0
+            };
+            
+            // Recalculate status based on updated counts
+            let calculatedStatus;
+            if (updatedJobCounts.totalJobs === 0) {
+              calculatedStatus = 'no jobs';
+            } else if (updatedJobCounts.nonClearanceJobs > 0) {
+              calculatedStatus = 'non clearance';
+            } else if (updatedJobCounts.completedJobs === updatedJobCounts.totalJobs) {
+              calculatedStatus = 'complete';
+            } else if (updatedJobCounts.activeJobs > 0 || updatedJobCounts.completedJobs > 0) {
+              calculatedStatus = 'active';
+            } else {
+              calculatedStatus = 'no jobs';
+            }
+            
+            return {
+              ...el,
+              status: calculatedStatus,
+              jobCounts: updatedJobCounts
+            };
+          }
+          return el;
+        })
+      );
       
       // Reset delete dialog state
       setShowDeleteDialog(false);
