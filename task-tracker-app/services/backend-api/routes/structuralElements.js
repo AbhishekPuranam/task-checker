@@ -1,7 +1,7 @@
 const express = require('express');
 const StructuralElement = require('../models/StructuralElement');
 const { auth, adminAuth } = require('../middleware/auth');
-const { cacheMiddleware } = require('../middleware/cache');
+const { cacheMiddleware, invalidateCache } = require('../middleware/cache');
 const multer = require('multer');
 const path = require('path');
 
@@ -25,7 +25,10 @@ const upload = multer({
 });
 
 // Get all structural elements (with filtering and pagination)
-router.get('/', auth, async (req, res) => {
+router.get('/', 
+  auth,
+  cacheMiddleware(300, (req) => `cache:structural:elements:project:${req.query.project || 'all'}:page:${req.query.page || 1}:limit:${req.query.limit || 10}:search:${req.query.search || ''}:status:${req.query.status || ''}:memberType:${req.query.memberType || ''}`),
+  async (req, res) => {
   try {
     const {
       page = 1,
@@ -266,6 +269,9 @@ router.post('/', auth, upload.array('attachments', 5), async (req, res) => {
 
     await element.save();
     
+    // Invalidate structural elements cache for this project
+    await invalidateCache(`cache:structural:elements:project:${project}:*`);
+    
     // Populate the element before sending response
     await element.populate('createdBy', 'name email role');
 
@@ -315,6 +321,9 @@ router.put('/:id', adminAuth, async (req, res) => {
     const oldStatus = element.status;
     await element.save();
     
+    // Invalidate structural elements cache for this project
+    await invalidateCache(`cache:structural:elements:project:${element.project}:*`);
+    
     // If status changed, update project status
     if (req.body.status && req.body.status !== oldStatus) {
       const Task = require('../models/Task');
@@ -350,7 +359,11 @@ router.delete('/:id', adminAuth, async (req, res) => {
     const Job = require('../models/Job');
     await Job.deleteMany({ structuralElement: req.params.id });
 
+    const projectId = element.project;
     await StructuralElement.findByIdAndDelete(req.params.id);
+
+    // Invalidate structural elements cache for this project
+    await invalidateCache(`cache:structural:elements:project:${projectId}:*`);
 
     // Emit socket event for real-time updates
     req.io.emit('structural-element-deleted', req.params.id);
@@ -377,10 +390,19 @@ router.post('/bulk-delete', adminAuth, async (req, res) => {
       structuralElement: { $in: elementIds } 
     });
 
+    // Get unique project IDs before deleting elements
+    const elements = await StructuralElement.find({ _id: { $in: elementIds } }).select('project');
+    const projectIds = [...new Set(elements.map(el => el.project.toString()))];
+
     // Delete the structural elements
     const deleteResult = await StructuralElement.deleteMany({
       _id: { $in: elementIds }
     });
+
+    // Invalidate cache for all affected projects
+    for (const projectId of projectIds) {
+      await invalidateCache(`cache:structural:elements:project:${projectId}:*`);
+    }
 
     // Emit socket event for real-time updates
     req.io.emit('structural-elements-bulk-deleted', elementIds);
@@ -556,6 +578,12 @@ router.post('/bulk-import', adminAuth, async (req, res) => {
     const result = await StructuralElement.insertMany(elementsWithCreator, { 
       ordered: false // Continue inserting even if some fail
     });
+
+    // Invalidate cache for all affected projects
+    const projectIds = [...new Set(elements.map(el => el.project?.toString()).filter(Boolean))];
+    for (const projectId of projectIds) {
+      await invalidateCache(`cache:structural:elements:project:${projectId}:*`);
+    }
 
     res.json({ 
       message: `${result.length} structural elements imported successfully`,
