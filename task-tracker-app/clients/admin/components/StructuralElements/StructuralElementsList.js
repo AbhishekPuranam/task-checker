@@ -511,7 +511,7 @@ const StructuralElementsList = ({ projectSlug }) => {
             calculatedStatus = 'non clearance';
           } else if (completedJobs === totalJobs && progressPercentage === 100) {
             calculatedStatus = 'complete';
-          } else if (activeJobs > 0 || completedJobs > 0) {
+          } else if (activeJobs > 0 || completedJobs > 0 || pendingJobs > 0) {
             calculatedStatus = 'active';
           } else {
             calculatedStatus = 'active';
@@ -778,7 +778,7 @@ const StructuralElementsList = ({ projectSlug }) => {
                 calculatedStatus = 'non clearance';
               } else if (updatedJobCounts.completedJobs === updatedJobCounts.totalJobs) {
                 calculatedStatus = 'complete';
-              } else if (updatedJobCounts.activeJobs > 0 || updatedJobCounts.completedJobs > 0) {
+              } else if (updatedJobCounts.activeJobs > 0 || updatedJobCounts.completedJobs > 0 || updatedJobCounts.pendingJobs > 0) {
                 calculatedStatus = 'active';
               } else {
                 calculatedStatus = 'no jobs';
@@ -852,7 +852,7 @@ const StructuralElementsList = ({ projectSlug }) => {
               calculatedStatus = 'non clearance';
             } else if (updatedJobCounts.completedJobs === updatedJobCounts.totalJobs) {
               calculatedStatus = 'complete';
-            } else if (updatedJobCounts.activeJobs > 0 || updatedJobCounts.completedJobs > 0) {
+            } else if (updatedJobCounts.activeJobs > 0 || updatedJobCounts.completedJobs > 0 || updatedJobCounts.pendingJobs > 0) {
               calculatedStatus = 'active';
             } else {
               calculatedStatus = 'no jobs';
@@ -924,7 +924,7 @@ const StructuralElementsList = ({ projectSlug }) => {
               calculatedStatus = 'non clearance';
             } else if (completedJobs === totalJobs) {
               calculatedStatus = 'complete';
-            } else if (activeJobs > 0 || completedJobs > 0) {
+            } else if (activeJobs > 0 || completedJobs > 0 || pendingJobs > 0) {
               calculatedStatus = 'active';
             } else {
               calculatedStatus = 'no jobs';
@@ -992,7 +992,7 @@ const StructuralElementsList = ({ projectSlug }) => {
                   calculatedStatus = 'non clearance';
                 } else if (completedJobs === totalJobs) {
                   calculatedStatus = 'complete';
-                } else if (activeJobs > 0 || completedJobs > 0) {
+                } else if (activeJobs > 0 || completedJobs > 0 || pendingJobs > 0) {
                   calculatedStatus = 'active';
                 } else {
                   calculatedStatus = 'no jobs';
