@@ -16,6 +16,7 @@ const path = require('path');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const { createExcelWorker } = require('./workers/excelProcessor');
+const { createBatchExcelWorker } = require('./workers/excelProcessorBatch');
 const { startProgressWorker } = require('./workers/progressCalculator');
 
 // Load environment variables
@@ -262,6 +263,7 @@ app.use('/api/jobs', jobRoutes);
 app.use('/api/excel', excelRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/upload-sessions', require('./routes/uploadSessions'));
 
 // Health check endpoint (must be before catch-all route)
 app.get('/health', (req, res) => {
@@ -286,10 +288,17 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 // Start Excel processing worker
+// Use batch-based worker if EXCEL_BATCH_MODE=true, otherwise use legacy worker
+const useBatchMode = process.env.EXCEL_BATCH_MODE === 'true';
 let excelWorker;
 try {
-  excelWorker = createExcelWorker();
-  console.log('✅ Excel processing worker started successfully');
+  if (useBatchMode) {
+    excelWorker = createBatchExcelWorker();
+    console.log('✅ Batch-based Excel processing worker started successfully');
+  } else {
+    excelWorker = createExcelWorker();
+    console.log('✅ Excel processing worker started successfully (legacy mode)');
+  }
 } catch (error) {
   console.error('❌ Failed to start Excel worker:', error.message);
   console.warn('⚠️  Excel upload will not work in background mode');
