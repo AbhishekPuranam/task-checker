@@ -462,11 +462,14 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
   const { addProgressJob } = require('../utils/queue');
   const mongoose = require('mongoose');
   
+  // MongoDB ready states
+  const MONGODB_CONNECTED = 1;
+  
   try {
     const { projectId } = req.params;
     
     // Check MongoDB connection before proceeding
-    if (mongoose.connection.readyState !== 1) {
+    if (mongoose.connection.readyState !== MONGODB_CONNECTED) {
       console.error('❌ MongoDB not connected, cannot process Excel upload');
       if (req.file && req.file.path) {
         try {

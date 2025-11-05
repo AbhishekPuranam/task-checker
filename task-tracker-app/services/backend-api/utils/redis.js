@@ -12,7 +12,8 @@ const getRedisClient = async () => {
     }
     // If not ready, try to reconnect
     try {
-      if (!redisClient.isOpen) {
+      // Check if connection is not open before attempting to connect
+      if (!redisClient.isOpen && typeof redisClient.connect === 'function') {
         await redisClient.connect();
       }
       return redisClient;

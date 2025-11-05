@@ -135,18 +135,43 @@ if (!MONGODB_URI) {
   }
 }
 
-// Connect to MongoDB with retry logic and persistent connection
-let connectionRetries = 0;
+// Connection retry configuration
 const MAX_RETRIES = 10;
 const INITIAL_RETRY_DELAY = 2000;
+const MAX_RETRY_DELAY = 30000;
 
+// Connection state management
+class ConnectionManager {
+  constructor() {
+    this.retryCount = 0;
+  }
+
+  getRetryDelay() {
+    if (this.retryCount === 0) return 0;
+    return Math.min(INITIAL_RETRY_DELAY * Math.pow(2, this.retryCount - 1), MAX_RETRY_DELAY);
+  }
+
+  incrementRetry() {
+    this.retryCount++;
+  }
+
+  resetRetry() {
+    this.retryCount = 0;
+  }
+
+  canRetry() {
+    return this.retryCount < MAX_RETRIES;
+  }
+}
+
+const connectionManager = new ConnectionManager();
+
+// Connect to MongoDB with retry logic and persistent connection
 const connectWithRetry = () => {
-  console.log(`Attempting to connect to MongoDB (attempt ${connectionRetries + 1}/${MAX_RETRIES})...`);
+  console.log(`Attempting to connect to MongoDB (attempt ${connectionManager.retryCount + 1}/${MAX_RETRIES})...`);
   
   // Exponential backoff for retries
-  const retryDelay = connectionRetries > 0 
-    ? Math.min(INITIAL_RETRY_DELAY * Math.pow(2, connectionRetries - 1), 30000)
-    : 0;
+  const retryDelay = connectionManager.getRetryDelay();
   
   mongoose.connect(MONGODB_URI, {
     useNewUrlParser: true,
@@ -165,7 +190,7 @@ const connectWithRetry = () => {
   })
   .then(async () => {
     console.log('✅ MongoDB connected successfully');
-    connectionRetries = 0; // Reset retry counter on successful connection
+    connectionManager.resetRetry(); // Reset retry counter on successful connection
     
     // Verify replica set status
     try {
@@ -181,12 +206,13 @@ const connectWithRetry = () => {
     // Or use scripts in /scripts folder from the host machine
   })
   .catch(err => {
-    connectionRetries++;
-    console.error(`❌ MongoDB connection error (attempt ${connectionRetries}/${MAX_RETRIES}):`, err.message);
+    connectionManager.incrementRetry();
+    console.error(`❌ MongoDB connection error (attempt ${connectionManager.retryCount}/${MAX_RETRIES}):`, err.message);
     
-    if (connectionRetries < MAX_RETRIES) {
-      console.log(`Retrying MongoDB connection in ${retryDelay}ms...`);
-      setTimeout(connectWithRetry, retryDelay);
+    if (connectionManager.canRetry()) {
+      const nextRetryDelay = connectionManager.getRetryDelay();
+      console.log(`Retrying MongoDB connection in ${nextRetryDelay}ms...`);
+      setTimeout(connectWithRetry, nextRetryDelay);
     } else {
       console.error('❌ Max MongoDB connection retries reached. Please check MongoDB service.');
       console.error('Application will continue but database operations will fail.');
@@ -198,7 +224,7 @@ const connectWithRetry = () => {
 // Handle connection events
 mongoose.connection.on('connected', () => {
   console.log('✅ Mongoose connected to MongoDB');
-  connectionRetries = 0; // Reset on reconnection
+  connectionManager.resetRetry(); // Reset on reconnection
 });
 
 mongoose.connection.on('error', (err) => {
@@ -208,7 +234,7 @@ mongoose.connection.on('error', (err) => {
 
 mongoose.connection.on('disconnected', () => {
   console.warn('⚠️  Mongoose disconnected from MongoDB');
-  if (mongoose.connection.readyState === 0 && connectionRetries < MAX_RETRIES) {
+  if (mongoose.connection.readyState === 0 && connectionManager.canRetry()) {
     console.log('Attempting to reconnect...');
     setTimeout(connectWithRetry, INITIAL_RETRY_DELAY);
   }
@@ -216,7 +242,7 @@ mongoose.connection.on('disconnected', () => {
 
 mongoose.connection.on('reconnected', () => {
   console.log('✅ Mongoose reconnected to MongoDB');
-  connectionRetries = 0;
+  connectionManager.resetRetry();
 });
 
 // Handle MongoDB topology errors
