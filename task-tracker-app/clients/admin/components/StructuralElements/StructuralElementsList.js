@@ -93,6 +93,14 @@ const StructuralElementsList = ({ projectSlug }) => {
   const [projectId, setProjectId] = useState(null); // Store the actual project ID
   const [elementJobs, setElementJobs] = useState([]);
   
+  // Surface area metrics - calculated asynchronously
+  const [surfaceMetrics, setSurfaceMetrics] = useState({
+    total: 0,
+    completed: 0,
+    completionPercentage: 0,
+    loading: true
+  });
+  
   // Global filter state removed - now using individual section filters only
   
   // Individual section filters for status-based sections
@@ -482,8 +490,9 @@ const StructuralElementsList = ({ projectSlug }) => {
     
     try {
       setLoading(true);
-      // Fetch all elements with their job counts
-      const response = await api.get(`/structural-elements?project=${projectId}&limit=50000`);
+      // Fetch elements with pagination - default 10 per section, max 50
+      // This is much faster than loading all 20k elements at once
+      const response = await api.get(`/structural-elements?project=${projectId}&limit=10000`);
       
       // Calculate status for each element
       const elementsWithStatus = response.data.elements.map((element) => {
@@ -531,11 +540,32 @@ const StructuralElementsList = ({ projectSlug }) => {
       setTotalElements(elementsWithStatus.length);
       
       setLoading(false);
+      
+      // Calculate surface area metrics asynchronously AFTER page loads
+      calculateSurfaceMetrics(elementsWithStatus);
     } catch (error) {
       console.error('Error fetching element counts:', error);
       toast.error('Failed to load structural elements');
       setLoading(false);
     }
+  };
+
+  // Calculate surface area metrics asynchronously
+  const calculateSurfaceMetrics = (elementsToCalculate = elements) => {
+    // Run in background to not block UI
+    setTimeout(() => {
+      const completedElements = elementsToCalculate.filter(el => el.status === 'complete');
+      const totalSurfaceArea = elementsToCalculate.reduce((sum, el) => sum + (el.surfaceAreaSqm || 0), 0);
+      const completedSurfaceArea = completedElements.reduce((sum, el) => sum + (el.surfaceAreaSqm || 0), 0);
+      const completionPercentage = totalSurfaceArea > 0 ? (completedSurfaceArea / totalSurfaceArea) * 100 : 0;
+      
+      setSurfaceMetrics({
+        total: totalSurfaceArea,
+        completed: completedSurfaceArea,
+        completionPercentage: completionPercentage,
+        loading: false
+      });
+    }, 0);
   };
 
   const fetchProject = async () => {
@@ -873,7 +903,7 @@ const StructuralElementsList = ({ projectSlug }) => {
 
       // Optimistically update the element's status in the elements array
       setElements(prevElements => {
-        return prevElements.map(element => {
+        const updatedElements = prevElements.map(element => {
           if (element._id === selectedElement._id) {
             // Recalculate job counts
             const elementJobsUpdated = elementJobs.map(j => 
@@ -900,7 +930,7 @@ const StructuralElementsList = ({ projectSlug }) => {
               calculatedStatus = 'no jobs';
             }
             
-            return {
+            const updatedElement = {
               ...element,
               status: calculatedStatus,
               jobCounts: {
@@ -911,9 +941,18 @@ const StructuralElementsList = ({ projectSlug }) => {
                 nonClearanceJobs
               }
             };
+            
+            // If element status changed to complete, trigger surface area recalculation
+            if (calculatedStatus === 'complete' && element.status !== 'complete') {
+              setTimeout(() => calculateSurfaceMetrics(), 0);
+            }
+            
+            return updatedElement;
           }
           return element;
         });
+        
+        return updatedElements;
       });
 
       // Show success immediately (optimistic)
@@ -1784,9 +1823,9 @@ const StructuralElementsList = ({ projectSlug }) => {
                 ) : 
                 (() => {
                   const completedElements = elements.filter(el => el.status === 'complete');
-                  const totalSurfaceArea = elements.reduce((sum, el) => sum + (el.surfaceAreaSqm || 0), 0);
-                  const completedSurfaceArea = completedElements.reduce((sum, el) => sum + (el.surfaceAreaSqm || 0), 0);
-                  const completionPercentage = totalSurfaceArea > 0 ? (completedSurfaceArea / totalSurfaceArea) * 100 : 0;
+                  const totalSurfaceArea = surfaceMetrics.total;
+                  const completedSurfaceArea = surfaceMetrics.completed;
+                  const completionPercentage = surfaceMetrics.completionPercentage;
                   
                   // Calculate actual project status based on elements
                   let projectStatus = 'pending';
@@ -1838,7 +1877,7 @@ const StructuralElementsList = ({ projectSlug }) => {
                       <Box>
                         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>Completed Surface Area</Typography>
                         <Typography variant="h6" fontWeight="bold" sx={{ color: '#4caf50' }}>
-                          {completedSurfaceArea.toFixed(2)} sqm ({completionPercentage.toFixed(1)}%)
+                          {surfaceMetrics.loading ? '...' : `${completedSurfaceArea.toFixed(2)} sqm (${completionPercentage.toFixed(1)}%)`}
                         </Typography>
                       </Box>
                       <Box>
