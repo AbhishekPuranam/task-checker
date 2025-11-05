@@ -514,7 +514,7 @@ const StructuralElementsList = ({ projectSlug }) => {
           } else if (activeJobs > 0 || completedJobs > 0 || pendingJobs > 0) {
             calculatedStatus = 'active';
           } else {
-            calculatedStatus = 'active';
+            calculatedStatus = 'no jobs';
           }
 
           return {
