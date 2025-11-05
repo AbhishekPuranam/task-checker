@@ -83,12 +83,86 @@ router.get('/', auth, async (req, res) => {
       .populate('createdBy', 'name email role')
       .sort(sort)
       .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .skip((page - 1) * limit)
+      .lean();
 
     const total = await StructuralElement.countDocuments(filter);
 
+    // Get job counts and current pending job for each element
+    const Job = require('../models/Job');
+    const elementIds = elements.map(e => e._id);
+    
+    const jobStats = await Job.aggregate([
+      { $match: { structuralElement: { $in: elementIds } } },
+      {
+        $group: {
+          _id: '$structuralElement',
+          totalJobs: { $sum: 1 },
+          completedJobs: {
+            $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] }
+          },
+          activeJobs: {
+            $sum: { $cond: [{ $eq: ['$status', 'in-progress'] }, 1, 0] }
+          },
+          pendingJobs: {
+            $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] }
+          }
+        }
+      }
+    ]);
+    
+    // Get first pending job for each element
+    const pendingJobs = await Job.find({
+      structuralElement: { $in: elementIds },
+      status: 'pending'
+    })
+      .sort({ orderIndex: 1 })
+      .select('structuralElement jobTitle jobType');
+    
+    // Create maps for quick lookup
+    const statsMap = new Map(
+      jobStats.map(stat => [stat._id.toString(), stat])
+    );
+    
+    const pendingJobsMap = new Map();
+    pendingJobs.forEach(job => {
+      const elemId = job.structuralElement.toString();
+      if (!pendingJobsMap.has(elemId)) {
+        pendingJobsMap.set(elemId, job);
+      }
+    });
+    
+    // Add job counts and current pending job to elements
+    const elementsWithJobs = elements.map(element => {
+      const stats = statsMap.get(element._id.toString()) || {
+        totalJobs: 0,
+        completedJobs: 0,
+        activeJobs: 0,
+        pendingJobs: 0
+      };
+      
+      const currentPendingJob = pendingJobsMap.get(element._id.toString());
+      
+      return {
+        ...element,
+        jobCounts: {
+          total: stats.totalJobs,
+          completed: stats.completedJobs,
+          active: stats.activeJobs,
+          pending: stats.pendingJobs
+        },
+        currentPendingJob: currentPendingJob ? {
+          title: currentPendingJob.jobTitle,
+          type: currentPendingJob.jobType
+        } : null,
+        progressPercentage: stats.totalJobs > 0 
+          ? Math.round((stats.completedJobs / stats.totalJobs) * 100) 
+          : 0
+      };
+    });
+
     res.json({
-      elements,
+      elements: elementsWithJobs,
       totalPages: Math.ceil(total / limit),
       currentPage: page,
       total

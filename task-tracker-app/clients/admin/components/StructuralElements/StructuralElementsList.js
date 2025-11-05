@@ -1570,22 +1570,99 @@ const StructuralElementsList = ({ projectSlug }) => {
                 </Tooltip>
               </Box>
             ) : (
-              <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
-                {projectName ? `Loading project ${projectName.replace(/-/g, ' ')}...` : 'Loading project...'}
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                <Box
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 2,
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    animation: 'pulse 2s ease-in-out infinite',
+                    '@keyframes pulse': {
+                      '0%, 100%': { opacity: 1 },
+                      '50%': { opacity: 0.5 }
+                    }
+                  }}
+                >
+                  <Typography sx={{ fontSize: '1.5rem' }}>📋</Typography>
+                </Box>
+                <Box>
+                  <Box sx={{ 
+                    width: 250, 
+                    height: 34, 
+                    bgcolor: '#e0e0e0', 
+                    borderRadius: 1,
+                    mb: 0.5,
+                    animation: 'shimmer 1.5s infinite',
+                    background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
+                    backgroundSize: '200% 100%',
+                    '@keyframes shimmer': {
+                      '0%': { backgroundPosition: '200% 0' },
+                      '100%': { backgroundPosition: '-200% 0' }
+                    }
+                  }} />
+                  <Box sx={{ 
+                    width: 180, 
+                    height: 20, 
+                    bgcolor: '#e0e0e0', 
+                    borderRadius: 1,
+                    animation: 'shimmer 1.5s infinite',
+                    background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
+                    backgroundSize: '200% 100%',
+                    '@keyframes shimmer': {
+                      '0%': { backgroundPosition: '200% 0' },
+                      '100%': { backgroundPosition: '-200% 0' }
+                    }
+                  }} />
+                </Box>
+              </Box>
             )}
             
             {/* Project Completion Summary */}
-            {elements.length > 0 && (
+            {(elements.length > 0 || loading) && (
               <Box sx={{ 
                 mt: 1, 
                 p: 2, 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: loading 
+                  ? 'linear-gradient(90deg, rgba(102, 126, 234, 0.3) 25%, rgba(118, 75, 162, 0.3) 50%, rgba(102, 126, 234, 0.3) 75%)'
+                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 color: 'white',
                 borderRadius: 2,
-                boxShadow: '0 4px 20px rgba(102, 126, 234, 0.3)'
+                boxShadow: '0 4px 20px rgba(102, 126, 234, 0.3)',
+                ...(loading && {
+                  animation: 'shimmer 1.5s infinite',
+                  backgroundSize: '200% 100%',
+                  '@keyframes shimmer': {
+                    '0%': { backgroundPosition: '200% 0' },
+                    '100%': { backgroundPosition: '-200% 0' }
+                  }
+                })
               }}>
-                {(() => {
+                {loading ? (
+                  <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+                    {[1, 2, 3, 4].map((i) => (
+                      <Box key={i}>
+                        <Box sx={{ 
+                          width: 100,
+                          height: 16,
+                          backgroundColor: 'rgba(255,255,255,0.2)',
+                          borderRadius: 1,
+                          mb: 0.5
+                        }} />
+                        <Box sx={{ 
+                          width: 120,
+                          height: 24,
+                          backgroundColor: 'rgba(255,255,255,0.3)',
+                          borderRadius: 1
+                        }} />
+                      </Box>
+                    ))}
+                  </Box>
+                ) : 
+                (() => {
                   const completedElements = elements.filter(el => el.status === 'complete');
                   const totalSurfaceArea = elements.reduce((sum, el) => sum + (el.surfaceAreaSqm || 0), 0);
                   const completedSurfaceArea = completedElements.reduce((sum, el) => sum + (el.surfaceAreaSqm || 0), 0);
@@ -1797,13 +1874,22 @@ const StructuralElementsList = ({ projectSlug }) => {
               ml: 'auto',
               px: 2,
               py: 1,
-              backgroundColor: 'rgba(255,255,255,0.2)',
+              backgroundColor: loading ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.2)',
               borderRadius: 1,
               color: 'white',
-              border: '1px solid rgba(255,255,255,0.3)'
+              border: '1px solid rgba(255,255,255,0.3)',
+              ...(loading && {
+                animation: 'shimmer 1.5s infinite',
+                background: 'linear-gradient(90deg, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 75%)',
+                backgroundSize: '200% 100%',
+                '@keyframes shimmer': {
+                  '0%': { backgroundPosition: '200% 0' },
+                  '100%': { backgroundPosition: '-200% 0' }
+                }
+              })
             }}>
               <Typography variant="body2" fontWeight="bold">
-                {elements.length} Elements
+                {loading ? '...' : `${elements.length} Elements`}
               </Typography>
             </Box>
           </Box>
@@ -2279,26 +2365,49 @@ const StructuralElementsList = ({ projectSlug }) => {
                                     </TableRow>
                                   </TableHead>
                                   <TableBody>
-                                    {paginatedElements.map((element) => (
-                                      <TableRow 
-                                        key={element._id} 
-                                        hover
-                                        sx={{
-                                          '&:hover': {
-                                            backgroundColor: `${statusColor}08`,
-                                          },
-                                          '&:nth-of-type(even)': {
-                                            backgroundColor: 'grey.25'
-                                          }
-                                        }}
-                                      >
-                                        {getVisibleColumns().map(column => (
-                                          <TableCell key={column.key}>
-                                            {renderCellContent(element, column.key)}
-                                          </TableCell>
-                                        ))}
-                                      </TableRow>
-                                    ))}
+                                    {loading ? (
+                                      // Loading skeleton rows
+                                      Array.from({ length: 5 }).map((_, idx) => (
+                                        <TableRow key={idx}>
+                                          {getVisibleColumns().map((column, colIdx) => (
+                                            <TableCell key={colIdx}>
+                                              <Box sx={{ 
+                                                width: column.key === 'elementId' ? 80 : column.key === 'actions' ? 120 : '100%',
+                                                height: 20,
+                                                backgroundColor: 'grey.200',
+                                                borderRadius: 1,
+                                                animation: 'pulse 1.5s ease-in-out infinite',
+                                                '@keyframes pulse': {
+                                                  '0%, 100%': { opacity: 1 },
+                                                  '50%': { opacity: 0.5 }
+                                                }
+                                              }} />
+                                            </TableCell>
+                                          ))}
+                                        </TableRow>
+                                      ))
+                                    ) : (
+                                      paginatedElements.map((element) => (
+                                        <TableRow 
+                                          key={element._id} 
+                                          hover
+                                          sx={{
+                                            '&:hover': {
+                                              backgroundColor: `${statusColor}08`,
+                                            },
+                                            '&:nth-of-type(even)': {
+                                              backgroundColor: 'grey.25'
+                                            }
+                                          }}
+                                        >
+                                          {getVisibleColumns().map(column => (
+                                            <TableCell key={column.key}>
+                                              {renderCellContent(element, column.key)}
+                                            </TableCell>
+                                          ))}
+                                        </TableRow>
+                                      ))
+                                    )}
                                   </TableBody>
                                 </Table>
                               </TableContainer>
