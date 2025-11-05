@@ -527,19 +527,6 @@ const ProjectList = () => {
                         >
                           {project.title}
                         </Typography>
-                        <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-                          <Chip
-                            label={project.priority}
-                            color={getPriorityColor(project.priority)}
-                            size="small"
-                          />
-                          <Chip
-                            label={projectProgress[project._id]?.status || project.status}
-                            color={getStatusColor(projectProgress[project._id]?.status || project.status)}
-                            size="small"
-                          />
-
-                        </Stack>
                       </Box>
                     </Box>
 
