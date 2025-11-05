@@ -14,7 +14,7 @@ services:
       - '--data-dir=/data'
       - '--bootstrap-prometheus-url=http://prometheus:9090'
       - '--bootstrap-refresh-interval=15s'
-      - '--bootstrap-clickhouse-address=clickhouse:9000'
+      - '--bootstrap-clickhouse-address=clickhouse:4001'
     depends_on:
       - clickhouse
       - prometheus
