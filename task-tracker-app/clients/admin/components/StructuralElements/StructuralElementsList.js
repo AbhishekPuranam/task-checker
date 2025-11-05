@@ -482,78 +482,41 @@ const StructuralElementsList = ({ projectSlug }) => {
     
     try {
       setLoading(true);
-      // Fetch ALL elements for the project without pagination limit
+      // Fetch ALL elements for the project - backend now includes job counts
       const response = await api.get(`/structural-elements?project=${projectId}&limit=10000`);
       
-      // Fetch ALL jobs for the project in one API call to avoid rate limiting
-      const jobsResponse = await api.get(`/jobs?project=${projectId}&limit=10000`);
-      const allJobs = jobsResponse.data.jobs || [];
+      // Backend now provides jobCounts, progressPercentage, and currentPendingJob
+      // No need to fetch jobs separately anymore!
       
-      // Group jobs by structural element ID for quick lookup
-      const jobsByElement = {};
-      allJobs.forEach(job => {
-        let elementId;
-        if (typeof job.structuralElement === 'object' && job.structuralElement !== null) {
-          elementId = job.structuralElement._id;
-        } else {
-          elementId = job.structuralElement;
-        }
-        if (elementId && !jobsByElement[elementId]) {
-          jobsByElement[elementId] = [];
-        }
-        if (elementId) {
-          jobsByElement[elementId].push(job);
-        }
-      });
-      
-      // Calculate status for each element based on its jobs
+      // Calculate status for each element based on backend job data
       const elementsWithStatus = response.data.elements.map((element) => {
         try {
-          // Get jobs for this specific element from the pre-fetched data
-          const jobs = jobsByElement[element._id] || [];
+          const jobCounts = element.jobCounts || { totalJobs: 0, completedJobs: 0, activeJobs: 0, pendingJobs: 0 };
+          const totalJobs = jobCounts.totalJobs || 0;
+          const completedJobs = jobCounts.completedJobs || 0;
+          const activeJobs = jobCounts.activeJobs || 0;
+          const progressPercentage = element.progressPercentage || 0;
           
           let calculatedStatus;
-          if (jobs.length === 0) {
+          if (totalJobs === 0) {
             calculatedStatus = 'no jobs';
+          } else if (completedJobs === totalJobs && progressPercentage === 100) {
+            calculatedStatus = 'complete';
+          } else if (activeJobs > 0 || completedJobs > 0) {
+            calculatedStatus = 'active';
           } else {
-            // Check if any jobs are marked as not_applicable (non clearance)
-            const hasNonClearanceJobs = jobs.some(job => job.status === 'not_applicable');
-            
-            // Calculate completion percentage based on jobs
-            const completedJobs = jobs.filter(job => job.status === 'completed').length;
-            const totalJobs = jobs.length;
-            const completionPercentage = (completedJobs / totalJobs) * 100;
-            
-            // Calculate average progress percentage
-            const avgProgress = jobs.reduce((sum, job) => sum + (job.progressPercentage || 0), 0) / jobs.length;
-            
-            // Calculate status based on job completion and non-clearance jobs
-            if (hasNonClearanceJobs) {
-              calculatedStatus = 'non clearance'; // Has non-clearance jobs
-            } else if (completionPercentage === 100 && avgProgress === 100) {
-              calculatedStatus = 'complete'; // Mark complete when all jobs done
-            } else if (completionPercentage > 0 || avgProgress > 0) {
-              calculatedStatus = 'active'; // Some work done but not complete
-            } else {
-              // If jobs exist but no work started yet, still mark as active (pending jobs)
-              calculatedStatus = 'active';
-            }
+            calculatedStatus = 'active'; // Has pending jobs
           }
-          
-          // Calculate completion metrics
-          const completedJobs = jobs.filter(job => job.status === 'completed').length;
-          const totalJobs = jobs.length;
-          const completionPercentage = totalJobs > 0 ? (completedJobs / totalJobs) * 100 : 0;
-          const avgProgress = jobs.length > 0 ? jobs.reduce((sum, job) => sum + (job.progressPercentage || 0), 0) / jobs.length : 0;
 
           return {
             ...element,
             status: calculatedStatus,
             jobsCompleted: completedJobs,
             totalJobs: totalJobs,
-            completionPercentage: Math.round(completionPercentage),
-            avgProgress: Math.round(avgProgress),
-            jobs: jobs // Include jobs for reference
+            completionPercentage: Math.round(progressPercentage),
+            avgProgress: Math.round(progressPercentage),
+            jobCounts: jobCounts, // Include backend job counts
+            currentPendingJob: element.currentPendingJob // Include current pending job from backend
           };
         } catch (error) {
           console.error(`Error calculating status for element ${element._id}:`, error);
