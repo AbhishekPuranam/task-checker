@@ -13,7 +13,8 @@ const { addExcelJob, getJobStatus } = require('../utils/queue');
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = 'uploads/excel';
+    // Use absolute path to ensure file can be found by worker
+    const uploadDir = path.join(__dirname, '../uploads/excel');
     console.log(`📂 [MULTER] Checking upload directory: ${uploadDir}`);
     if (!fs.existsSync(uploadDir)) {
       console.log(`📂 [MULTER] Creating upload directory: ${uploadDir}`);

@@ -207,23 +207,55 @@ function createExcelWorker() {
         await job.updateProgress({ stage: 'parsing', percent: 0, message: 'Parsing Excel file...' });
         
         console.log(`📄 [WORKER] Parsing file: ${filePath}`);
-        console.log(`📄 [WORKER] File exists check: ${require('fs').existsSync(filePath)}`);
         console.log(`📄 [WORKER] Current working directory: ${process.cwd()}`);
         
-        if (!require('fs').existsSync(filePath)) {
-          console.error(`❌ [WORKER] File not found at: ${filePath}`);
-          console.log(`📂 [WORKER] Checking uploads directory...`);
-          const uploadsDir = 'uploads/excel';
-          if (require('fs').existsSync(uploadsDir)) {
-            const files = require('fs').readdirSync(uploadsDir);
-            console.log(`📂 [WORKER] Files in ${uploadsDir}:`, files);
-          } else {
-            console.log(`❌ [WORKER] Uploads directory does not exist: ${uploadsDir}`);
-          }
-          throw new Error(`File not found: ${filePath}`);
+        // Ensure we have an absolute path
+        const path = require('path');
+        let absoluteFilePath = filePath;
+        if (!path.isAbsolute(filePath)) {
+          // If relative path, resolve it from the worker's working directory
+          absoluteFilePath = path.resolve(process.cwd(), filePath);
+          console.log(`📄 [WORKER] Converted relative path to absolute: ${absoluteFilePath}`);
         }
         
-        const excelData = parseExcelFile(filePath);
+        console.log(`📄 [WORKER] File exists check: ${require('fs').existsSync(absoluteFilePath)}`);
+        
+        if (!require('fs').existsSync(absoluteFilePath)) {
+          console.error(`❌ [WORKER] File not found at: ${absoluteFilePath}`);
+          console.log(`📂 [WORKER] Checking uploads directory...`);
+          
+          // Try multiple possible locations
+          const possiblePaths = [
+            filePath,
+            absoluteFilePath,
+            path.join(process.cwd(), 'uploads/excel', path.basename(filePath)),
+            path.join(__dirname, '../uploads/excel', path.basename(filePath))
+          ];
+          
+          console.log(`📂 [WORKER] Trying possible paths:`, possiblePaths);
+          
+          for (const tryPath of possiblePaths) {
+            if (require('fs').existsSync(tryPath)) {
+              console.log(`✅ [WORKER] File found at: ${tryPath}`);
+              absoluteFilePath = tryPath;
+              break;
+            }
+          }
+          
+          // Final check
+          if (!require('fs').existsSync(absoluteFilePath)) {
+            const uploadsDir = path.join(__dirname, '../uploads/excel');
+            if (require('fs').existsSync(uploadsDir)) {
+              const files = require('fs').readdirSync(uploadsDir);
+              console.log(`📂 [WORKER] Files in ${uploadsDir}:`, files);
+            } else {
+              console.log(`❌ [WORKER] Uploads directory does not exist: ${uploadsDir}`);
+            }
+            throw new Error(`File not found: ${filePath} (tried: ${possiblePaths.join(', ')})`);
+          }
+        }
+        
+        const excelData = parseExcelFile(absoluteFilePath);
         console.log(`✅ [WORKER] Parsed ${excelData?.length || 0} rows from Excel`);
         
         if (!excelData || excelData.length === 0) {
@@ -441,7 +473,8 @@ function createExcelWorker() {
         
         // Clean up file
         try {
-          fs.unlinkSync(filePath);
+          fs.unlinkSync(absoluteFilePath);
+          console.log(`🗑️ [WORKER] Cleaned up file: ${absoluteFilePath}`);
         } catch (error) {
           console.error('Error deleting file:', error);
         }
@@ -477,10 +510,14 @@ function createExcelWorker() {
         // Rollback cache transaction
         await cacheTransaction.rollback();
         
-        // Clean up file on error
-        if (filePath) {
+        // Clean up file on error (use both paths in case absoluteFilePath wasn't set)
+        const pathsToClean = [filePath, absoluteFilePath].filter(p => p);
+        for (const pathToClean of pathsToClean) {
           try {
-            fs.unlinkSync(filePath);
+            if (fs.existsSync(pathToClean)) {
+              fs.unlinkSync(pathToClean);
+              console.log(`🗑️ [WORKER] Cleaned up file on error: ${pathToClean}`);
+            }
           } catch (e) {
             console.error('Error deleting file:', e);
           }
