@@ -12,10 +12,23 @@ distributor:
 
 ingester:
   max_block_duration: 5m               # cut the headblock when this much time passes
+  trace_idle_period: 10s
+  max_block_bytes: 1_000_000
 
 compactor:
   compaction:
     block_retention: 720h                # 30 days retention
+
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
+      cluster: docker-compose
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://coroot-prometheus:9090/api/v1/write
+        send_exemplars: true
 
 storage:
   trace:
@@ -29,3 +42,5 @@ overrides:
   defaults:
     metrics_generator:
       processors: [service-graphs, span-metrics]
+      generate_native_histograms: both
+      max_active_series: 10000
