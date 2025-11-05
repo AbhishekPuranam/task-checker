@@ -10,6 +10,44 @@ const Job = require('../models/Job');
 const { auth } = require('../middleware/auth');
 const { addExcelJob, getJobStatus } = require('../utils/queue');
 
+// Security: Define allowed upload directory
+const UPLOAD_DIR = path.resolve('uploads/excel');
+
+/**
+ * Security: Validate that a file path is within the allowed upload directory
+ * Prevents path traversal attacks
+ */
+function isPathSafe(filePath) {
+  if (!filePath) return false;
+  const resolvedPath = path.resolve(filePath);
+  return resolvedPath.startsWith(UPLOAD_DIR);
+}
+
+/**
+ * Security: Safely delete a file only if it's in the upload directory
+ */
+function safeDeleteFile(filePath) {
+  if (!filePath) return;
+  
+  if (!isPathSafe(filePath)) {
+    console.error('⚠️  Security: Attempted to delete file outside upload directory');
+    return;
+  }
+  
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      // Log only the filename, not the full path, for security
+      const filename = path.basename(filePath);
+      console.log(`✅ Deleted file: ${filename}`);
+    }
+  } catch (error) {
+    // Log only the filename, not the full path
+    const filename = path.basename(filePath);
+    console.error(`❌ Error deleting file ${filename}:`, error.message);
+  }
+}
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -409,7 +447,7 @@ router.post('/preview', auth, upload.single('excel'), async (req, res) => {
     const jsonData = XLSX.utils.sheet_to_json(worksheet);
     
     // Clean up uploaded file
-    fs.unlinkSync(req.file.path);
+    safeDeleteFile(req.file.path);
     
     // Transform and validate the first few rows for preview
     const previewData = jsonData.slice(0, 5).map((row, index) => {
@@ -444,7 +482,7 @@ router.post('/preview', auth, upload.single('excel'), async (req, res) => {
     console.error('Error previewing Excel file:', error);
     // Clean up file on error
     if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+      safeDeleteFile(req.file.path);
     }
     res.status(500).json({ message: 'Error processing Excel file', error: error.message });
   }
@@ -460,9 +498,25 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
   const { DatabaseTransaction } = require('../utils/transaction');
   const { CacheTransaction, invalidateCache } = require('../middleware/cache');
   const { addProgressJob } = require('../utils/queue');
+  const mongoose = require('mongoose');
+  
+  // MongoDB ready states
+  const MONGODB_CONNECTED = 1;
   
   try {
     const { projectId } = req.params;
+    
+    // Check MongoDB connection before proceeding
+    if (mongoose.connection.readyState !== MONGODB_CONNECTED) {
+      console.error('❌ MongoDB not connected, cannot process Excel upload');
+      if (req.file && req.file.path) {
+        safeDeleteFile(req.file.path);
+      }
+      return res.status(503).json({ 
+        message: 'Database is temporarily unavailable. Please try again in a few moments.',
+        error: 'Database connection lost'
+      });
+    }
     
     // Verify project exists
     const project = await Task.findById(projectId);
@@ -497,7 +551,7 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
     
     if (!excelData || excelData.length === 0) {
       // Clean up file
-      fs.unlinkSync(req.file.path);
+      safeDeleteFile(req.file.path);
       return res.status(400).json({ message: 'Excel file is empty or invalid' });
     }
 
@@ -523,7 +577,7 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
     
     if (errors.length > 0 && structuralElements.length === 0) {
       // Clean up file
-      fs.unlinkSync(req.file.path);
+      safeDeleteFile(req.file.path);
       return res.status(400).json({ 
         message: `All rows contain errors. First error: ${errors[0].message}`,
         errors: errors.slice(0, 10)
@@ -613,7 +667,7 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
       }
       
       // Clean up file
-      fs.unlinkSync(req.file.path);
+      safeDeleteFile(req.file.path);
       
       // Return success response
       res.json({
@@ -629,9 +683,19 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
     } catch (txError) {
       console.error(`❌ Transaction failed:`, txError);
       
+      // Check if it's a MongoDB connection error
+      if (txError.name === 'MongoNetworkError' || txError.name === 'MongoServerError') {
+        console.error('❌ MongoDB connection lost during transaction');
+      }
+      
       // Automatic rollback - nothing was saved!
       await dbTransaction.rollback();
       console.log(`🔙 Transaction rolled back - no data was saved to database`);
+      
+      // Return appropriate error message
+      if (txError.name === 'MongoNetworkError') {
+        throw new Error('Database connection lost during upload. Please try again.');
+      }
       
       throw txError;
     }
@@ -641,11 +705,7 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
     
     // Clean up uploaded file in case of error
     if (req.file && req.file.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (deleteError) {
-        console.error('Error deleting uploaded file:', deleteError);
-      }
+      safeDeleteFile(req.file.path);
     }
     
     res.status(500).json({ 

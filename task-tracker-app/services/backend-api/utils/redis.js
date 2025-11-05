@@ -6,7 +6,21 @@ let redisClient = null;
 
 const getRedisClient = async () => {
   if (redisClient) {
-    return redisClient;
+    // Check if existing client is still connected
+    if (redisClient.isReady) {
+      return redisClient;
+    }
+    // If not ready, try to reconnect
+    try {
+      // Check if connection is not open before attempting to connect
+      if (!redisClient.isOpen && typeof redisClient.connect === 'function') {
+        await redisClient.connect();
+      }
+      return redisClient;
+    } catch (err) {
+      console.warn('⚠️  Existing Redis client failed to reconnect:', err.message);
+      redisClient = null; // Reset to create new client
+    }
   }
 
   try {
@@ -29,31 +43,46 @@ const getRedisClient = async () => {
       url: redisUrl,
       socket: {
         reconnectStrategy: (retries) => {
-          if (retries > 10) {
-            console.error('Redis: Too many retries, stopping reconnection');
+          if (retries > 20) {
+            console.error('❌ Redis: Too many retries, stopping reconnection');
             return new Error('Too many retries');
           }
-          return Math.min(retries * 100, 3000);
-        }
-      }
+          // Exponential backoff: 100ms, 200ms, 400ms, ..., max 5s
+          const delay = Math.min(retries * 100, 5000);
+          console.log(`🔄 Redis retry ${retries} in ${delay}ms`);
+          return delay;
+        },
+        connectTimeout: 10000,
+        keepAlive: 5000,
+      },
+      // Enable offline queue to buffer commands when disconnected
+      enableOfflineQueue: true,
     });
 
     redisClient.on('error', (err) => {
-      console.error('Redis Client Error:', err);
+      console.error('❌ Redis Client Error:', err.message);
     });
 
     redisClient.on('connect', () => {
       console.log('✅ Redis connected successfully');
     });
 
+    redisClient.on('ready', () => {
+      console.log('✅ Redis client ready to accept commands');
+    });
+
     redisClient.on('reconnecting', () => {
       console.log('🔄 Redis reconnecting...');
+    });
+
+    redisClient.on('end', () => {
+      console.log('⚠️  Redis connection closed');
     });
 
     await redisClient.connect();
     return redisClient;
   } catch (error) {
-    console.error('Failed to connect to Redis:', error);
+    console.error('❌ Failed to connect to Redis:', error.message);
     // Return null if Redis is not available - app should work without cache
     return null;
   }

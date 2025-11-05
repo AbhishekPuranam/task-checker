@@ -135,66 +135,119 @@ if (!MONGODB_URI) {
   }
 }
 
+// Connection retry configuration
+const MAX_RETRIES = 10;
+const INITIAL_RETRY_DELAY = 2000;
+const MAX_RETRY_DELAY = 30000;
+
+// Connection state management
+class ConnectionManager {
+  constructor() {
+    this.retryCount = 0;
+  }
+
+  getRetryDelay() {
+    if (this.retryCount === 0) return 0;
+    return Math.min(INITIAL_RETRY_DELAY * Math.pow(2, this.retryCount - 1), MAX_RETRY_DELAY);
+  }
+
+  incrementRetry() {
+    this.retryCount++;
+  }
+
+  resetRetry() {
+    this.retryCount = 0;
+  }
+
+  canRetry() {
+    return this.retryCount < MAX_RETRIES;
+  }
+}
+
+const connectionManager = new ConnectionManager();
+
 // Connect to MongoDB with retry logic and persistent connection
 const connectWithRetry = () => {
-  console.log('Attempting to connect to MongoDB...');
+  console.log(`Attempting to connect to MongoDB (attempt ${connectionManager.retryCount + 1}/${MAX_RETRIES})...`);
+  
+  // Exponential backoff for retries
+  const retryDelay = connectionManager.getRetryDelay();
+  
   mongoose.connect(MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
     serverSelectionTimeoutMS: 30000,
-    socketTimeoutMS: 30000,
-    maxPoolSize: 10,
+    socketTimeoutMS: 45000, // Increased for better stability
+    connectTimeoutMS: 30000,
+    maxPoolSize: 20, // Increased pool size for better concurrency
     minPoolSize: 5,
+    maxIdleTimeMS: 30000, // Close idle connections after 30s
     heartbeatFrequencyMS: 10000,
+    retryWrites: true, // Enable retryable writes
+    retryReads: true, // Enable retryable reads
     bufferCommands: false,
+    autoIndex: false, // Disable auto index creation in production
   })
   .then(async () => {
-    console.log('MongoDB connected successfully');
+    console.log('✅ MongoDB connected successfully');
+    connectionManager.resetRetry(); // Reset retry counter on successful connection
+    
+    // Verify replica set status
+    try {
+      const admin = mongoose.connection.db.admin();
+      const status = await admin.command({ replSetGetStatus: 1 });
+      console.log(`✅ MongoDB Replica Set: ${status.set}, Members: ${status.members.length}`);
+    } catch (err) {
+      console.warn('⚠️  Could not get replica set status:', err.message);
+    }
     
     // Note: Database initialization scripts moved to /scripts folder
     // Run manually with: docker exec tasktracker-app-dev node create-users.js
     // Or use scripts in /scripts folder from the host machine
-    
-    // Initialize database with default users (commented out - files moved to /scripts)
-    // try {
-    //   const initializeDatabase = require('./init-db');
-    //   await initializeDatabase();
-    //   
-    //   // Migrate existing users to add usernames
-    //   const migrateExistingUsers = require('./migrate-users');
-    //   await migrateExistingUsers();
-    //   
-    //   // Create initial users (if they don't exist)
-    //   const createInitialUsers = require('./create-initial-users');
-    //   await createInitialUsers();
-    // } catch (error) {
-    //   console.error('Database initialization error:', error);
-    // }
   })
   .catch(err => {
-    console.error('MongoDB connection error:', err);
-    console.log('Retrying MongoDB connection in 5 seconds...');
-    setTimeout(connectWithRetry, 5000);
+    connectionManager.incrementRetry();
+    console.error(`❌ MongoDB connection error (attempt ${connectionManager.retryCount}/${MAX_RETRIES}):`, err.message);
+    
+    if (connectionManager.canRetry()) {
+      const nextRetryDelay = connectionManager.getRetryDelay();
+      console.log(`Retrying MongoDB connection in ${nextRetryDelay}ms...`);
+      setTimeout(connectWithRetry, nextRetryDelay);
+    } else {
+      console.error('❌ Max MongoDB connection retries reached. Please check MongoDB service.');
+      console.error('Application will continue but database operations will fail.');
+      // Don't exit - allow app to run in degraded mode for health checks
+    }
   });
 };
 
 // Handle connection events
 mongoose.connection.on('connected', () => {
-  console.log('Mongoose connected to MongoDB');
+  console.log('✅ Mongoose connected to MongoDB');
+  connectionManager.resetRetry(); // Reset on reconnection
 });
 
 mongoose.connection.on('error', (err) => {
-  console.error('Mongoose connection error:', err);
-  if (mongoose.connection.readyState === 0) {
-    connectWithRetry();
-  }
+  console.error('❌ Mongoose connection error:', err.message);
+  // Don't auto-retry on error - let the disconnect event handle it
 });
 
 mongoose.connection.on('disconnected', () => {
-  console.log('Mongoose disconnected');
-  if (mongoose.connection.readyState === 0) {
-    connectWithRetry();
+  console.warn('⚠️  Mongoose disconnected from MongoDB');
+  if (mongoose.connection.readyState === 0 && connectionManager.canRetry()) {
+    console.log('Attempting to reconnect...');
+    setTimeout(connectWithRetry, INITIAL_RETRY_DELAY);
   }
+});
+
+mongoose.connection.on('reconnected', () => {
+  console.log('✅ Mongoose reconnected to MongoDB');
+  connectionManager.resetRetry();
+});
+
+// Handle MongoDB topology errors
+mongoose.connection.on('close', () => {
+  console.log('⚠️  MongoDB connection closed');
 });
 
 // Graceful exit
@@ -264,8 +317,57 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Health check endpoint (must be before catch-all route)
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+app.get('/health', async (req, res) => {
+  const health = {
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    services: {
+      mongodb: 'unknown',
+      redis: 'unknown'
+    }
+  };
+
+  // Check MongoDB connection
+  try {
+    if (mongoose.connection.readyState === 1) {
+      health.services.mongodb = 'connected';
+      // Verify with a simple operation
+      await mongoose.connection.db.admin().ping();
+    } else if (mongoose.connection.readyState === 2) {
+      health.services.mongodb = 'connecting';
+      health.status = 'DEGRADED';
+    } else if (mongoose.connection.readyState === 3) {
+      health.services.mongodb = 'disconnecting';
+      health.status = 'DEGRADED';
+    } else {
+      health.services.mongodb = 'disconnected';
+      health.status = 'DEGRADED';
+    }
+  } catch (err) {
+    health.services.mongodb = 'error: ' + err.message;
+    health.status = 'DEGRADED';
+  }
+
+  // Check Redis connection
+  try {
+    const { getRedisClient } = require('./utils/redis');
+    const client = await getRedisClient();
+    if (client && client.isReady) {
+      health.services.redis = 'connected';
+      // Verify with a ping
+      await client.ping();
+    } else {
+      health.services.redis = 'disconnected';
+      // Redis is optional, so don't degrade health
+    }
+  } catch (err) {
+    health.services.redis = 'error: ' + err.message;
+    // Redis is optional, so don't degrade health
+  }
+
+  const statusCode = health.status === 'OK' ? 200 : 503;
+  res.status(statusCode).json(health);
 });
 
 // Serve static assets in production
