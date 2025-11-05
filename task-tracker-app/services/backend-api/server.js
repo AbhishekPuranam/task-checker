@@ -128,10 +128,10 @@ let MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
   try {
     const MONGODB_PASSWORD = fs.readFileSync('/run/secrets/mongodb_password', 'utf8').trim();
-    MONGODB_URI = `mongodb://admin:${MONGODB_PASSWORD}@mongodb:27017/projecttracker?authSource=admin`;
+    MONGODB_URI = `mongodb://admin:${MONGODB_PASSWORD}@mongodb:27017/tasktracker?authSource=admin`;
   } catch (err) {
     console.warn('Warning: Could not read MongoDB password from secrets, using default connection');
-    MONGODB_URI = 'mongodb://mongodb:27017/projecttracker';
+    MONGODB_URI = 'mongodb://mongodb:27017/tasktracker';
   }
 }
 

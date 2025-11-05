@@ -26,7 +26,7 @@ const fs = require('fs');
 const MONGODB_PASSWORD = fs.readFileSync('/run/secrets/mongodb_password', 'utf8').trim();
 
 // MongoDB Connection
-const mongoUri = `mongodb://admin:${MONGODB_PASSWORD}@mongodb:27017/projecttracker?authSource=admin`;
+const mongoUri = `mongodb://admin:${MONGODB_PASSWORD}@mongodb:27017/tasktracker?authSource=admin`;
 mongoose.connect(mongoUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
