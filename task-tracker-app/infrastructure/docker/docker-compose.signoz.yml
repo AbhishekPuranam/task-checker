@@ -11,8 +11,10 @@ services:
     tty: true
     volumes:
       - clickhouse_data:/var/lib/clickhouse/
+      - ./signoz/clickhouse-user-config.xml:/etc/clickhouse-server/users.d/custom.xml:ro
     environment:
       - CLICKHOUSE_DB=signoz_traces
+    command: --config-file=/etc/clickhouse-server/config.xml
     ulimits:
       nofile:
         soft: 262144
