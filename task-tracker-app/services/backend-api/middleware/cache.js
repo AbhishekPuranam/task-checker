@@ -196,6 +196,8 @@ class CacheTransaction {
     return [
       `cache:jobs:project:${projectId}:*`,
       `cache:stats:project:${projectId}:*`,
+      `cache:structural:elements:project:${projectId}:*`,
+      `cache:structural:summary:${projectId}:*`,
       `cache:/api/structural-elements/${projectId}*`,
       `cache:/api/projects/${projectId}*`
     ];
