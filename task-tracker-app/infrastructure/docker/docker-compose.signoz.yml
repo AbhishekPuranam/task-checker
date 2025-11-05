@@ -3,15 +3,14 @@
 
 services:
   # ClickHouse - Time-series database for traces and metrics
+  # ClickHouse - Time-series database for traces and metrics
   clickhouse:
-    image: clickhouse/clickhouse-server:23.11-alpine
+    image: clickhouse/clickhouse-server:23.7.3-alpine
     container_name: signoz-clickhouse
     restart: unless-stopped
-    privileged: true
+    tty: true
     volumes:
       - clickhouse_data:/var/lib/clickhouse/
-      - ./signoz/clickhouse-config.xml:/etc/clickhouse-server/config.d/custom-config.xml:ro
-      - /sys:/host-sys:ro
     environment:
       - CLICKHOUSE_DB=signoz_traces
     ulimits:
