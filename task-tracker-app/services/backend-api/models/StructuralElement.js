@@ -117,8 +117,10 @@ const structuralElementSchema = new mongoose.Schema({
 });
 
 // Indexes for efficient queries
-structuralElementSchema.index({ project: 1, serialNo: 1 }); // Compound index - unique within project
-structuralElementSchema.index({ project: 1, structureNumber: 1 }); // Compound index - unique within project
+// IMPORTANT: Compound unique index to prevent duplicate serialNo within the same project
+// Different projects CAN have elements with the same serialNo
+structuralElementSchema.index({ project: 1, serialNo: 1 }, { unique: true });
+structuralElementSchema.index({ project: 1, structureNumber: 1 });
 structuralElementSchema.index({ drawingNo: 1 });
 structuralElementSchema.index({ level: 1 });
 structuralElementSchema.index({ memberType: 1 });
