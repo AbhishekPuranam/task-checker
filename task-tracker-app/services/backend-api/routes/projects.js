@@ -300,6 +300,7 @@ router.put('/:id', auth, async (req, res) => {
     // Invalidate all project list caches when a project is updated
     await invalidateCache('cache:projects:*');
     await invalidateCache(`cache:project:${req.params.id}:*`);
+    await invalidateCache(`cache:project:name:*`); // Invalidate all name-based caches (in case title changed)
     
     res.json({
       message: 'Project updated successfully',
@@ -320,6 +321,9 @@ router.delete('/:id', auth, async (req, res) => {
       return res.status(404).json({ message: 'Project not found' });
     }
     
+    // Store project name for cache invalidation
+    const projectName = project.title;
+    
     // Also delete all related structural elements and jobs
     await StructuralElement.deleteMany({ project: req.params.id });
     await Job.deleteMany({ project: req.params.id });
@@ -329,6 +333,7 @@ router.delete('/:id', auth, async (req, res) => {
     // Invalidate all project-related caches when a project is deleted
     await invalidateCache('cache:projects:*');
     await invalidateCache(`cache:project:${req.params.id}:*`);
+    await invalidateCache(`cache:project:name:*`); // Invalidate all name-based caches
     await invalidateCache(`cache:structural:*:project:${req.params.id}:*`);
     await invalidateCache(`cache:jobs:project:${req.params.id}:*`);
     await invalidateCache(`cache:stats:project:${req.params.id}:*`);

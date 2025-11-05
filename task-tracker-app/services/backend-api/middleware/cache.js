@@ -194,6 +194,9 @@ class CacheTransaction {
    */
   static getProjectCachePatterns(projectId) {
     return [
+      `cache:projects:*`, // Invalidate all project listings (they include progress/element counts)
+      `cache:project:${projectId}:*`, // Invalidate specific project cache
+      `cache:project:name:*`, // Invalidate all project-by-name caches
       `cache:jobs:project:${projectId}:*`,
       `cache:stats:project:${projectId}:*`,
       `cache:structural:elements:project:${projectId}:*`,
