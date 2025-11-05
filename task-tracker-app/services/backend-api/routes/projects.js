@@ -417,4 +417,34 @@ router.delete('/:id/remove-engineer/:engineerId', auth, async (req, res) => {
   }
 });
 
+// Admin endpoint to manually trigger progress calculation
+router.post('/:id/calculate-progress', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    
+    const project = await Task.findById(req.params.id);
+    
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+    
+    // Trigger progress calculation
+    const job = await addProgressJob(req.params.id);
+    
+    // Invalidate caches
+    await invalidateCache(`cache:projects:*`);
+    await invalidateCache(`cache:structural:elements:project:${req.params.id}:*`);
+    
+    res.json({ 
+      message: 'Progress calculation triggered successfully',
+      jobId: job?.id
+    });
+  } catch (error) {
+    console.error('Error triggering progress calculation:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;
