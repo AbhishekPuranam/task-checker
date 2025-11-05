@@ -50,7 +50,7 @@ services:
     image: redis:7-alpine
     container_name: tasktracker-redis
     restart: unless-stopped
-    command: /bin/sh -c "redis-server --requirepass $$(cat /run/secrets/redis_password) --maxmemory 512mb --maxmemory-policy allkeys-lru --save 60 1000 --appendonly yes --appendfsync everysec"
+    command: /bin/sh -c "redis-server --requirepass $$(cat /run/secrets/redis_password) --maxmemory 2gb --maxmemory-policy noeviction --save 60 1000 --appendonly yes --appendfsync everysec"
     volumes:
       - redis_data:/data
     secrets:
@@ -63,14 +63,22 @@ services:
       timeout: 10s
       retries: 3
 
-  # Backend API
+  # Backend API - Scaled to 3 replicas
   tasktracker-app:
     build:
       context: ../../services/backend-api
       dockerfile: Dockerfile
       target: production
-    container_name: tasktracker-app
     restart: unless-stopped
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
     environment:
       NODE_ENV: production
       PORT: 5000
@@ -101,7 +109,13 @@ services:
       - "traefik.http.routers.backend-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api`)"
       - "traefik.http.routers.backend-secure.entrypoints=websecure"
       - "traefik.http.routers.backend-secure.tls.certresolver=letsencrypt"
+      # Load balancer configuration
       - "traefik.http.services.backend.loadbalancer.server.port=5000"
+      - "traefik.http.services.backend.loadbalancer.sticky.cookie=true"
+      - "traefik.http.services.backend.loadbalancer.sticky.cookie.name=backend_sticky"
+      - "traefik.http.services.backend.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.backend.loadbalancer.healthcheck.interval=10s"
+      - "traefik.http.services.backend.loadbalancer.healthcheck.timeout=3s"
 
   # Auth Service
   tasktracker-auth:
@@ -138,13 +152,21 @@ services:
       - "traefik.http.routers.auth-secure.tls.certresolver=letsencrypt"
       - "traefik.http.services.auth.loadbalancer.server.port=4000"
 
-  # Admin Client
+  # Admin Client - Scaled to 2 replicas
   tasktracker-admin:
     build:
       context: ../../clients/admin
       dockerfile: Dockerfile
-    container_name: tasktracker-admin
     restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: https://projects.sapcindia.com/api
@@ -161,15 +183,26 @@ services:
       - "traefik.http.routers.admin-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/admin`)"
       - "traefik.http.routers.admin-secure.entrypoints=websecure"
       - "traefik.http.routers.admin-secure.tls.certresolver=letsencrypt"
+      # Load balancer configuration
       - "traefik.http.services.admin.loadbalancer.server.port=3002"
+      - "traefik.http.services.admin.loadbalancer.sticky.cookie=true"
+      - "traefik.http.services.admin.loadbalancer.sticky.cookie.name=admin_sticky"
 
-  # Engineer Client
+  # Engineer Client - Scaled to 2 replicas
   tasktracker-engineer:
     build:
       context: ../../clients/engineer
       dockerfile: Dockerfile
-    container_name: tasktracker-engineer
     restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: https://projects.sapcindia.com/api
@@ -186,7 +219,10 @@ services:
       - "traefik.http.routers.engineer-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/engineer`)"
       - "traefik.http.routers.engineer-secure.entrypoints=websecure"
       - "traefik.http.routers.engineer-secure.tls.certresolver=letsencrypt"
+      # Load balancer configuration
       - "traefik.http.services.engineer.loadbalancer.server.port=3001"
+      - "traefik.http.services.engineer.loadbalancer.sticky.cookie=true"
+      - "traefik.http.services.engineer.loadbalancer.sticky.cookie.name=engineer_sticky"
 
   # Netdata - Real-time Monitoring & Observability
   netdata:
