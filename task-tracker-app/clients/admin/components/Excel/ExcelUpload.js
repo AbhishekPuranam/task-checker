@@ -31,6 +31,8 @@ import {
 import { useRouter } from 'next/router';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
+import BatchProgressCard from './BatchProgressCard';
+import UploadSessionHistory from './UploadSessionHistory';
 
 const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
   const navigate = useRouter();
@@ -41,6 +43,9 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
   const [uploadProgress, setUploadProgress] = useState(null);
   const [progressInterval, setProgressInterval] = useState(null);
   const [jobId, setJobId] = useState(null);
+  const [uploadId, setUploadId] = useState(null); // For batch mode
+  const [isBatchMode, setIsBatchMode] = useState(false); // Batch mode detection
+  const [uploadSession, setUploadSession] = useState(null); // Current upload session
   const completionNotifiedRef = useRef(false);
   const fileInputRef = useRef(null);
 
@@ -137,9 +142,20 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
         },
       });
       
-      // New BullMQ response has jobId instead of sessionId
-      if (response.data.jobId) {
+      // Check if batch mode or legacy mode
+      if (response.data.uploadId) {
+        // Batch mode
+        setUploadId(response.data.uploadId);
+        setIsBatchMode(true);
+        toast.success('File uploaded! Processing in batches...');
+        
+        // Start polling for upload session status
+        const interval = setInterval(() => pollUploadSession(response.data.uploadId), 2000);
+        setProgressInterval(interval);
+      } else if (response.data.jobId) {
+        // Legacy mode with BullMQ
         setJobId(response.data.jobId);
+        setIsBatchMode(false);
         toast.success('File uploaded! Processing in background...');
         
         // Start polling for job status
@@ -226,6 +242,68 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
     }
   };
 
+  const pollUploadSession = async (uploadId) => {
+    try {
+      const response = await api.get(`/upload-sessions/${uploadId}`);
+      const session = response.data;
+      setUploadSession(session);
+      
+      // Update progress based on batch completion
+      const totalBatches = session.batches.length;
+      const completedBatches = session.batches.filter(
+        b => b.status === 'success' || b.status === 'failed'
+      ).length;
+      const successfulBatches = session.batches.filter(b => b.status === 'success').length;
+      
+      const percent = totalBatches > 0 ? (completedBatches / totalBatches) * 100 : 0;
+      
+      setUploadProgress({
+        stage: session.status,
+        percent,
+        message: `Processing batches: ${completedBatches}/${totalBatches} complete`,
+        saved: session.summary.totalElementsCreated || 0,
+        jobsCreated: session.summary.totalJobsCreated || 0,
+        validated: completedBatches,
+        errors: session.summary.failedBatches || 0,
+      });
+      
+      // Check if all batches are complete
+      if (session.status === 'completed' || session.status === 'failed') {
+        if (progressInterval) {
+          clearInterval(progressInterval);
+          setProgressInterval(null);
+        }
+        
+        setUploading(false);
+        
+        // Show final notification
+        if (!completionNotifiedRef.current) {
+          completionNotifiedRef.current = true;
+          if (session.status === 'completed') {
+            const jobMessage = session.summary.totalJobsCreated > 0 
+              ? ` and ${session.summary.totalJobsCreated} Fire Proofing jobs` 
+              : '';
+            toast.success(`Successfully imported ${session.summary.totalElementsCreated || 0} elements${jobMessage}! (${successfulBatches}/${totalBatches} batches succeeded)`);
+          } else {
+            toast.error(`Upload completed with errors. ${session.summary.failedBatches} batches failed.`);
+          }
+        }
+        
+        if (onUploadSuccess && session.status === 'completed') {
+          onUploadSuccess({
+            savedElements: session.summary.totalElementsCreated,
+            jobsCreated: session.summary.totalJobsCreated,
+            totalBatches,
+            successfulBatches,
+          });
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error polling upload session:', error);
+    }
+  };
+
   const downloadTemplate = async () => {
     try {
       const response = await api.get('/excel/template', {
@@ -274,6 +352,9 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
     setPreviewData([]);
     setUploadProgress(null);
     setJobId(null);
+    setUploadId(null);
+    setIsBatchMode(false);
+    setUploadSession(null);
     completionNotifiedRef.current = false;
     onClose();
   };
@@ -564,6 +645,41 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
                 </Alert>
               </Box>
             )}
+          </Box>
+        )}
+
+        {/* Batch Mode Upload Session */}
+        {isBatchMode && uploadSession && (
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              Batch Upload Progress
+            </Typography>
+            <BatchProgressCard
+              uploadSession={uploadSession}
+              onRetrySuccess={() => {
+                // Refresh session data
+                if (uploadId) {
+                  pollUploadSession(uploadId);
+                }
+              }}
+              onDeleteSuccess={() => {
+                // Clear session and close
+                setUploadSession(null);
+                setUploadId(null);
+                setIsBatchMode(false);
+                toast.success('Upload session deleted');
+              }}
+            />
+          </Box>
+        )}
+
+        {/* Upload History (only show when not actively uploading) */}
+        {!uploading && !uploadSession && projectId && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              Recent Uploads
+            </Typography>
+            <UploadSessionHistory projectId={projectId} />
           </Box>
         )}
       </DialogContent>
