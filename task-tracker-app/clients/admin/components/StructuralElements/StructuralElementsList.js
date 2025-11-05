@@ -786,6 +786,8 @@ const StructuralElementsList = ({ projectSlug }) => {
   };
 
   const handleQuickStatusUpdate = async (job, newStatus) => {
+    const oldStatus = job.status; // Store for potential rollback
+    
     try {
       const updateData = { status: newStatus };
       
@@ -796,37 +798,121 @@ const StructuralElementsList = ({ projectSlug }) => {
 
       console.log('Quick status update:', updateData); // Debug log
 
-      await api.put(`/jobs/${job._id}`, updateData);
+      // Optimistically update the UI immediately
+      job.status = newStatus;
+      if (newStatus === 'completed') {
+        job.progressPercentage = 100;
+      }
+
+      // Update the job in the elementJobs array for immediate UI feedback
+      setElementJobs(prevJobs => 
+        prevJobs.map(j => j._id === job._id ? { ...j, status: newStatus, progressPercentage: newStatus === 'completed' ? 100 : j.progressPercentage } : j)
+      );
+
+      // Optimistically update the element's status in the elements array
+      setElements(prevElements => {
+        return prevElements.map(element => {
+          if (element._id === selectedElement._id) {
+            // Recalculate job counts
+            const elementJobsUpdated = elementJobs.map(j => 
+              j._id === job._id ? { ...j, status: newStatus } : j
+            );
+            
+            const totalJobs = elementJobsUpdated.length;
+            const completedJobs = elementJobsUpdated.filter(j => j.status === 'completed').length;
+            const activeJobs = elementJobsUpdated.filter(j => j.status === 'in_progress').length;
+            const pendingJobs = elementJobsUpdated.filter(j => j.status === 'pending').length;
+            const nonClearanceJobs = elementJobsUpdated.filter(j => j.status === 'not_applicable').length;
+            
+            // Calculate new status
+            let calculatedStatus;
+            if (totalJobs === 0) {
+              calculatedStatus = 'no jobs';
+            } else if (nonClearanceJobs > 0) {
+              calculatedStatus = 'non clearance';
+            } else if (completedJobs === totalJobs) {
+              calculatedStatus = 'complete';
+            } else if (activeJobs > 0 || completedJobs > 0) {
+              calculatedStatus = 'active';
+            } else {
+              calculatedStatus = 'no jobs';
+            }
+            
+            return {
+              ...element,
+              status: calculatedStatus,
+              jobCounts: {
+                totalJobs,
+                completedJobs,
+                activeJobs,
+                pendingJobs,
+                nonClearanceJobs
+              }
+            };
+          }
+          return element;
+        });
+      });
+
+      // Show success immediately (optimistic)
       toast.success(`Job status updated to ${newStatus.replace('_', ' ')}`);
       
-      // Check if project status changed unexpectedly
-      const projectBefore = project;
-      setTimeout(async () => {
-        try {
-          const updatedProject = await api.get(`/projects/by-name/${projectName}`);
-          if (updatedProject.data.status !== projectBefore.status) {
-            console.warn('⚠️ Project status changed automatically after job update:', {
-              before: projectBefore.status,
-              after: updatedProject.data.status,
-              jobUpdated: job.jobTitle,
-              newJobStatus: newStatus
-            });
-            // Show warning to user
-            toast.warning('Project status changed automatically - this should not happen!');
-            setProject(updatedProject.data);
-          }
-        } catch (error) {
-          console.error('Error checking project status:', error);
-        }
-      }, 1000);
+      // Make the API call in background (don't await - fire and forget)
+      api.put(`/jobs/${job._id}`, updateData)
+        .then(() => {
+          // After successful update, refresh jobs silently in background
+          fetchElementJobs(selectedElement._id);
+        })
+        .catch((error) => {
+          // If API call fails, revert the optimistic update
+          console.error('Error updating job status:', error);
+          job.status = oldStatus;
+          setElementJobs(prevJobs => 
+            prevJobs.map(j => j._id === job._id ? { ...j, status: oldStatus } : j)
+          );
+          setElements(prevElements => 
+            prevElements.map(el => {
+              if (el._id === selectedElement._id) {
+                // Recalculate with reverted status
+                const elementJobsReverted = elementJobs.map(j => 
+                  j._id === job._id ? { ...j, status: oldStatus } : j
+                );
+                
+                const totalJobs = elementJobsReverted.length;
+                const completedJobs = elementJobsReverted.filter(j => j.status === 'completed').length;
+                const activeJobs = elementJobsReverted.filter(j => j.status === 'in_progress').length;
+                const pendingJobs = elementJobsReverted.filter(j => j.status === 'pending').length;
+                const nonClearanceJobs = elementJobsReverted.filter(j => j.status === 'not_applicable').length;
+                
+                let calculatedStatus;
+                if (totalJobs === 0) {
+                  calculatedStatus = 'no jobs';
+                } else if (nonClearanceJobs > 0) {
+                  calculatedStatus = 'non clearance';
+                } else if (completedJobs === totalJobs) {
+                  calculatedStatus = 'complete';
+                } else if (activeJobs > 0 || completedJobs > 0) {
+                  calculatedStatus = 'active';
+                } else {
+                  calculatedStatus = 'no jobs';
+                }
+                
+                return {
+                  ...el,
+                  status: calculatedStatus,
+                  jobCounts: { totalJobs, completedJobs, activeJobs, pendingJobs, nonClearanceJobs }
+                };
+              }
+              return el;
+            })
+          );
+          toast.error(error.response?.data?.message || 'Failed to update job status - reverted');
+        });
       
-      // Refresh jobs list and main elements table
-      fetchElementJobs(selectedElement._id);
-      fetchElements(); // Refresh the main elements table to update the "Current Pending Job" column
     } catch (error) {
-      console.error('Error updating job status:', error);
-      console.error('Full error response:', error.response);
-      toast.error(error.response?.data?.message || 'Failed to update job status');
+      // Catch any synchronous errors (e.g., in the optimistic update logic)
+      console.error('Error in quick status update:', error);
+      toast.error('Failed to update job status');
     }
   };
 
