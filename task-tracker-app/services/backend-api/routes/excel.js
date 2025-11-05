@@ -10,6 +10,40 @@ const Job = require('../models/Job');
 const { auth } = require('../middleware/auth');
 const { addExcelJob, getJobStatus } = require('../utils/queue');
 
+// Security: Define allowed upload directory
+const UPLOAD_DIR = path.resolve('uploads/excel');
+
+/**
+ * Security: Validate that a file path is within the allowed upload directory
+ * Prevents path traversal attacks
+ */
+function isPathSafe(filePath) {
+  if (!filePath) return false;
+  const resolvedPath = path.resolve(filePath);
+  return resolvedPath.startsWith(UPLOAD_DIR);
+}
+
+/**
+ * Security: Safely delete a file only if it's in the upload directory
+ */
+function safeDeleteFile(filePath) {
+  if (!filePath) return;
+  
+  if (!isPathSafe(filePath)) {
+    console.error(`⚠️  Security: Attempted to delete file outside upload directory: ${filePath}`);
+    return;
+  }
+  
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log(`✅ Deleted file: ${filePath}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error deleting file ${filePath}:`, error.message);
+  }
+}
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -409,7 +443,7 @@ router.post('/preview', auth, upload.single('excel'), async (req, res) => {
     const jsonData = XLSX.utils.sheet_to_json(worksheet);
     
     // Clean up uploaded file
-    fs.unlinkSync(req.file.path);
+    safeDeleteFile(req.file.path);
     
     // Transform and validate the first few rows for preview
     const previewData = jsonData.slice(0, 5).map((row, index) => {
@@ -444,7 +478,7 @@ router.post('/preview', auth, upload.single('excel'), async (req, res) => {
     console.error('Error previewing Excel file:', error);
     // Clean up file on error
     if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+      safeDeleteFile(req.file.path);
     }
     res.status(500).json({ message: 'Error processing Excel file', error: error.message });
   }
@@ -472,11 +506,7 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
     if (mongoose.connection.readyState !== MONGODB_CONNECTED) {
       console.error('❌ MongoDB not connected, cannot process Excel upload');
       if (req.file && req.file.path) {
-        try {
-          fs.unlinkSync(req.file.path);
-        } catch (e) {
-          console.error('Error deleting uploaded file:', e);
-        }
+        safeDeleteFile(req.file.path);
       }
       return res.status(503).json({ 
         message: 'Database is temporarily unavailable. Please try again in a few moments.',
@@ -517,7 +547,7 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
     
     if (!excelData || excelData.length === 0) {
       // Clean up file
-      fs.unlinkSync(req.file.path);
+      safeDeleteFile(req.file.path);
       return res.status(400).json({ message: 'Excel file is empty or invalid' });
     }
 
@@ -543,7 +573,7 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
     
     if (errors.length > 0 && structuralElements.length === 0) {
       // Clean up file
-      fs.unlinkSync(req.file.path);
+      safeDeleteFile(req.file.path);
       return res.status(400).json({ 
         message: `All rows contain errors. First error: ${errors[0].message}`,
         errors: errors.slice(0, 10)
@@ -633,7 +663,7 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
       }
       
       // Clean up file
-      fs.unlinkSync(req.file.path);
+      safeDeleteFile(req.file.path);
       
       // Return success response
       res.json({
@@ -671,11 +701,7 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
     
     // Clean up uploaded file in case of error
     if (req.file && req.file.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (deleteError) {
-        console.error('Error deleting uploaded file:', deleteError);
-      }
+      safeDeleteFile(req.file.path);
     }
     
     res.status(500).json({ 
