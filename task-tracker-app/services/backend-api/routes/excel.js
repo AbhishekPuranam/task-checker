@@ -460,9 +460,26 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
   const { DatabaseTransaction } = require('../utils/transaction');
   const { CacheTransaction, invalidateCache } = require('../middleware/cache');
   const { addProgressJob } = require('../utils/queue');
+  const mongoose = require('mongoose');
   
   try {
     const { projectId } = req.params;
+    
+    // Check MongoDB connection before proceeding
+    if (mongoose.connection.readyState !== 1) {
+      console.error('❌ MongoDB not connected, cannot process Excel upload');
+      if (req.file && req.file.path) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch (e) {
+          console.error('Error deleting uploaded file:', e);
+        }
+      }
+      return res.status(503).json({ 
+        message: 'Database is temporarily unavailable. Please try again in a few moments.',
+        error: 'Database connection lost'
+      });
+    }
     
     // Verify project exists
     const project = await Task.findById(projectId);
@@ -629,9 +646,19 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
     } catch (txError) {
       console.error(`❌ Transaction failed:`, txError);
       
+      // Check if it's a MongoDB connection error
+      if (txError.name === 'MongoNetworkError' || txError.name === 'MongoServerError') {
+        console.error('❌ MongoDB connection lost during transaction');
+      }
+      
       // Automatic rollback - nothing was saved!
       await dbTransaction.rollback();
       console.log(`🔙 Transaction rolled back - no data was saved to database`);
+      
+      // Return appropriate error message
+      if (txError.name === 'MongoNetworkError') {
+        throw new Error('Database connection lost during upload. Please try again.');
+      }
       
       throw txError;
     }
