@@ -9,8 +9,13 @@ services:
     restart: unless-stopped
     volumes:
       - clickhouse_data:/var/lib/clickhouse/
+      - ./signoz/clickhouse-config.xml:/etc/clickhouse-server/config.d/logging.xml:ro
     environment:
       - CLICKHOUSE_DB=signoz_traces
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
     healthcheck:
       test: ['CMD', 'wget', '--spider', '-q', 'localhost:8123/ping']
       interval: 30s
