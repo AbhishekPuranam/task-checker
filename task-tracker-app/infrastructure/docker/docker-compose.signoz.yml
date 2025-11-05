@@ -7,9 +7,13 @@ services:
     image: clickhouse/clickhouse-server:23.11-alpine
     container_name: signoz-clickhouse
     restart: unless-stopped
+    cap_add:
+      - SYS_NICE
+      - NET_ADMIN
+      - IPC_LOCK
     volumes:
       - clickhouse_data:/var/lib/clickhouse/
-      - ./signoz/clickhouse-config.xml:/etc/clickhouse-server/config.d/logging.xml:ro
+      - ./signoz/clickhouse-config.xml:/etc/clickhouse-server/config.d/custom-config.xml:ro
     environment:
       - CLICKHOUSE_DB=signoz_traces
     ulimits:
@@ -21,6 +25,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 60s
     networks:
       - tasktracker-network
 
