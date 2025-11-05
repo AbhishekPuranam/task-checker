@@ -490,9 +490,8 @@ const StructuralElementsList = ({ projectSlug }) => {
     
     try {
       setLoading(true);
-      // Fetch elements with pagination - default 10 per section, max 50
-      // This is much faster than loading all 20k elements at once
-      const response = await api.get(`/structural-elements?project=${projectId}&limit=10000`);
+      // Fetch all elements for accurate metrics
+      const response = await api.get(`/structural-elements?project=${projectId}&limit=50000`);
       
       // Calculate status for each element
       const elementsWithStatus = response.data.elements.map((element) => {
@@ -1884,12 +1883,6 @@ const StructuralElementsList = ({ projectSlug }) => {
                           {surfaceMetrics.loading ? '...' : `${completedSurfaceArea.toFixed(2)} sqm`}
                         </Typography>
                       </Box>
-                      <Box>
-                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>Elements Progress</Typography>
-                        <Typography variant="h6" fontWeight="bold" color="white">
-                          {completedElements.length}/{elements.length} elements
-                        </Typography>
-                      </Box>
                       
                       {/* Show correction button if project is wrongly marked complete */}
                       {project.status === 'completed' && projectStatus !== 'complete' && (
@@ -2033,28 +2026,6 @@ const StructuralElementsList = ({ projectSlug }) => {
             </Button>
             
             {/* Elements Count */}
-            <Box sx={{ 
-              ml: 'auto',
-              px: 2,
-              py: 1,
-              backgroundColor: loading ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.2)',
-              borderRadius: 1,
-              color: 'white',
-              border: '1px solid rgba(255,255,255,0.3)',
-              ...(loading && {
-                animation: 'shimmer 1.5s infinite',
-                background: 'linear-gradient(90deg, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 75%)',
-                backgroundSize: '200% 100%',
-                '@keyframes shimmer': {
-                  '0%': { backgroundPosition: '200% 0' },
-                  '100%': { backgroundPosition: '-200% 0' }
-                }
-              })
-            }}>
-              <Typography variant="body2" fontWeight="bold">
-                {loading ? '...' : `${totalElements} Elements`}
-              </Typography>
-            </Box>
           </Box>
         </Paper>
 
