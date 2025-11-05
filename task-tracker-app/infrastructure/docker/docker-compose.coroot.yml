@@ -14,9 +14,7 @@ services:
       - '--data-dir=/data'
       - '--bootstrap-prometheus-url=http://prometheus:9090'
       - '--bootstrap-refresh-interval=15s'
-      - '--bootstrap-clickhouse-address=clickhouse:4001'
     depends_on:
-      - clickhouse
       - prometheus
     labels:
       - "traefik.enable=true"
@@ -89,20 +87,12 @@ services:
     networks:
       - tasktracker-network
 
-  clickhouse:
-    image: greptime/greptimedb:latest
-    container_name: coroot-greptimedb
-    restart: unless-stopped
-    command: standalone start --http-addr 0.0.0.0:4000 --rpc-addr 0.0.0.0:4001 --mysql-addr 0.0.0.0:4002 --postgres-addr 0.0.0.0:4003
-    volumes:
-      - greptimedb_data:/tmp/greptimedb
-    networks:
-      - tasktracker-network
+  # GreptimeDB removed - was intended as ClickHouse replacement but blog post shows
+  # GreptimeDB replaces Prometheus for metrics, not ClickHouse for traces
+  # Coroot works fine without ClickHouse - it just won't have trace storage
 
 volumes:
   prometheus_data:
-    driver: local
-  greptimedb_data:
     driver: local
   coroot_data:
     driver: local
