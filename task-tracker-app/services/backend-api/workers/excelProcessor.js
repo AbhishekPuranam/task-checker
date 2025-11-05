@@ -513,17 +513,27 @@ function createExcelWorker() {
         // Rollback cache transaction
         await cacheTransaction.rollback();
         
-        // Clean up file on error (use both paths in case absoluteFilePath wasn't set)
-        const pathsToClean = [filePath, absoluteFilePath].filter(p => p);
-        for (const pathToClean of pathsToClean) {
-          try {
-            if (fs.existsSync(pathToClean)) {
-              fs.unlinkSync(pathToClean);
-              console.log(`🗑️ [WORKER] Cleaned up file on error: ${pathToClean}`);
+        // Only clean up file if this is the final attempt (no more retries)
+        // BullMQ retries jobs, so we need to keep the file for subsequent attempts
+        const attemptsLimit = job.opts?.attempts || 3;
+        const currentAttempt = job.attemptsMade || 1;
+        const isFinalAttempt = currentAttempt >= attemptsLimit;
+        
+        if (isFinalAttempt) {
+          console.log(`🗑️ [WORKER] Final attempt (${currentAttempt}/${attemptsLimit}) - cleaning up file`);
+          const pathsToClean = [filePath, absoluteFilePath].filter(p => p);
+          for (const pathToClean of pathsToClean) {
+            try {
+              if (fs.existsSync(pathToClean)) {
+                fs.unlinkSync(pathToClean);
+                console.log(`🗑️ [WORKER] Cleaned up file: ${pathToClean}`);
+              }
+            } catch (e) {
+              console.error('Error deleting file:', e);
             }
-          } catch (e) {
-            console.error('Error deleting file:', e);
           }
+        } else {
+          console.log(`⏭️ [WORKER] Attempt ${currentAttempt}/${attemptsLimit} - keeping file for retry`);
         }
         
         throw error;
