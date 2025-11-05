@@ -532,72 +532,94 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
     
         console.log(`✅ Validation complete - ${structuralElements.length} valid, ${errors.length} errors`);
 
-    // Start transaction for atomic operations
+    // Process elements in batches with separate transactions to avoid timeout
     const { DatabaseTransaction } = require('../utils/transaction');
-    const dbTransaction = new DatabaseTransaction();
+    const BATCH_SIZE = 100; // Process 100 elements per transaction batch
+    
+    let savedCount = 0;
+    let duplicateCount = 0;
+    let totalJobsCreated = 0;
+    
+    console.log(`💾 Processing ${structuralElements.length} structural elements...`);
     
     try {
-      await dbTransaction.start();
-      const session = dbTransaction.getSession();
-      
-      console.log(`💾 Saving ${structuralElements.length} elements with transaction protection...`);
-      
-      let savedCount = 0;
-      let duplicateCount = 0;
-      let totalJobsCreated = 0;
-      
-      // Process elements within transaction
-      for (let idx = 0; idx < structuralElements.length; idx++) {
-        const elementData = structuralElements[idx];
+      // Process in batches
+      for (let batchStart = 0; batchStart < structuralElements.length; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, structuralElements.length);
+        const batch = structuralElements.slice(batchStart, batchEnd);
+        const batchNum = Math.floor(batchStart / BATCH_SIZE) + 1;
+        const totalBatches = Math.ceil(structuralElements.length / BATCH_SIZE);
         
-        // Check for duplicate
-        const existingElement = await StructuralElement.findOne({
-          project: projectId,
-          structureNumber: elementData.structureNumber,
-          drawingNo: elementData.drawingNo,
-          level: elementData.level,
-          memberType: elementData.memberType,
-          gridNo: elementData.gridNo,
-          partMarkNo: elementData.partMarkNo
-        }).session(session);
+        // Start new transaction for this batch
+        const dbTransaction = new DatabaseTransaction();
         
-        if (existingElement) {
-          console.log(`⚠️  Skipping duplicate: ${elementData.structureNumber}`);
-          duplicateCount++;
-          continue;
-        }
-        
-        const structuralElement = new StructuralElement(elementData);
-        const saved = await structuralElement.save({ session });
-        dbTransaction.trackStructuralElement(saved._id);
-        
-        // Create fire proofing jobs if workflow assigned
-        if (saved.fireProofingWorkflow) {
-          const jobs = await createFireProofingJobs(saved, req.user.id, session);
-          totalJobsCreated += jobs.length;
-          jobs.forEach(job => dbTransaction.trackJob(job._id));
-        }
-        
-        savedCount++;
-        
-        // Log progress every 100 elements
-        if (savedCount % 100 === 0) {
-          console.log(`📊 Progress: ${savedCount}/${structuralElements.length} elements processed`);
+        try {
+          await dbTransaction.start();
+          const session = dbTransaction.getSession();
+          
+          let batchSaved = 0;
+          let batchDuplicates = 0;
+          let batchJobs = 0;
+          
+          // Process elements in this batch
+          for (let idx = 0; idx < batch.length; idx++) {
+            const elementData = batch[idx];
+            
+            // Check for duplicate
+            const existingElement = await StructuralElement.findOne({
+              project: projectId,
+              structureNumber: elementData.structureNumber,
+              drawingNo: elementData.drawingNo,
+              level: elementData.level,
+              memberType: elementData.memberType,
+              gridNo: elementData.gridNo,
+              partMarkNo: elementData.partMarkNo
+            }).session(session);
+            
+            if (existingElement) {
+              batchDuplicates++;
+              continue;
+            }
+            
+            const structuralElement = new StructuralElement(elementData);
+            const saved = await structuralElement.save({ session });
+            dbTransaction.trackStructuralElement(saved._id);
+            
+            // Create fire proofing jobs if workflow assigned
+            if (saved.fireProofingWorkflow) {
+              const jobs = await createFireProofingJobs(saved, req.user.id, session);
+              batchJobs += jobs.length;
+              jobs.forEach(job => dbTransaction.trackJob(job._id));
+            }
+            
+            batchSaved++;
+          }
+          
+          // Commit batch transaction
+          await dbTransaction.commit();
+          
+          savedCount += batchSaved;
+          duplicateCount += batchDuplicates;
+          totalJobsCreated += batchJobs;
+          
+          // Show percentage progress to customer
+          const percentComplete = Math.round(((batchStart + batch.length) / structuralElements.length) * 100);
+          console.log(`📊 Progress: ${percentComplete}% complete (${savedCount + duplicateCount}/${structuralElements.length} processed)`);
+          
+        } catch (batchError) {
+          console.error(`❌ Processing failed at ${Math.round((batchStart / structuralElements.length) * 100)}%:`, batchError.message);
+          await dbTransaction.rollback();
+          throw batchError; // Stop processing on batch failure
         }
       }
       
-      console.log(`✅ Saved ${savedCount} elements, ${duplicateCount} duplicates, ${totalJobsCreated} jobs created`);
+      console.log(`✅ Processing complete! ${savedCount} elements saved, ${duplicateCount} duplicates skipped, ${totalJobsCreated} jobs created`);
       
-      // Update project count within transaction
+      // Update project count (no transaction needed for this simple update)
       await Task.findByIdAndUpdate(
         projectId,
-        { $inc: { structuralElementsCount: savedCount } },
-        { session }
+        { $inc: { structuralElementsCount: savedCount } }
       );
-      
-      // Commit transaction - all or nothing!
-      await dbTransaction.commit();
-      console.log(`✅ Transaction committed successfully - ${savedCount} elements and ${totalJobsCreated} jobs saved atomically`);
       
       // Invalidate caches after successful commit
       await invalidateCache(`cache:jobs:project:${projectId}:*`);
@@ -626,14 +648,11 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
         totalRows: excelData.length
       });
       
-    } catch (txError) {
-      console.error(`❌ Transaction failed:`, txError);
+    } catch (batchError) {
+      console.error(`❌ Batch processing failed:`, batchError);
+      console.log(`⚠️  Partial data saved: ${savedCount}/${structuralElements.length} elements before failure`);
       
-      // Automatic rollback - nothing was saved!
-      await dbTransaction.rollback();
-      console.log(`🔙 Transaction rolled back - no data was saved to database`);
-      
-      throw txError;
+      throw batchError;
     }
 
   } catch (error) {
