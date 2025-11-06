@@ -6,7 +6,7 @@ import Navbar from '../components/Navbar';
 
 export default function Monitoring() {
   const handleOpenDashboard = () => {
-    window.open('https://projects.sapcindia.com/dashboard', '_blank');
+    window.open('https://status.sapcindia.com', '_blank');
   };
 
   return (
