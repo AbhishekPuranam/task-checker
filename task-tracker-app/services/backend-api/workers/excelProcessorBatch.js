@@ -61,91 +61,24 @@ function transformExcelRow(row, projectId, userId, project, subProjectId = null)
  * Create fire proofing jobs for a structural element
  */
 async function createFireProofingJobs(structuralElement, userId, session = null) {
-  const workflowJobs = {
-    'cement_fire_proofing': [
-      { title: 'Surface Preparation', order: 1 },
-      { title: 'Rockwool Filling', order: 2 },
-      { title: 'Adhesive coat/Primer', order: 3 },
-      { title: 'Vermiculite-Cement', order: 4 },
-      { title: 'Thickness inspection', order: 5 },
-      { title: 'Sealer coat', order: 6 },
-      { title: 'WIR', order: 7 },
-    ],
-    'gypsum_fire_proofing': [
-      { title: 'Surface Preparation', order: 1 },
-      { title: 'Rockwool Filling', order: 2 },
-      { title: 'Adhesive coat/Primer', order: 3 },
-      { title: 'Vermiculite-Gypsum', order: 4 },
-      { title: 'Thickness inspection', order: 5 },
-      { title: 'Sealer coat', order: 6 },
-      { title: 'WIR', order: 7 },
-    ],
-    'intumescent_coatings': [
-      { title: 'Surface Preparation', order: 1 },
-      { title: 'Primer', order: 2 },
-      { title: 'Coat -1', order: 3 },
-      { title: 'Coat-2', order: 4 },
-      { title: 'Coat-3', order: 5 },
-      { title: 'Coat-4', order: 6 },
-      { title: 'Coat-5', order: 7 },
-      { title: 'Thickness inspection', order: 8 },
-      { title: 'Top Coat', order: 9 },
-    ],
-    'refinery_fire_proofing': [
-      { title: 'Scaffolding Errection', order: 1 },
-      { title: 'Surface Preparation', order: 2 },
-      { title: 'Primer/Adhesive coat', order: 3 },
-      { title: 'Mesh', order: 4 },
-      { title: 'FP 1 Coat', order: 5 },
-      { title: 'FP Finish coat', order: 6 },
-      { title: 'Sealer', order: 7 },
-      { title: 'Top coat Primer', order: 8 },
-      { title: 'Top coat', order: 9 },
-      { title: 'Sealant', order: 10 },
-      { title: 'Inspection', order: 11 },
-      { title: 'Scaffolding -Dismantling', order: 12 },
-    ],
-  };
-
-  const jobs = workflowJobs[structuralElement.fireProofingWorkflow] || [];
-  const createdJobs = [];
-
-  for (const jobTemplate of jobs) {
-    let fireProofingType;
-    switch (structuralElement.fireProofingWorkflow) {
-      case 'cement_fire_proofing':
-        fireProofingType = 'Cement';
-        break;
-      case 'gypsum_fire_proofing':
-        fireProofingType = 'Gypsum';
-        break;
-      case 'intumescent_coatings':
-        fireProofingType = 'Intumescent';
-        break;
-      case 'refinery_fire_proofing':
-        fireProofingType = 'Refinery';
-        break;
-      default:
-        fireProofingType = 'Other';
-    }
-    
-    const job = new Job({
-      structuralElement: structuralElement._id,
-      project: structuralElement.project,
-      jobTitle: jobTemplate.title,
-      jobDescription: `${jobTemplate.title} for ${structuralElement.structureNumber}`,
-      jobType: structuralElement.fireProofingWorkflow,
-      orderIndex: jobTemplate.order * 100,
-      fireProofingType: fireProofingType,
-      status: 'pending',
-      createdBy: userId,
-    });
-
-    const saved = await job.save({ session });
-    createdJobs.push(saved);
+  // Use the standard Job.createPredefinedJobs method for consistency
+  if (!structuralElement.fireProofingWorkflow) {
+    return [];
   }
 
-  return createdJobs;
+  try {
+    const createdJobs = await Job.createPredefinedJobs(
+      structuralElement.fireProofingWorkflow,
+      structuralElement._id,
+      structuralElement.project,
+      userId
+    );
+    
+    return createdJobs;
+  } catch (error) {
+    console.error(`Error creating predefined jobs for element ${structuralElement.structureNumber}:`, error);
+    return [];
+  }
 }
 
 /**
