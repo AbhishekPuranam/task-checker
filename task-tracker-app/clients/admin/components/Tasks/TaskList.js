@@ -420,7 +420,7 @@ const ProjectList = () => {
                     if (user?.role === 'engineer') {
                       router.push(`/projects/${project._id}/jobs`);
                     } else {
-                      router.push(`/projects/${createSlug(project.title)}/elements`);
+                      router.push(`/projects/${project._id}`);
                     }
                   }}
                 >
