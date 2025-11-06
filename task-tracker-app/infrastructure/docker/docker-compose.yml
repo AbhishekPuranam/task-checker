@@ -236,36 +236,22 @@ services:
     image: louislam/uptime-kuma:1
     container_name: uptime-kuma
     restart: unless-stopped
-    ports:
-      - "3001:3001"
+    environment:
+      - UPTIME_KUMA_DISABLE_FRAME_SAMEORIGIN=true
     volumes:
       - uptime_kuma_data:/app/data
     networks:
       - tasktracker-network
     labels:
       - "traefik.enable=true"
-      # Middleware to strip /dashboard prefix
-      - "traefik.http.middlewares.uptime-stripprefix.stripprefix.prefixes=/dashboard"
-      - "traefik.http.middlewares.uptime-stripprefix.stripprefix.forceSlash=false"
-      # HTTP router for /dashboard (with stripprefix)
-      - "traefik.http.routers.uptime.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/dashboard`)"
-      - "traefik.http.routers.uptime.entrypoints=web"
-      - "traefik.http.routers.uptime.middlewares=uptime-stripprefix"
-      - "traefik.http.routers.uptime.priority=200"
-      # HTTPS router for /dashboard (with stripprefix)
-      - "traefik.http.routers.uptime-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/dashboard`)"
+      # HTTPS router - direct access without path manipulation
+      - "traefik.http.routers.uptime-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/uptime-kuma`)"
       - "traefik.http.routers.uptime-secure.entrypoints=websecure"
       - "traefik.http.routers.uptime-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.uptime-secure.middlewares=uptime-stripprefix"
       - "traefik.http.routers.uptime-secure.priority=200"
-      # Temporary root route for initial setup (higher priority)
-      - "traefik.http.routers.uptime-setup.rule=Host(`status.sapcindia.com`)"
-      - "traefik.http.routers.uptime-setup.entrypoints=web"
-      - "traefik.http.routers.uptime-setup.priority=300"
-      - "traefik.http.routers.uptime-setup-secure.rule=Host(`status.sapcindia.com`)"
-      - "traefik.http.routers.uptime-setup-secure.entrypoints=websecure"
-      - "traefik.http.routers.uptime-setup-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.uptime-setup-secure.priority=300"
+      # Middleware to strip the /uptime-kuma prefix
+      - "traefik.http.middlewares.uptime-strip.stripprefix.prefixes=/uptime-kuma"
+      - "traefik.http.routers.uptime-secure.middlewares=uptime-strip"
       - "traefik.http.services.uptime.loadbalancer.server.port=3001"
 
   # Traefik Reverse Proxy

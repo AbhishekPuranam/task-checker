@@ -29,7 +29,7 @@ export default function Monitoring() {
           }}
         >
           <iframe
-            src="https://status.sapcindia.com"
+            src="/uptime-kuma/"
             style={{
               width: '100%',
               height: '100%',
