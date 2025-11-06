@@ -52,9 +52,23 @@ export default function SubProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [loadingGroups, setLoadingGroups] = useState(false);
   
-  // Pagination state
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  // Pagination state - per group
+  const [groupPages, setGroupPages] = useState({});
+  const [groupRowsPerPage, setGroupRowsPerPage] = useState({});
+  
+  // Get pagination for specific group
+  const getGroupPage = (groupIndex) => groupPages[groupIndex] || 0;
+  const getGroupRowsPerPage = (groupIndex) => groupRowsPerPage[groupIndex] || 10;
+  
+  // Pagination handlers for groups
+  const handleGroupPageChange = (groupIndex, newPage) => {
+    setGroupPages(prev => ({ ...prev, [groupIndex]: newPage }));
+  };
+  
+  const handleGroupRowsPerPageChange = (groupIndex, event) => {
+    setGroupRowsPerPage(prev => ({ ...prev, [groupIndex]: parseInt(event.target.value, 10) }));
+    setGroupPages(prev => ({ ...prev, [groupIndex]: 0 }));
+  };
   
   // Column visibility state
   const [visibleColumns, setVisibleColumns] = useState({
@@ -207,7 +221,8 @@ export default function SubProjectDetail() {
           groupBy,
           subGroupBy: subGroupBy || undefined,
           page: 1,
-          limit: 100
+          limit: 10000, // Fetch all elements
+          includeElements: true // Request full element details
         },
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -235,16 +250,6 @@ export default function SubProjectDetail() {
       console.error('Error downloading report:', err);
       alert('Failed to download report');
     }
-  };
-  
-  // Pagination handlers
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-  
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
   };
   
   // Column visibility handlers
@@ -634,11 +639,11 @@ export default function SubProjectDetail() {
                   </Box>
                 </Box>
 
-                {/* Sample Elements */}
+                {/* All Elements */}
                 {group.elements && group.elements.length > 0 && (
                   <Box sx={{ mt: 2 }}>
                     <Typography variant="body2" fontWeight="600" sx={{ color: '#333', mb: 1 }}>
-                      Elements (showing {Math.min(rowsPerPage, group.elements.length)} of {group.count}):
+                      All Elements ({group.elements.length} total):
                     </Typography>
                     <Box sx={{ overflowX: 'auto' }}>
                       <table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
@@ -653,7 +658,10 @@ export default function SubProjectDetail() {
                         </thead>
                         <tbody>
                           {group.elements
-                            .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                            .slice(
+                              getGroupPage(index) * getGroupRowsPerPage(index), 
+                              getGroupPage(index) * getGroupRowsPerPage(index) + getGroupRowsPerPage(index)
+                            )
                             .map((element) => (
                               <tr key={element._id} style={{ borderBottom: '1px solid #f0f0f0' }}>
                                 {getVisibleColumns().map((column) => (
@@ -672,11 +680,11 @@ export default function SubProjectDetail() {
                       <TablePagination
                         component="div"
                         count={group.elements.length}
-                        page={page}
-                        onPageChange={handleChangePage}
-                        rowsPerPage={rowsPerPage}
-                        onRowsPerPageChange={handleChangeRowsPerPage}
-                        rowsPerPageOptions={[5, 10, 25, 50]}
+                        page={getGroupPage(index)}
+                        onPageChange={(event, newPage) => handleGroupPageChange(index, newPage)}
+                        rowsPerPage={getGroupRowsPerPage(index)}
+                        onRowsPerPageChange={(event) => handleGroupRowsPerPageChange(index, event)}
+                        rowsPerPageOptions={[5, 10, 25, 50, 100]}
                         sx={{ borderTop: '1px solid #e0e0e0', mt: 1 }}
                       />
                     )}
