@@ -166,35 +166,38 @@ router.post('/elements', auth, async (req, res) => {
         
         const total = countResults[0]?.total || 0;
         
-        // Fetch jobs for all elements in the groups
+        // Fetch ALL jobs for all elements in the groups
         const allElementIds = groupResults.flatMap(group => 
           group.elements.map(el => el._id)
         );
         
-        // Get current (pending) job for each element
+        // Get ALL jobs for each element (not just pending/in_progress)
         const jobs = await Job.find({
-          structuralElement: { $in: allElementIds },
-          status: { $in: ['pending', 'in_progress'] }
+          structuralElement: { $in: allElementIds }
         })
-        .sort({ orderIndex: 1 })
-        .limit(allElementIds.length)
+        .sort({ orderIndex: 1, stepNumber: 1, createdAt: 1 })
         .lean();
         
-        // Create a map of elementId -> currentJob
+        // Create a map of elementId -> jobs array
         const jobMap = {};
         jobs.forEach(job => {
           const elementId = job.structuralElement.toString();
           if (!jobMap[elementId]) {
-            jobMap[elementId] = job;
+            jobMap[elementId] = [];
           }
+          jobMap[elementId].push(job);
         });
         
-        // Add job information to elements
+        // Add ALL jobs information to elements
         groupResults.forEach(group => {
-          group.elements = group.elements.map(element => ({
-            ...element,
-            currentJob: jobMap[element._id.toString()] || null
-          }));
+          group.elements = group.elements.map(element => {
+            const elementJobs = jobMap[element._id.toString()] || [];
+            return {
+              ...element,
+              jobs: elementJobs, // Array of all jobs
+              currentJob: elementJobs.find(j => ['pending', 'in_progress'].includes(j.status)) || null // Current active job
+            };
+          });
         });
         
         // Calculate totals across all groups

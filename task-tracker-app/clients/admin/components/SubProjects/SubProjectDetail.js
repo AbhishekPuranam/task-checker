@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import { titleToSlug, getSubProjectUrl } from '../../utils/slug';
+import JobManagementDialog from '../Jobs/JobManagementDialog';
 import {
   Container,
   Box,
@@ -66,6 +67,7 @@ export default function SubProjectDetail() {
   const [selectedElement, setSelectedElement] = useState(null);
   const [statusDialog, setStatusDialog] = useState({ open: false, status: '' });
   const [jobDialog, setJobDialog] = useState({ open: false, mode: 'add', job: {} });
+  const [jobManagementDialog, setJobManagementDialog] = useState({ open: false, element: null });
   
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -186,6 +188,7 @@ export default function SubProjectDetail() {
     status: true,
     fireProofingWorkflow: true,
     currentJob: true,
+    jobs: true,
     jobProgress: true,
     actions: true
   });
@@ -212,6 +215,7 @@ export default function SubProjectDetail() {
     { key: 'status', label: 'Status' },
     { key: 'fireProofingWorkflow', label: 'FP Workflow' },
     { key: 'currentJob', label: 'Current Job' },
+    { key: 'jobs', label: 'All Jobs' },
     { key: 'jobProgress', label: 'Job Progress' },
     { key: 'actions', label: 'Actions' }
   ];
@@ -417,6 +421,8 @@ export default function SubProjectDetail() {
         return element.fireProofingWorkflow || '-';
       case 'currentJob':
         return element.currentJob?.jobTitle || '-';
+      case 'jobs':
+        return element.jobs?.length || 0;
       case 'jobProgress':
         return element.currentJob?.status || '-';
       case 'actions':
@@ -891,6 +897,20 @@ export default function SubProjectDetail() {
                                       >
                                         <MoreVertIcon />
                                       </IconButton>
+                                    ) : column.key === 'jobs' ? (
+                                      <Button
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={() => setJobManagementDialog({ open: true, element })}
+                                        sx={{ 
+                                          minWidth: '80px',
+                                          fontWeight: 'bold',
+                                          color: element.jobs?.length > 0 ? 'primary.main' : 'text.disabled',
+                                          borderColor: element.jobs?.length > 0 ? 'primary.main' : 'divider'
+                                        }}
+                                      >
+                                        {element.jobs?.length || 0} Job{element.jobs?.length !== 1 ? 's' : ''}
+                                      </Button>
                                     ) : (
                                       getCellValue(element, column.key)
                                     )}
@@ -1109,6 +1129,19 @@ export default function SubProjectDetail() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Job Management Dialog */}
+      <JobManagementDialog
+        open={jobManagementDialog.open}
+        onClose={() => setJobManagementDialog({ open: false, element: null })}
+        element={jobManagementDialog.element}
+        onJobsUpdated={() => {
+          // Refresh data after jobs are updated
+          if (groupBy && subProject?._id) {
+            fetchGroupedData();
+          }
+        }}
+      />
     </Box>
   );
 }

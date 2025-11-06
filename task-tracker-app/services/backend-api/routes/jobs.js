@@ -1077,4 +1077,175 @@ router.get('/stats/dashboard', auth, async (req, res) => {
   }
 });
 
+// PATCH /:id/status - Update only job status (for quick status changes)
+router.patch('/:id/status', auth, async (req, res) => {
+  try {
+    const jobId = req.params.id;
+    const { status } = req.body;
+    
+    if (!status) {
+      return res.status(400).json({ message: 'Status is required' });
+    }
+    
+    const validStatuses = ['pending', 'in_progress', 'completed', 'on_hold', 'cancelled', 'not_applicable'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+    }
+
+    // Find the job
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+
+    // Check permissions
+    const canUpdate = req.user.role === 'admin' || 
+                     req.user.role === 'site-engineer' ||
+                     job.createdBy.toString() === req.user.id || 
+                     (job.assignedTo && job.assignedTo.toString() === req.user.id);
+    
+    if (!canUpdate) {
+      return res.status(403).json({ message: 'Not authorized to update this job' });
+    }
+
+    // Update status and related fields
+    const updates = { status };
+    if (status === 'completed') {
+      updates.completedDate = new Date();
+      updates.progressPercentage = 100;
+    } else if (status === 'not_applicable' || status === 'cancelled') {
+      updates.completedDate = new Date();
+    }
+
+    const updatedJob = await Job.findByIdAndUpdate(
+      jobId,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).populate([
+      { path: 'structuralElement', select: 'structureNumber memberType partMarkNo status' },
+      { path: 'assignedTo', select: 'name email' },
+      { path: 'createdBy', select: 'name email' }
+    ]);
+
+    // Invalidate cache
+    await invalidateCache(`cache:jobs:project:${updatedJob.project}:*`);
+    await invalidateCache(`cache:stats:project:${updatedJob.project}`);
+    if (updatedJob.structuralElement) {
+      await invalidateCache(`cache:structural:jobs:${updatedJob.structuralElement._id || updatedJob.structuralElement}`);
+      await invalidateCache(`cache:structural:summary:${updatedJob.project}:*`);
+    }
+
+    // Trigger progress calculation if job was completed
+    if (status === 'completed') {
+      addProgressJob(updatedJob.project.toString()).catch(err => 
+        console.error('Failed to queue progress job:', err)
+      );
+    }
+
+    res.json(updatedJob);
+  } catch (error) {
+    console.error('Error updating job status:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// POST /custom - Create a custom job and insert it at specific position
+router.post('/custom', auth, async (req, res) => {
+  try {
+    const {
+      structuralElement,
+      project,
+      jobTitle,
+      jobDescription,
+      parentFireproofingType,
+      insertAfterJobId, // Insert after this job (optional)
+      assignedTo,
+      dueDate,
+      priority = 'medium'
+    } = req.body;
+
+    // Validate required fields
+    if (!structuralElement || !project || !jobTitle || !jobDescription) {
+      return res.status(400).json({ 
+        message: 'structuralElement, project, jobTitle, and jobDescription are required' 
+      });
+    }
+
+    // Verify structural element exists
+    const element = await StructuralElement.findById(structuralElement);
+    if (!element) {
+      return res.status(404).json({ message: 'Structural element not found' });
+    }
+
+    // Get all jobs for this element to determine orderIndex
+    const existingJobs = await Job.find({ structuralElement })
+      .sort({ orderIndex: 1 })
+      .lean();
+
+    let newOrderIndex = 0;
+
+    if (insertAfterJobId) {
+      // Find the job to insert after
+      const insertAfterJob = existingJobs.find(j => j._id.toString() === insertAfterJobId);
+      if (!insertAfterJob) {
+        return res.status(404).json({ message: 'Job to insert after not found' });
+      }
+
+      // Set new order index between the job and the next one
+      const insertAfterIndex = insertAfterJob.orderIndex;
+      const nextJob = existingJobs.find(j => j.orderIndex > insertAfterIndex);
+      
+      if (nextJob) {
+        // Insert between two jobs - use average
+        newOrderIndex = (insertAfterIndex + nextJob.orderIndex) / 2;
+      } else {
+        // Insert at the end
+        newOrderIndex = insertAfterIndex + 1;
+      }
+    } else {
+      // Insert at the end
+      if (existingJobs.length > 0) {
+        const maxOrderIndex = Math.max(...existingJobs.map(j => j.orderIndex));
+        newOrderIndex = maxOrderIndex + 1;
+      }
+    }
+
+    // Create the custom job
+    const customJob = new Job({
+      structuralElement,
+      project,
+      jobTitle,
+      jobDescription,
+      jobType: 'custom',
+      parentFireproofingType: parentFireproofingType || element.fireProofingWorkflow,
+      status: 'pending',
+      priority,
+      orderIndex: newOrderIndex,
+      createdBy: req.user.id,
+      assignedTo: assignedTo || null,
+      dueDate: dueDate || null
+    });
+
+    await customJob.save();
+
+    // Populate the job
+    const populatedJob = await Job.findById(customJob._id).populate([
+      { path: 'structuralElement', select: 'structureNumber memberType partMarkNo' },
+      { path: 'assignedTo', select: 'name email' },
+      { path: 'createdBy', select: 'name email' }
+    ]);
+
+    // Invalidate cache
+    await invalidateCache(`cache:jobs:project:${project}:*`);
+    await invalidateCache(`cache:stats:project:${project}`);
+    await invalidateCache(`cache:structural:jobs:${structuralElement}`);
+    await invalidateCache(`cache:structural:summary:${project}:*`);
+
+    res.status(201).json(populatedJob);
+  } catch (error) {
+    console.error('Error creating custom job:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 module.exports = router;
