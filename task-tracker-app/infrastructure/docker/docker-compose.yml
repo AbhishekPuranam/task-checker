@@ -242,15 +242,19 @@ services:
       - tasktracker-network
     labels:
       - "traefik.enable=true"
-      # Route all /dashboard/* to Uptime Kuma WITHOUT stripping prefix
+      # HTTP router - redirect to HTTPS
       - "traefik.http.routers.uptime.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/dashboard`)"
       - "traefik.http.routers.uptime.entrypoints=web"
       - "traefik.http.routers.uptime.priority=200"
+      - "traefik.http.routers.uptime.middlewares=redirect-to-https@docker"
       # HTTPS router
       - "traefik.http.routers.uptime-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/dashboard`)"
       - "traefik.http.routers.uptime-secure.entrypoints=websecure"
       - "traefik.http.routers.uptime-secure.tls.certresolver=letsencrypt"
       - "traefik.http.routers.uptime-secure.priority=200"
+      # HTTPS redirect middleware
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
       - "traefik.http.services.uptime.loadbalancer.server.port=3001"
 
   # Traefik Reverse Proxy
