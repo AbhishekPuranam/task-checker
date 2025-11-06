@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import { titleToSlug, getSubProjectUrl } from '../../utils/slug';
-import JobManagementDialog from '../Jobs/JobManagementDialog';
 import {
   Container,
   Box,
@@ -26,14 +25,9 @@ import {
   Switch,
   FormControlLabel,
   IconButton,
-  Tooltip,
-  Menu,
-  TextField
+  Tooltip
 } from '@mui/material';
-import { 
-  ArrowBack, Download, ViewModule as ViewModuleIcon, Settings as SettingsIcon,
-  MoreVert as MoreVertIcon, CheckCircle, Cancel, Edit, AddCircle 
-} from '@mui/icons-material';
+import { ArrowBack, Download, ViewModule as ViewModuleIcon, Settings as SettingsIcon } from '@mui/icons-material';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -58,21 +52,11 @@ export default function SubProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [loadingGroups, setLoadingGroups] = useState(false);
   
-    // Pagination state for grouped data
+  // Pagination state - per group
   const [groupPages, setGroupPages] = useState({});
   const [groupRowsPerPage, setGroupRowsPerPage] = useState({});
   
-  // Job action states
-  const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
-  const [selectedElement, setSelectedElement] = useState(null);
-  const [statusDialog, setStatusDialog] = useState({ open: false, status: '' });
-  const [jobDialog, setJobDialog] = useState({ open: false, mode: 'add', job: {} });
-  const [jobManagementDialog, setJobManagementDialog] = useState({ open: false, element: null });
-  
-  // Search state
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Pagination helpers
+  // Get pagination for specific group
   const getGroupPage = (groupIndex) => groupPages[groupIndex] || 0;
   const getGroupRowsPerPage = (groupIndex) => groupRowsPerPage[groupIndex] || 25;
   
@@ -85,96 +69,8 @@ export default function SubProjectDetail() {
     setGroupRowsPerPage(prev => ({ ...prev, [groupIndex]: parseInt(event.target.value, 10) }));
     setGroupPages(prev => ({ ...prev, [groupIndex]: 0 }));
   };
-
-  // Job action handlers
-  const handleActionMenuOpen = (event, element) => {
-    setActionMenuAnchor(event.currentTarget);
-    setSelectedElement(element);
-  };
-
-  const handleActionMenuClose = () => {
-    setActionMenuAnchor(null);
-  };
-
-  const handleStatusChange = async (status) => {
-    handleActionMenuClose();
-    setStatusDialog({ open: true, status });
-  };
-
-  const confirmStatusChange = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      await axios.put(
-        `${API_URL}/structuralElements/${selectedElement._id}`,
-        { status: statusDialog.status },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
-      setStatusDialog({ open: false, status: '' });
-      setSelectedElement(null);
-      
-      // Refresh data
-      await fetchGroupedData();
-      await fetchData();
-      
-      alert('Status updated successfully');
-    } catch (err) {
-      console.error('Error updating status:', err);
-      alert('Failed to update status: ' + (err.response?.data?.message || err.message));
-    }
-  };
-
-  const handleEditJob = () => {
-    handleActionMenuClose();
-    if (selectedElement.currentJob) {
-      setJobDialog({ 
-        open: true, 
-        mode: 'edit', 
-        job: selectedElement.currentJob 
-      });
-    }
-  };
-
-  const handleAddJob = () => {
-    handleActionMenuClose();
-    setJobDialog({ 
-      open: true, 
-      mode: 'add', 
-      job: { 
-        jobTitle: '', 
-        jobDescription: '', 
-        structuralElement: selectedElement._id 
-      } 
-    });
-  };
-
-  const handleJobSave = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const endpoint = jobDialog.mode === 'add' 
-        ? `${API_URL}/jobs`
-        : `${API_URL}/jobs/${jobDialog.job._id}`;
-      
-      const method = jobDialog.mode === 'add' ? 'post' : 'put';
-      
-      await axios[method](endpoint, jobDialog.job, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      setJobDialog({ open: false, mode: 'add', job: {} });
-      setSelectedElement(null);
-      
-      // Refresh data
-      await fetchGroupedData();
-      
-      alert(`Job ${jobDialog.mode === 'add' ? 'added' : 'updated'} successfully`);
-    } catch (err) {
-      console.error('Error saving job:', err);
-      alert('Failed to save job');
-    }
-  };
   
-  // Column visibility handlers
+  // Column visibility state
   const [visibleColumns, setVisibleColumns] = useState({
     serialNo: true,
     structureNumber: true,
@@ -188,9 +84,7 @@ export default function SubProjectDetail() {
     status: true,
     fireProofingWorkflow: true,
     currentJob: true,
-    jobs: true,
-    jobProgress: true,
-    actions: true
+    jobProgress: true
   });
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   
@@ -215,9 +109,7 @@ export default function SubProjectDetail() {
     { key: 'status', label: 'Status' },
     { key: 'fireProofingWorkflow', label: 'FP Workflow' },
     { key: 'currentJob', label: 'Current Job' },
-    { key: 'jobs', label: 'All Jobs' },
-    { key: 'jobProgress', label: 'Job Progress' },
-    { key: 'actions', label: 'Actions' }
+    { key: 'jobProgress', label: 'Job Progress' }
   ];
 
   useEffect(() => {
@@ -421,33 +313,11 @@ export default function SubProjectDetail() {
         return element.fireProofingWorkflow || '-';
       case 'currentJob':
         return element.currentJob?.jobTitle || '-';
-      case 'jobs':
-        return element.jobs?.length || 0;
       case 'jobProgress':
         return element.currentJob?.status || '-';
-      case 'actions':
-        return null; // Actions will be rendered separately
       default:
         return '';
     }
-  };
-
-  // Search filter function
-  const filterElementsBySearch = (elements) => {
-    if (!searchQuery || searchQuery.trim() === '') {
-      return elements;
-    }
-
-    const query = searchQuery.toLowerCase().trim();
-    
-    return elements.filter(element => {
-      // Search across all visible columns
-      return getVisibleColumns().some(column => {
-        const value = getCellValue(element, column.key);
-        if (value === null || value === undefined) return false;
-        return String(value).toLowerCase().includes(query);
-      });
-    });
   };
 
   if (loading) {
@@ -687,30 +557,6 @@ export default function SubProjectDetail() {
           </Box>
           
           <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Search across all columns"
-                placeholder="Type to search in serial no, structure, drawing, level, etc..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                variant="outlined"
-                sx={{ 
-                  mb: 2,
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: 'white'
-                  }
-                }}
-                InputProps={{
-                  startAdornment: (
-                    <Box sx={{ mr: 1, color: 'text.secondary' }}>
-                      🔍
-                    </Box>
-                  )
-                }}
-              />
-            </Grid>
-
             <Grid item xs={12} md={6}>
               <FormControl fullWidth>
                 <InputLabel>Group By</InputLabel>
@@ -785,59 +631,8 @@ export default function SubProjectDetail() {
               Grouped Results ({groupedData.groups?.length || 0} groups)
             </Typography>
 
-            {/* Current View Metrics */}
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid item xs={6} md={4}>
-                <Box sx={{ 
-                  background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
-                  p: 2,
-                  borderRadius: 2,
-                  border: '1px solid #90caf9'
-                }}>
-                  <Typography variant="h5" fontWeight="bold" sx={{ color: '#1565c0', mb: 0.5 }}>
-                    {groupedData.totalElements || 0}
-                  </Typography>
-                  <Typography variant="body2" fontWeight="medium" sx={{ color: '#1976d2' }}>
-                    Total Elements (Current View)
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={6} md={4}>
-                <Box sx={{ 
-                  background: 'linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%)',
-                  p: 2,
-                  borderRadius: 2,
-                  border: '1px solid #ce93d8'
-                }}>
-                  <Typography variant="h5" fontWeight="bold" sx={{ color: '#6a1b9a', mb: 0.5 }}>
-                    {groupedData.totalSqm?.toFixed(2) || '0.00'}
-                  </Typography>
-                  <Typography variant="body2" fontWeight="medium" sx={{ color: '#7b1fa2' }}>
-                    Total SQM (Current View)
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={6} md={4}>
-                <Box sx={{ 
-                  background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
-                  p: 2,
-                  borderRadius: 2,
-                  border: '1px solid #ffb74d'
-                }}>
-                  <Typography variant="h5" fontWeight="bold" sx={{ color: '#e65100', mb: 0.5 }}>
-                    {groupedData.totalQty || 0}
-                  </Typography>
-                  <Typography variant="body2" fontWeight="medium" sx={{ color: '#ef6c00' }}>
-                    Total Quantity (Current View)
-                  </Typography>
-                </Box>
-              </Grid>
-            </Grid>
-
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {groupedData.groups?.map((group, index) => {
-              const filteredGroupElements = filterElementsBySearch(group.elements);
-              return (
+            {groupedData.groups?.map((group, index) => (
               <Paper key={index} sx={{ p: 3, border: '1px solid #e0e0e0', borderRadius: 2 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
                   <Typography variant="h6" fontWeight="600">
@@ -850,7 +645,7 @@ export default function SubProjectDetail() {
                   </Typography>
                   <Box sx={{ textAlign: 'right' }}>
                     <Typography variant="body2" sx={{ color: '#666' }}>
-                      {searchQuery ? `${filteredGroupElements.length} of ${group.count}` : group.count} elements • {group.totalSqm?.toFixed(2)} SQM
+                      {group.count} elements • {group.totalSqm?.toFixed(2)} SQM
                     </Typography>
                     {group.totalQty > 0 && (
                       <Typography variant="body2" sx={{ color: '#666' }}>
@@ -861,12 +656,10 @@ export default function SubProjectDetail() {
                 </Box>
 
                 {/* All Elements */}
-                {group.elements && group.elements.length > 0 && (() => {
-                  const filteredElements = filterElementsBySearch(group.elements);
-                  return (
+                {group.elements && group.elements.length > 0 && (
                   <Box sx={{ mt: 2 }}>
                     <Typography variant="body2" fontWeight="600" sx={{ color: '#333', mb: 1 }}>
-                      All Elements ({filteredElements.length} {searchQuery ? `of ${group.elements.length}` : ''} total):
+                      All Elements ({group.elements.length} total):
                     </Typography>
                     <Box sx={{ overflowX: 'auto' }}>
                       <table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
@@ -880,7 +673,7 @@ export default function SubProjectDetail() {
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredElements
+                          {group.elements
                             .slice(
                               getGroupPage(index) * getGroupRowsPerPage(index), 
                               getGroupPage(index) * getGroupRowsPerPage(index) + getGroupRowsPerPage(index)
@@ -889,31 +682,7 @@ export default function SubProjectDetail() {
                               <tr key={element._id} style={{ borderBottom: '1px solid #f0f0f0' }}>
                                 {getVisibleColumns().map((column) => (
                                   <td key={column.key} style={{ padding: '8px 12px' }}>
-                                    {column.key === 'actions' ? (
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => handleActionMenuOpen(e, element)}
-                                        sx={{ color: '#6a11cb' }}
-                                      >
-                                        <MoreVertIcon />
-                                      </IconButton>
-                                    ) : column.key === 'jobs' ? (
-                                      <Button
-                                        size="small"
-                                        variant="outlined"
-                                        onClick={() => setJobManagementDialog({ open: true, element })}
-                                        sx={{ 
-                                          minWidth: '80px',
-                                          fontWeight: 'bold',
-                                          color: element.jobs?.length > 0 ? 'primary.main' : 'text.disabled',
-                                          borderColor: element.jobs?.length > 0 ? 'primary.main' : 'divider'
-                                        }}
-                                      >
-                                        {element.jobs?.length || 0} Job{element.jobs?.length !== 1 ? 's' : ''}
-                                      </Button>
-                                    ) : (
-                                      getCellValue(element, column.key)
-                                    )}
+                                    {getCellValue(element, column.key)}
                                   </td>
                                 ))}
                               </tr>
@@ -925,7 +694,7 @@ export default function SubProjectDetail() {
                     {/* Pagination */}
                     <TablePagination
                       component="div"
-                      count={filteredElements.length}
+                      count={group.elements.length}
                       page={getGroupPage(index)}
                       onPageChange={(event, newPage) => handleGroupPageChange(index, newPage)}
                       rowsPerPage={getGroupRowsPerPage(index)}
@@ -934,11 +703,9 @@ export default function SubProjectDetail() {
                       sx={{ borderTop: '1px solid #e0e0e0', mt: 1 }}
                     />
                   </Box>
-                  );
-                })()}
+                )}
               </Paper>
-              );
-            })}
+            ))}
             </Box>
           </Paper>
         )}
@@ -1011,8 +778,7 @@ export default function SubProjectDetail() {
                 gridNo: true,
                 sectionSizes: true,
                 surfaceAreaSqm: true,
-                qty: true,
-                actions: true
+                qty: true
               });
             }}
           >
@@ -1026,122 +792,6 @@ export default function SubProjectDetail() {
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Action Menu */}
-      <Menu
-        anchorEl={actionMenuAnchor}
-        open={Boolean(actionMenuAnchor)}
-        onClose={handleActionMenuClose}
-      >
-        <MenuItem onClick={() => handleStatusChange('complete')}>
-          <CheckCircle sx={{ mr: 1, color: 'green' }} />
-          Mark Complete
-        </MenuItem>
-        <MenuItem onClick={() => handleStatusChange('non_clearance')}>
-          <Cancel sx={{ mr: 1, color: 'orange' }} />
-          Mark Non-Clearance
-        </MenuItem>
-        <MenuItem onClick={handleEditJob} disabled={!selectedElement?.currentJob}>
-          <Edit sx={{ mr: 1, color: 'blue' }} />
-          Edit Job
-        </MenuItem>
-        <MenuItem onClick={handleAddJob}>
-          <AddCircle sx={{ mr: 1, color: 'purple' }} />
-          Add Custom Job
-        </MenuItem>
-      </Menu>
-
-      {/* Status Change Confirmation Dialog */}
-      <Dialog
-        open={statusDialog.open}
-        onClose={() => setStatusDialog({ open: false, status: '' })}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Confirm Status Change</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Are you sure you want to mark this element as{' '}
-            <strong>{statusDialog.status === 'complete' ? 'Complete' : 'Non-Clearance'}</strong>?
-          </Typography>
-          {selectedElement && (
-            <Box sx={{ mt: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
-              <Typography variant="body2"><strong>Serial No:</strong> {selectedElement.serialNo}</Typography>
-              <Typography variant="body2"><strong>Structure:</strong> {selectedElement.structureNumber}</Typography>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setStatusDialog({ open: false, status: '' })}>
-            Cancel
-          </Button>
-          <Button onClick={confirmStatusChange} variant="contained" color="primary">
-            Confirm
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Job Dialog */}
-      <Dialog
-        open={jobDialog.open}
-        onClose={() => setJobDialog({ open: false, mode: 'add', job: {} })}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          {jobDialog.mode === 'add' ? 'Add Custom Job' : 'Edit Job'}
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              label="Job Title"
-              fullWidth
-              value={jobDialog.job.jobTitle || ''}
-              onChange={(e) => setJobDialog(prev => ({
-                ...prev,
-                job: { ...prev.job, jobTitle: e.target.value }
-              }))}
-            />
-            <TextField
-              label="Job Description"
-              fullWidth
-              multiline
-              rows={3}
-              value={jobDialog.job.jobDescription || ''}
-              onChange={(e) => setJobDialog(prev => ({
-                ...prev,
-                job: { ...prev.job, jobDescription: e.target.value }
-              }))}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setJobDialog({ open: false, mode: 'add', job: {} })}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleJobSave} 
-            variant="contained" 
-            color="primary"
-            disabled={!jobDialog.job.jobTitle}
-          >
-            {jobDialog.mode === 'add' ? 'Add Job' : 'Save Changes'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Job Management Dialog */}
-      <JobManagementDialog
-        open={jobManagementDialog.open}
-        onClose={() => setJobManagementDialog({ open: false, element: null })}
-        element={jobManagementDialog.element}
-        onJobsUpdated={() => {
-          // Refresh data after jobs are updated
-          if (groupBy && subProject?._id) {
-            fetchGroupedData();
-          }
-        }}
-      />
     </Box>
   );
 }

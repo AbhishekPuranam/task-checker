@@ -19,6 +19,7 @@ import {
   AdminPanelSettings,
   Logout,
   MenuBook,
+  MonitorHeart,
 } from '@mui/icons-material';
 import { useRouter } from 'next/router';
 import { useAuth } from '../contexts/AuthContext';
@@ -113,6 +114,16 @@ const Navbar = () => {
               onClick={() => router.push('/users')}
             >
               User Management
+            </Button>
+          )}
+
+          {user?.role === 'admin' && (
+            <Button
+              color="inherit"
+              startIcon={<MonitorHeart />}
+              onClick={() => router.push('/monitoring')}
+            >
+              Monitoring
             </Button>
           )}
 

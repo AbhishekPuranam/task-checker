@@ -236,25 +236,23 @@ services:
     image: louislam/uptime-kuma:1
     container_name: uptime-kuma
     restart: unless-stopped
+    environment:
+      - UPTIME_KUMA_BASE_URL=/dashboard
     volumes:
       - uptime_kuma_data:/app/data
     networks:
       - tasktracker-network
     labels:
       - "traefik.enable=true"
-      # HTTP router - redirect to HTTPS
+      # Route all /dashboard/* to Uptime Kuma (without stripping)
       - "traefik.http.routers.uptime.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/dashboard`)"
       - "traefik.http.routers.uptime.entrypoints=web"
       - "traefik.http.routers.uptime.priority=200"
-      - "traefik.http.routers.uptime.middlewares=redirect-to-https@docker"
       # HTTPS router
       - "traefik.http.routers.uptime-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/dashboard`)"
       - "traefik.http.routers.uptime-secure.entrypoints=websecure"
       - "traefik.http.routers.uptime-secure.tls.certresolver=letsencrypt"
       - "traefik.http.routers.uptime-secure.priority=200"
-      # HTTPS redirect middleware
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
       - "traefik.http.services.uptime.loadbalancer.server.port=3001"
 
   # Traefik Reverse Proxy
