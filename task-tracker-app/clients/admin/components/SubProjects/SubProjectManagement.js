@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
+import { titleToSlug } from '../../utils/slug';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -32,19 +33,37 @@ export default function SubProjectManagement() {
       setLoading(true);
       const token = localStorage.getItem('token');
       
-      const [projectRes, subProjectsRes, statsRes] = await Promise.all([
-        axios.get(`${API_URL}/projects/${projectId}`, {
+      // Check if projectId looks like a MongoDB ObjectId (24 hex characters)
+      const isMongoId = /^[0-9a-fA-F]{24}$/.test(projectId);
+      const projectEndpoint = isMongoId 
+        ? `${API_URL}/projects/${projectId}`
+        : `${API_URL}/projects/by-name/${encodeURIComponent(projectId)}`;
+      
+      // First, fetch the project to get the actual ID
+      const projectRes = await axios.get(projectEndpoint, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      const fetchedProject = projectRes.data;
+      const actualProjectId = fetchedProject._id;
+      
+      // Update URL to use slug if we got an ID-based URL
+      if (isMongoId && fetchedProject.title) {
+        const slug = titleToSlug(fetchedProject.title);
+        router.replace(`/projects/${slug}`, undefined, { shallow: true });
+      }
+      
+      // Now fetch subprojects and stats using the actual project ID
+      const [subProjectsRes, statsRes] = await Promise.all([
+        axios.get(`${API_URL}/subprojects/project/${actualProjectId}`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
-        axios.get(`${API_URL}/subprojects/project/${projectId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get(`${API_URL}/subprojects/project/${projectId}/statistics`, {
+        axios.get(`${API_URL}/subprojects/project/${actualProjectId}/statistics`, {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);
 
-      setProject(projectRes.data);
+      setProject(fetchedProject);
       setSubProjects(subProjectsRes.data.subProjects || []);
       setProjectStats(statsRes.data);
       setError(null);
@@ -59,12 +78,14 @@ export default function SubProjectManagement() {
   const handleCreateSubProject = async (e) => {
     e.preventDefault();
     
+    if (!project) return;
+    
     try {
       const token = localStorage.getItem('token');
       await axios.post(
         `${API_URL}/subprojects`,
         {
-          projectId,
+          projectId: project._id,
           ...newSubProject
         },
         {
@@ -82,19 +103,25 @@ export default function SubProjectManagement() {
   };
 
   const navigateToSubProject = (subProjectId) => {
-    router.push(`/projects/${projectId}/subprojects/${subProjectId}`);
+    if (!project) return;
+    const slug = titleToSlug(project.title);
+    router.push(`/projects/${slug}/subprojects/${subProjectId}`);
   };
 
   const navigateToExcelUpload = (subProjectId) => {
-    router.push(`/projects/${projectId}/subprojects/${subProjectId}/upload`);
+    if (!project) return;
+    const slug = titleToSlug(project.title);
+    router.push(`/projects/${slug}/subprojects/${subProjectId}/upload`);
   };
 
   const downloadReport = async (subProjectId, status = null) => {
+    if (!project) return;
+    
     try {
       const token = localStorage.getItem('token');
       const url = subProjectId
         ? `${API_URL}/reports/excel/subproject/${subProjectId}${status ? `?status=${status}` : ''}`
-        : `${API_URL}/reports/excel/project/${projectId}${status ? `?status=${status}` : ''}`;
+        : `${API_URL}/reports/excel/project/${project._id}${status ? `?status=${status}` : ''}`;
 
       window.open(url + `&token=${token}`, '_blank');
     } catch (err) {

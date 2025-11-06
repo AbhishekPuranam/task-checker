@@ -43,6 +43,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import ProjectAccessManager from '../Admin/ProjectAccessManager';
+import { titleToSlug } from '../../utils/slug';
 
 const ProjectList = () => {
   const router = useRouter();
@@ -417,10 +418,11 @@ const ProjectList = () => {
                     },
                   }}
                   onClick={() => {
+                    const slug = titleToSlug(project.title);
                     if (user?.role === 'engineer') {
-                      router.push(`/projects/${project._id}/jobs`);
+                      router.push(`/projects/${slug}/jobs`);
                     } else {
-                      router.push(`/projects/${project._id}`);
+                      router.push(`/projects/${slug}`);
                     }
                   }}
                 >

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
+import { titleToSlug } from '../../utils/slug';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -16,6 +17,7 @@ export default function SubProjectDetail() {
   const { projectId, subProjectId } = router.query;
 
   const [subProject, setSubProject] = useState(null);
+  const [project, setProject] = useState(null);
   const [activeSection, setActiveSection] = useState('active');
   const [groupBy, setGroupBy] = useState('');
   const [subGroupBy, setSubGroupBy] = useState('');
@@ -25,11 +27,11 @@ export default function SubProjectDetail() {
   const [loadingGroups, setLoadingGroups] = useState(false);
 
   useEffect(() => {
-    if (subProjectId) {
-      fetchSubProject();
+    if (projectId && subProjectId) {
+      fetchData();
       fetchAvailableFields();
     }
-  }, [subProjectId]);
+  }, [projectId, subProjectId]);
 
   useEffect(() => {
     if (groupBy && subProjectId) {
@@ -37,17 +39,37 @@ export default function SubProjectDetail() {
     }
   }, [groupBy, subGroupBy, activeSection]);
 
-  const fetchSubProject = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const res = await axios.get(`${API_URL}/subprojects/${subProjectId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setSubProject(res.data);
+      
+      // Check if projectId looks like a MongoDB ObjectId
+      const isMongoId = /^[0-9a-fA-F]{24}$/.test(projectId);
+      const projectEndpoint = isMongoId 
+        ? `${API_URL}/projects/${projectId}`
+        : `${API_URL}/projects/by-name/${encodeURIComponent(projectId)}`;
+      
+      const [projectRes, subProjectRes] = await Promise.all([
+        axios.get(projectEndpoint, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${API_URL}/subprojects/${subProjectId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
+      
+      setProject(projectRes.data);
+      setSubProject(subProjectRes.data);
+      
+      // Update URL to use slug if we got an ID-based URL
+      if (isMongoId && projectRes.data.title) {
+        const slug = titleToSlug(projectRes.data.title);
+        router.replace(`/projects/${slug}/subprojects/${subProjectId}`, undefined, { shallow: true });
+      }
     } catch (err) {
-      console.error('Error fetching SubProject:', err);
-      alert('Failed to load SubProject');
+      console.error('Error fetching data:', err);
+      alert('Failed to load data');
     } finally {
       setLoading(false);
     }
@@ -126,7 +148,12 @@ export default function SubProjectDetail() {
             )}
           </div>
           <button
-            onClick={() => router.push(`/projects/${projectId}`)}
+            onClick={() => {
+              if (project) {
+                const slug = titleToSlug(project.title);
+                router.push(`/projects/${slug}`);
+              }
+            }}
             className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
           >
             ← Back to Project
