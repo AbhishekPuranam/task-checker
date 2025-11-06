@@ -127,12 +127,26 @@ const structuralElementSchema = new mongoose.Schema({
 });
 
 // Indexes for efficient queries
-// IMPORTANT: Compound unique index to prevent duplicate serialNo within the same project
-// Different projects CAN have elements with the same serialNo
-structuralElementSchema.index({ project: 1, serialNo: 1 }, { unique: true });
+// IMPORTANT: Updated duplicate prevention strategy
+// 1. For elements WITH subProject: Check duplicates within subproject only
+// 2. For elements WITHOUT subProject (legacy): Check duplicates within project only
+// This allows the same element to exist in different subprojects
+
+// Compound indexes for fast queries
+structuralElementSchema.index({ subProject: 1, status: 1 }); // Fast subproject filtering
+structuralElementSchema.index({ subProject: 1, level: 1 }); // Fast level grouping within subproject
+structuralElementSchema.index({ subProject: 1, memberType: 1 }); // Fast member type grouping
+structuralElementSchema.index({ subProject: 1, drawingNo: 1 }); // Fast drawing number lookup
+structuralElementSchema.index({ subProject: 1, gridNo: 1 }); // Fast grid number lookup
+structuralElementSchema.index({ subProject: 1, partMarkNo: 1 }); // Fast part mark lookup
+structuralElementSchema.index({ subProject: 1, fireProofingWorkflow: 1 }); // Fast workflow filtering
+
+// Project-level indexes (for backward compatibility and cross-subproject queries)
+structuralElementSchema.index({ project: 1, status: 1 });
 structuralElementSchema.index({ project: 1, structureNumber: 1 });
-structuralElementSchema.index({ subProject: 1, status: 1 }); // New index for SubProject queries
-structuralElementSchema.index({ subProject: 1, serialNo: 1 }); // New index for SubProject queries
+structuralElementSchema.index({ project: 1, serialNo: 1 }); // Non-unique, allows duplicates across subprojects
+
+// General indexes for search and filtering
 structuralElementSchema.index({ drawingNo: 1 });
 structuralElementSchema.index({ level: 1 });
 structuralElementSchema.index({ memberType: 1 });
