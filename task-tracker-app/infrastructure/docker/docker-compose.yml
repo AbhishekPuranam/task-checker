@@ -231,6 +231,32 @@ services:
       - "traefik.http.services.engineer.loadbalancer.sticky.cookie=true"
       - "traefik.http.services.engineer.loadbalancer.sticky.cookie.name=engineer_sticky"
 
+  # Uptime Kuma - Monitoring & Status Page
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    restart: unless-stopped
+    volumes:
+      - uptime_kuma_data:/app/data
+    networks:
+      - tasktracker-network
+    labels:
+      - "traefik.enable=true"
+      # HTTP router for status page
+      - "traefik.http.routers.status.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/status`)"
+      - "traefik.http.routers.status.entrypoints=web"
+      - "traefik.http.routers.status.priority=200"
+      # HTTPS router for status page
+      - "traefik.http.routers.status-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/status`)"
+      - "traefik.http.routers.status-secure.entrypoints=websecure"
+      - "traefik.http.routers.status-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.status-secure.priority=200"
+      # Strip /status prefix
+      - "traefik.http.middlewares.status-strip.stripprefix.prefixes=/status"
+      - "traefik.http.routers.status.middlewares=status-strip"
+      - "traefik.http.routers.status-secure.middlewares=status-strip"
+      - "traefik.http.services.status.loadbalancer.server.port=3001"
+
   # Traefik Reverse Proxy
   traefik:
     image: traefik:v2.10
@@ -271,6 +297,8 @@ volumes:
   vault_data:
     driver: local
   vault_logs:
+    driver: local
+  uptime_kuma_data:
     driver: local
 
 networks:

@@ -58,7 +58,7 @@ export default function SubProjectDetail() {
   
   // Get pagination for specific group
   const getGroupPage = (groupIndex) => groupPages[groupIndex] || 0;
-  const getGroupRowsPerPage = (groupIndex) => groupRowsPerPage[groupIndex] || 10;
+  const getGroupRowsPerPage = (groupIndex) => groupRowsPerPage[groupIndex] || 25;
   
   // Pagination handlers for groups
   const handleGroupPageChange = (groupIndex, newPage) => {
@@ -692,18 +692,16 @@ export default function SubProjectDetail() {
                     </Box>
                     
                     {/* Pagination */}
-                    {group.elements.length > 5 && (
-                      <TablePagination
-                        component="div"
-                        count={group.elements.length}
-                        page={getGroupPage(index)}
-                        onPageChange={(event, newPage) => handleGroupPageChange(index, newPage)}
-                        rowsPerPage={getGroupRowsPerPage(index)}
-                        onRowsPerPageChange={(event) => handleGroupRowsPerPageChange(index, event)}
-                        rowsPerPageOptions={[5, 10, 25, 50, 100]}
-                        sx={{ borderTop: '1px solid #e0e0e0', mt: 1 }}
-                      />
-                    )}
+                    <TablePagination
+                      component="div"
+                      count={group.elements.length}
+                      page={getGroupPage(index)}
+                      onPageChange={(event, newPage) => handleGroupPageChange(index, newPage)}
+                      rowsPerPage={getGroupRowsPerPage(index)}
+                      onRowsPerPageChange={(event) => handleGroupRowsPerPageChange(index, event)}
+                      rowsPerPageOptions={[5, 10, 25, 50, 100]}
+                      sx={{ borderTop: '1px solid #e0e0e0', mt: 1 }}
+                    />
                   </Box>
                 )}
               </Paper>
