@@ -128,7 +128,7 @@ subProjectSchema.statics.recalculateStatistics = async function(subProjectId) {
   
   // Aggregation pipeline to calculate all statistics
   const pipeline = [
-    { $match: { subProject: mongoose.Types.ObjectId(subProjectId) } },
+    { $match: { subProject: new mongoose.Types.ObjectId(subProjectId) } },
     {
       $group: {
         _id: '$status',
@@ -190,7 +190,7 @@ subProjectSchema.statics.recalculateStatistics = async function(subProjectId) {
 // Static method to recalculate project-level statistics
 subProjectSchema.statics.recalculateProjectStatistics = async function(projectId) {
   const pipeline = [
-    { $match: { project: mongoose.Types.ObjectId(projectId) } },
+    { $match: { project: new mongoose.Types.ObjectId(projectId) } },
     {
       $group: {
         _id: null,
