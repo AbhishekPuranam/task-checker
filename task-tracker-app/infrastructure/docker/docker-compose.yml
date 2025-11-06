@@ -236,26 +236,30 @@ services:
     image: louislam/uptime-kuma:1
     container_name: uptime-kuma
     restart: unless-stopped
+    environment:
+      - UPTIME_KUMA_PORT=3001
     volumes:
       - uptime_kuma_data:/app/data
     networks:
       - tasktracker-network
     labels:
       - "traefik.enable=true"
-      # HTTP router for status page
-      - "traefik.http.routers.status.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/status`)"
-      - "traefik.http.routers.status.entrypoints=web"
-      - "traefik.http.routers.status.priority=200"
-      # HTTPS router for status page
-      - "traefik.http.routers.status-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/status`)"
-      - "traefik.http.routers.status-secure.entrypoints=websecure"
-      - "traefik.http.routers.status-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.status-secure.priority=200"
-      # Strip /status prefix
-      - "traefik.http.middlewares.status-strip.stripprefix.prefixes=/status"
-      - "traefik.http.routers.status.middlewares=status-strip"
-      - "traefik.http.routers.status-secure.middlewares=status-strip"
-      - "traefik.http.services.status.loadbalancer.server.port=3001"
+      # HTTP router - route to dashboard directly
+      - "traefik.http.routers.uptime.rule=Host(`projects.sapcindia.com`) && Path(`/status`)"
+      - "traefik.http.routers.uptime.entrypoints=web"
+      - "traefik.http.routers.uptime.priority=200"
+      # HTTPS router
+      - "traefik.http.routers.uptime-secure.rule=Host(`projects.sapcindia.com`) && Path(`/status`)"
+      - "traefik.http.routers.uptime-secure.entrypoints=websecure"
+      - "traefik.http.routers.uptime-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.uptime-secure.priority=200"
+      # Redirect /status to /dashboard
+      - "traefik.http.middlewares.uptime-redirect.redirectregex.regex=^https?://([^/]+)/status$$"
+      - "traefik.http.middlewares.uptime-redirect.redirectregex.replacement=https://$${1}/dashboard"
+      - "traefik.http.middlewares.uptime-redirect.redirectregex.permanent=false"
+      - "traefik.http.routers.uptime.middlewares=uptime-redirect"
+      - "traefik.http.routers.uptime-secure.middlewares=uptime-redirect"
+      - "traefik.http.services.uptime.loadbalancer.server.port=3001"
 
   # Traefik Reverse Proxy
   traefik:
