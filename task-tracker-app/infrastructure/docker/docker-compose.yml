@@ -244,6 +244,7 @@ services:
       - "traefik.enable=true"
       # Middleware to strip /dashboard prefix
       - "traefik.http.middlewares.uptime-stripprefix.stripprefix.prefixes=/dashboard"
+      - "traefik.http.middlewares.uptime-stripprefix.stripprefix.forceSlash=false"
       # HTTP router
       - "traefik.http.routers.uptime.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/dashboard`)"
       - "traefik.http.routers.uptime.entrypoints=web"
