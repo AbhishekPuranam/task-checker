@@ -2311,15 +2311,28 @@ const StructuralElementsList = ({ projectSlug }) => {
                                   label="Group By"
                                 >
                                   <MenuItem value="">No Grouping</MenuItem>
+                                  <MenuItem value="serialNo">Serial No.</MenuItem>
                                   <MenuItem value="structureNumber">Structure Number</MenuItem>
-                                  <MenuItem value="memberType">Member Type</MenuItem>
+                                  <MenuItem value="drawingNo">Drawing No</MenuItem>
                                   <MenuItem value="level">Level</MenuItem>
+                                  <MenuItem value="memberType">Member Type</MenuItem>
                                   <MenuItem value="gridNo">Grid No</MenuItem>
                                   <MenuItem value="partMarkNo">Part Mark No</MenuItem>
                                   <MenuItem value="sectionSizes">Section Size</MenuItem>
-                                  <MenuItem value="drawingNo">Drawing No</MenuItem>
+                                  <MenuItem value="lengthMm">Length (mm)</MenuItem>
+                                  <MenuItem value="qty">Quantity</MenuItem>
+                                  <MenuItem value="sectionDepthMm">Section Depth (mm)</MenuItem>
+                                  <MenuItem value="flangeWidthMm">Flange Width (mm)</MenuItem>
+                                  <MenuItem value="webThicknessMm">Web Thickness (mm)</MenuItem>
+                                  <MenuItem value="flangeThicknessMm">Flange Thickness (mm)</MenuItem>
+                                  <MenuItem value="fireproofingThickness">Fireproofing Thickness</MenuItem>
+                                  <MenuItem value="surfaceArea">Surface Area (sqm)</MenuItem>
                                   <MenuItem value="fireProofingWorkflow">Fire Proofing Workflow</MenuItem>
+                                  <MenuItem value="projectName">Project Name</MenuItem>
                                   <MenuItem value="siteLocation">Site Location</MenuItem>
+                                  <MenuItem value="status">Status</MenuItem>
+                                  <MenuItem value="currentPendingJob">Current Pending Job</MenuItem>
+                                  <MenuItem value="progress">Progress</MenuItem>
                                 </Select>
                               </FormControl>
                               <Button
