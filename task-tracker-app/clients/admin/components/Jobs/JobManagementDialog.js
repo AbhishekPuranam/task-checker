@@ -39,10 +39,11 @@ const JobManagementDialog = ({ open, onClose, element, onJobsUpdated }) => {
   const [error, setError] = useState('');
   const [addingCustomJob, setAddingCustomJob] = useState(false);
   const [insertAfterJobId, setInsertAfterJobId] = useState(null);
+  const [editingJobId, setEditingJobId] = useState(null);
+  const [editJobTitle, setEditJobTitle] = useState('');
   
   // Custom job form
   const [customJobTitle, setCustomJobTitle] = useState('');
-  const [customJobDescription, setCustomJobDescription] = useState('');
 
   useEffect(() => {
     if (open && element?.jobs) {
@@ -104,8 +105,8 @@ const JobManagementDialog = ({ open, onClose, element, onJobsUpdated }) => {
   };
 
   const handleAddCustomJob = async () => {
-    if (!customJobTitle.trim() || !customJobDescription.trim()) {
-      setError('Job title and description are required');
+    if (!customJobTitle.trim()) {
+      setError('Job title is required');
       return;
     }
 
@@ -120,7 +121,7 @@ const JobManagementDialog = ({ open, onClose, element, onJobsUpdated }) => {
           structuralElement: element._id,
           project: element.project || element.subProject,
           jobTitle: customJobTitle,
-          jobDescription: customJobDescription,
+          jobDescription: customJobTitle, // Use title as description for simplicity
           parentFireproofingType: element.fireProofingWorkflow,
           insertAfterJobId: insertAfterJobId
         },
@@ -144,7 +145,6 @@ const JobManagementDialog = ({ open, onClose, element, onJobsUpdated }) => {
 
       setJobs(updatedJobs);
       setCustomJobTitle('');
-      setCustomJobDescription('');
       setAddingCustomJob(false);
       setInsertAfterJobId(null);
 
@@ -169,8 +169,84 @@ const JobManagementDialog = ({ open, onClose, element, onJobsUpdated }) => {
     setAddingCustomJob(false);
     setInsertAfterJobId(null);
     setCustomJobTitle('');
-    setCustomJobDescription('');
     setError('');
+  };
+
+  const handleStartEditJob = (job) => {
+    setEditingJobId(job._id);
+    setEditJobTitle(job.jobTitle);
+    setError('');
+  };
+
+  const handleSaveEditJob = async (jobId) => {
+    if (!editJobTitle.trim()) {
+      setError('Job title is required');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+
+      const token = localStorage.getItem('token');
+      const response = await axios.put(
+        `${API_URL}/jobs/${jobId}`,
+        { jobTitle: editJobTitle },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // Update local jobs array
+      setJobs(jobs.map(job => 
+        job._id === jobId ? { ...job, jobTitle: editJobTitle } : job
+      ));
+
+      setEditingJobId(null);
+      setEditJobTitle('');
+
+      if (onJobsUpdated) {
+        onJobsUpdated();
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update job title');
+      console.error('Error updating job title:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelEditJob = () => {
+    setEditingJobId(null);
+    setEditJobTitle('');
+    setError('');
+  };
+
+  const handleDeleteJob = async (jobId) => {
+    if (!confirm('Are you sure you want to delete this job? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+
+      const token = localStorage.getItem('token');
+      await axios.delete(
+        `${API_URL}/jobs/${jobId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // Remove job from local array
+      setJobs(jobs.filter(job => job._id !== jobId));
+
+      if (onJobsUpdated) {
+        onJobsUpdated();
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to delete job');
+      console.error('Error deleting job:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!element) return null;
@@ -235,12 +311,46 @@ const JobManagementDialog = ({ open, onClose, element, onJobsUpdated }) => {
 
                   {/* Job Details */}
                   <Box flex={1}>
-                    <Typography variant="subtitle1" fontWeight="bold">
-                      {job.jobTitle}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                      {job.jobDescription}
-                    </Typography>
+                    {editingJobId === job._id ? (
+                      // Edit mode
+                      <Box display="flex" gap={1} alignItems="center" mb={1}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          value={editJobTitle}
+                          onChange={(e) => setEditJobTitle(e.target.value)}
+                          disabled={loading}
+                          autoFocus
+                        />
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={() => handleSaveEditJob(job._id)}
+                          disabled={loading}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={handleCancelEditJob}
+                          disabled={loading}
+                        >
+                          Cancel
+                        </Button>
+                      </Box>
+                    ) : (
+                      // View mode
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        {job.jobTitle}
+                      </Typography>
+                    )}
+                    
+                    {!editingJobId && job.jobDescription && job.jobDescription !== job.jobTitle && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        {job.jobDescription}
+                      </Typography>
+                    )}
                     
                     <Box display="flex" gap={1} alignItems="center" flexWrap="wrap">
                       <Chip 
@@ -265,43 +375,86 @@ const JobManagementDialog = ({ open, onClose, element, onJobsUpdated }) => {
 
                   {/* Actions */}
                   <Box display="flex" flexDirection="column" gap={1}>
-                    {job.status !== 'completed' && (
-                      <Tooltip title="Mark Complete">
-                        <IconButton
-                          size="small"
-                          color="success"
-                          onClick={() => handleStatusChange(job._id, 'completed')}
-                          disabled={loading}
-                        >
-                          <CompleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                    
-                    {job.status !== 'not_applicable' && job.status !== 'completed' && (
-                      <Tooltip title="Mark Non-Clearance">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleStatusChange(job._id, 'not_applicable')}
-                          disabled={loading}
-                        >
-                          <NonClearanceIcon />
-                        </IconButton>
-                      </Tooltip>
-                    )}
+                    {editingJobId !== job._id && (
+                      <>
+                        {job.status !== 'completed' && (
+                          <Tooltip title="Mark Complete">
+                            <IconButton
+                              size="small"
+                              color="success"
+                              onClick={() => handleStatusChange(job._id, 'completed')}
+                              disabled={loading}
+                            >
+                              <CompleteIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        
+                        {job.status !== 'not_applicable' && job.status !== 'completed' && (
+                          <Tooltip title="Mark Non-Clearance">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => handleStatusChange(job._id, 'not_applicable')}
+                              disabled={loading}
+                            >
+                              <NonClearanceIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
 
-                    {job.status !== 'completed' && job.status !== 'not_applicable' && (
-                      <Tooltip title="Add Custom Job After This">
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          onClick={() => handleStartAddingJob(job._id)}
-                          disabled={loading || addingCustomJob}
-                        >
-                          <AddIcon />
-                        </IconButton>
-                      </Tooltip>
+                        {job.status !== 'completed' && job.status !== 'not_applicable' && job.status !== 'pending' && (
+                          <Tooltip title="Mark Pending">
+                            <IconButton
+                              size="small"
+                              color="warning"
+                              onClick={() => handleStatusChange(job._id, 'pending')}
+                              disabled={loading}
+                            >
+                              <AddIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+
+                        {job.jobType === 'custom' && (
+                          <>
+                            <Tooltip title="Edit Job Title">
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => handleStartEditJob(job)}
+                                disabled={loading}
+                              >
+                                <EditIcon />
+                              </IconButton>
+                            </Tooltip>
+                            
+                            <Tooltip title="Delete Job">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleDeleteJob(job._id)}
+                                disabled={loading}
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </Tooltip>
+                          </>
+                        )}
+
+                        {job.status !== 'completed' && job.status !== 'not_applicable' && (
+                          <Tooltip title="Add Custom Job After This">
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              onClick={() => handleStartAddingJob(job._id)}
+                              disabled={loading || addingCustomJob}
+                            >
+                              <AddIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </>
                     )}
                   </Box>
                 </Box>
@@ -327,23 +480,13 @@ const JobManagementDialog = ({ open, onClose, element, onJobsUpdated }) => {
                   <TextField
                     fullWidth
                     label="Job Title"
+                    placeholder="Enter job title..."
                     value={customJobTitle}
                     onChange={(e) => setCustomJobTitle(e.target.value)}
                     margin="dense"
                     size="small"
                     required
-                  />
-                  
-                  <TextField
-                    fullWidth
-                    label="Job Description"
-                    value={customJobDescription}
-                    onChange={(e) => setCustomJobDescription(e.target.value)}
-                    margin="dense"
-                    size="small"
-                    multiline
-                    rows={2}
-                    required
+                    autoFocus
                   />
                   
                   <Box display="flex" gap={1} mt={1}>
@@ -402,23 +545,13 @@ const JobManagementDialog = ({ open, onClose, element, onJobsUpdated }) => {
               <TextField
                 fullWidth
                 label="Job Title"
+                placeholder="Enter job title..."
                 value={customJobTitle}
                 onChange={(e) => setCustomJobTitle(e.target.value)}
                 margin="dense"
                 size="small"
                 required
-              />
-              
-              <TextField
-                fullWidth
-                label="Job Description"
-                value={customJobDescription}
-                onChange={(e) => setCustomJobDescription(e.target.value)}
-                margin="dense"
-                size="small"
-                multiline
-                rows={2}
-                required
+                autoFocus
               />
               
               <Box display="flex" gap={1} mt={1}>

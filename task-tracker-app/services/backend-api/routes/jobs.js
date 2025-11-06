@@ -1248,4 +1248,48 @@ router.post('/custom', auth, async (req, res) => {
   }
 });
 
+// DELETE /:id - Delete a job (only custom jobs)
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const jobId = req.params.id;
+
+    // Find the job
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+
+    // Only allow deletion of custom jobs
+    if (job.jobType !== 'custom') {
+      return res.status(403).json({ message: 'Only custom jobs can be deleted' });
+    }
+
+    // Check permissions
+    const canDelete = req.user.role === 'admin' || 
+                     req.user.role === 'site-engineer' ||
+                     job.createdBy.toString() === req.user.id;
+    
+    if (!canDelete) {
+      return res.status(403).json({ message: 'Not authorized to delete this job' });
+    }
+
+    const projectId = job.project;
+    const structuralElementId = job.structuralElement;
+
+    // Delete the job
+    await Job.findByIdAndDelete(jobId);
+
+    // Invalidate cache
+    await invalidateCache(`cache:jobs:project:${projectId}:*`);
+    await invalidateCache(`cache:stats:project:${projectId}`);
+    await invalidateCache(`cache:structural:jobs:${structuralElementId}`);
+    await invalidateCache(`cache:structural:summary:${projectId}:*`);
+
+    res.json({ message: 'Job deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting job:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 module.exports = router;
