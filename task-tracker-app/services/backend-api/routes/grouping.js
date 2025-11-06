@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const StructuralElement = require('../models/StructuralElement');
-const { isAuthenticated } = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const cache = require('../utils/cache');
 
 /**
@@ -11,7 +11,7 @@ const cache = require('../utils/cache');
  *     summary: Get grouped structural elements with optional sub-grouping (OPTIMIZED)
  *     tags: [Grouping]
  */
-router.post('/elements', isAuthenticated, async (req, res) => {
+router.post('/elements', auth, async (req, res) => {
   try {
     const {
       projectId,
@@ -175,7 +175,7 @@ router.post('/elements', isAuthenticated, async (req, res) => {
  *     summary: Get all elements in a specific group
  *     tags: [Grouping]
  */
-router.post('/elements/group-details', isAuthenticated, async (req, res) => {
+router.post('/elements/group-details', auth, async (req, res) => {
   try {
     const {
       projectId,
@@ -250,7 +250,7 @@ router.post('/elements/group-details', isAuthenticated, async (req, res) => {
  *     summary: Get list of available fields for grouping
  *     tags: [Grouping]
  */
-router.get('/available-fields', isAuthenticated, async (req, res) => {
+router.get('/available-fields', auth, async (req, res) => {
   try {
     // Cache this as it rarely changes
     const cacheKey = 'grouping:available-fields';

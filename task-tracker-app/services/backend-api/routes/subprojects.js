@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const SubProject = require('../models/SubProject');
 const StructuralElement = require('../models/StructuralElement');
-const { isAuthenticated, isAdmin } = require('../middleware/auth');
+const { auth, adminAuth } = require('../middleware/auth');
 const cache = require('../utils/cache');
 
 /**
@@ -14,7 +14,7 @@ const cache = require('../utils/cache');
  *     security:
  *       - bearerAuth: []
  */
-router.post('/', isAuthenticated, isAdmin, async (req, res) => {
+router.post('/', adminAuth, async (req, res) => {
   try {
     const { projectId, name, code, description, metadata } = req.body;
     
@@ -143,7 +143,7 @@ router.get('/:id', isAuthenticated, async (req, res) => {
  *     summary: Update a SubProject
  *     tags: [SubProjects]
  */
-router.put('/:id', isAuthenticated, isAdmin, async (req, res) => {
+router.put('/:id', adminAuth, async (req, res) => {
   try {
     const { name, code, description, status, metadata } = req.body;
     
@@ -191,7 +191,7 @@ router.put('/:id', isAuthenticated, isAdmin, async (req, res) => {
  *     summary: Delete a SubProject
  *     tags: [SubProjects]
  */
-router.delete('/:id', isAuthenticated, isAdmin, async (req, res) => {
+router.delete('/:id', adminAuth, async (req, res) => {
   try {
     // Check if subproject has elements
     const elementCount = await StructuralElement.countDocuments({ 
@@ -256,7 +256,7 @@ router.get('/:id/statistics', isAuthenticated, async (req, res) => {
  *     summary: Trigger recalculation of SubProject statistics
  *     tags: [SubProjects]
  */
-router.post('/:id/recalculate', isAuthenticated, isAdmin, async (req, res) => {
+router.post('/:id/recalculate', adminAuth, async (req, res) => {
   try {
     const stats = await SubProject.recalculateStatistics(req.params.id);
     
