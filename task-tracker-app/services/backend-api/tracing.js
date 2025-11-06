@@ -7,10 +7,12 @@ const { Resource } = require('@opentelemetry/resources');
 const { SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_SERVICE_VERSION } = require('@opentelemetry/semantic-conventions');
 const { PeriodicExportingMetricReader } = require('@opentelemetry/sdk-metrics');
 
+console.log('🔍 Initializing OpenTelemetry SDK...');
+
 // Configure the OpenTelemetry SDK
 const sdk = new NodeSDK({
   resource: new Resource({
-    [SEMRESATTRS_SERVICE_NAME]: 'backend-api',
+    [SEMRESATTRS_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || 'backend-api',
     [SEMRESATTRS_SERVICE_VERSION]: '1.0.0',
   }),
   traceExporter: new OTLPTraceExporter({
@@ -55,6 +57,8 @@ const sdk = new NodeSDK({
 
 // Start the SDK
 sdk.start();
+console.log('✅ OpenTelemetry SDK started successfully');
+console.log(`📡 Exporting traces to: ${process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://otel-collector:4318'}`);
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
