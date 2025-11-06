@@ -51,10 +51,10 @@ export default function SubProjectDetail() {
   }, [projectId, subProjectId]);
 
   useEffect(() => {
-    if (groupBy && subProjectId) {
+    if (groupBy && subProject?._id) {
       fetchGroupedData();
     }
-  }, [groupBy, subGroupBy, activeSection]);
+  }, [groupBy, subGroupBy, activeSection, subProject]);
 
   const fetchData = async () => {
     try {
@@ -127,7 +127,7 @@ export default function SubProjectDetail() {
       const res = await axios.post(
         `${API_URL}/grouping/elements`,
         {
-          subProjectId,
+          subProjectId: subProject._id,
           status: activeSection,
           groupBy,
           subGroupBy: subGroupBy || undefined,
