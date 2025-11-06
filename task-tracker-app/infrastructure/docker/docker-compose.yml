@@ -242,18 +242,14 @@ services:
       - tasktracker-network
     labels:
       - "traefik.enable=true"
-      # Strip /dashboard prefix before forwarding to Uptime Kuma
-      - "traefik.http.middlewares.uptime-stripprefix.stripprefix.prefixes=/dashboard"
       # HTTP router
       - "traefik.http.routers.uptime.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/dashboard`)"
       - "traefik.http.routers.uptime.entrypoints=web"
-      - "traefik.http.routers.uptime.middlewares=uptime-stripprefix"
       - "traefik.http.routers.uptime.priority=200"
       # HTTPS router
       - "traefik.http.routers.uptime-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/dashboard`)"
       - "traefik.http.routers.uptime-secure.entrypoints=websecure"
       - "traefik.http.routers.uptime-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.uptime-secure.middlewares=uptime-stripprefix"
       - "traefik.http.routers.uptime-secure.priority=200"
       - "traefik.http.services.uptime.loadbalancer.server.port=3001"
 
