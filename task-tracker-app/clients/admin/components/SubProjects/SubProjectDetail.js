@@ -36,7 +36,7 @@ export default function SubProjectDetail() {
   const [subProject, setSubProject] = useState(null);
   const [project, setProject] = useState(null);
   const [activeSection, setActiveSection] = useState('active');
-  const [groupBy, setGroupBy] = useState('');
+  const [groupBy, setGroupBy] = useState('level'); // Default to 'level' grouping
   const [subGroupBy, setSubGroupBy] = useState('');
   const [groupedData, setGroupedData] = useState(null);
   const [availableFields, setAvailableFields] = useState([]);
