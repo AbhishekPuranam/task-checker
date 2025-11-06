@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const StructuralElement = require('../models/StructuralElement');
+const Job = require('../models/Job');
 const { auth } = require('../middleware/auth');
 const cache = require('../utils/cache');
 
@@ -106,7 +107,8 @@ router.post('/elements', auth, async (req, res) => {
             lengthMm: '$lengthMm',
             qty: '$qty',
             surfaceAreaSqm: '$surfaceAreaSqm',
-            status: '$status'
+            status: '$status',
+            fireProofingWorkflow: '$fireProofingWorkflow'
           }
         };
         
@@ -146,6 +148,37 @@ router.post('/elements', auth, async (req, res) => {
         ]);
         
         const total = countResults[0]?.total || 0;
+        
+        // Fetch jobs for all elements in the groups
+        const allElementIds = groupResults.flatMap(group => 
+          group.elements.map(el => el._id)
+        );
+        
+        // Get current (pending) job for each element
+        const jobs = await Job.find({
+          structuralElement: { $in: allElementIds },
+          status: { $in: ['pending', 'in_progress'] }
+        })
+        .sort({ orderIndex: 1 })
+        .limit(allElementIds.length)
+        .lean();
+        
+        // Create a map of elementId -> currentJob
+        const jobMap = {};
+        jobs.forEach(job => {
+          const elementId = job.structuralElement.toString();
+          if (!jobMap[elementId]) {
+            jobMap[elementId] = job;
+          }
+        });
+        
+        // Add job information to elements
+        groupResults.forEach(group => {
+          group.elements = group.elements.map(element => ({
+            ...element,
+            currentJob: jobMap[element._id.toString()] || null
+          }));
+        });
         
         // Return formatted response
         return {

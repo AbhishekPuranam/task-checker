@@ -80,7 +80,11 @@ export default function SubProjectDetail() {
     gridNo: true,
     sectionSizes: true,
     surfaceAreaSqm: true,
-    qty: true
+    qty: true,
+    status: true,
+    fireProofingWorkflow: true,
+    currentJob: true,
+    jobProgress: true
   });
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   
@@ -101,7 +105,11 @@ export default function SubProjectDetail() {
     { key: 'sectionDepthMm', label: 'Depth (mm)' },
     { key: 'flangeWidthMm', label: 'Flange Width (mm)' },
     { key: 'webThicknessMm', label: 'Web Thickness (mm)' },
-    { key: 'flangeThicknessMm', label: 'Flange Thickness (mm)' }
+    { key: 'flangeThicknessMm', label: 'Flange Thickness (mm)' },
+    { key: 'status', label: 'Status' },
+    { key: 'fireProofingWorkflow', label: 'FP Workflow' },
+    { key: 'currentJob', label: 'Current Job' },
+    { key: 'jobProgress', label: 'Job Progress' }
   ];
 
   useEffect(() => {
@@ -299,6 +307,14 @@ export default function SubProjectDetail() {
         return element.webThicknessMm;
       case 'flangeThicknessMm':
         return element.flangeThicknessMm;
+      case 'status':
+        return element.status;
+      case 'fireProofingWorkflow':
+        return element.fireProofingWorkflow || '-';
+      case 'currentJob':
+        return element.currentJob?.jobTitle || '-';
+      case 'jobProgress':
+        return element.currentJob?.status || '-';
       default:
         return '';
     }
