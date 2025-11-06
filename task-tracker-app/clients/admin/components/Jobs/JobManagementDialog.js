@@ -81,12 +81,16 @@ const JobManagementDialog = ({ open, onClose, element, onJobsUpdated }) => {
       setLoading(true);
       setError('');
 
+      console.log(`🔄 Updating job ${jobId} to status: ${newStatus}`);
+
       const token = localStorage.getItem('token');
       const response = await axios.patch(
         `${API_URL}/jobs/${jobId}/status`,
         { status: newStatus },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      console.log('✅ Status update response:', response.data);
 
       // Update local jobs array
       setJobs(jobs.map(job => 
@@ -97,8 +101,9 @@ const JobManagementDialog = ({ open, onClose, element, onJobsUpdated }) => {
         onJobsUpdated();
       }
     } catch (err) {
+      console.error('❌ Error updating job status:', err);
+      console.error('Error response:', err.response?.data);
       setError(err.response?.data?.message || 'Failed to update job status');
-      console.error('Error updating job status:', err);
     } finally {
       setLoading(false);
     }
@@ -114,6 +119,8 @@ const JobManagementDialog = ({ open, onClose, element, onJobsUpdated }) => {
       setLoading(true);
       setError('');
 
+      console.log('➕ Creating custom job:', customJobTitle);
+
       const token = localStorage.getItem('token');
       const response = await axios.post(
         `${API_URL}/jobs/custom`,
@@ -127,6 +134,8 @@ const JobManagementDialog = ({ open, onClose, element, onJobsUpdated }) => {
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      console.log('✅ Custom job created:', response.data);
 
       // Add new job to local array
       const newJob = response.data;
@@ -152,8 +161,9 @@ const JobManagementDialog = ({ open, onClose, element, onJobsUpdated }) => {
         onJobsUpdated();
       }
     } catch (err) {
+      console.error('❌ Error creating custom job:', err);
+      console.error('Error response:', err.response?.data);
       setError(err.response?.data?.message || 'Failed to create custom job');
-      console.error('Error creating custom job:', err);
     } finally {
       setLoading(false);
     }
