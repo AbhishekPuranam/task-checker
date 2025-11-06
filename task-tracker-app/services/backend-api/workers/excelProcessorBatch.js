@@ -151,7 +151,7 @@ async function createFireProofingJobs(structuralElement, userId, session = null)
 /**
  * Process a single batch with its own transaction
  */
-async function processBatch(uploadSession, batchNumber, excelData, project, userId) {
+async function processBatch(uploadSession, batchNumber, excelData, project, userId, subProjectId = null) {
   const batch = uploadSession.batches.find(b => b.batchNumber === batchNumber);
   if (!batch) {
     throw new Error(`Batch ${batchNumber} not found`);
@@ -352,7 +352,7 @@ function createBatchExcelWorker() {
           });
 
           // Process batch with its own transaction
-          const result = await processBatch(uploadSession, batch.batchNumber, excelData, project, userId);
+          const result = await processBatch(uploadSession, batch.batchNumber, excelData, project, userId, subProjectId);
 
           processedBatches++;
 
@@ -379,14 +379,26 @@ function createBatchExcelWorker() {
             projectId,
             { $inc: { structuralElementsCount: summary.totalElementsCreated } }
           );
+          
+          // Update subproject count if subProjectId is provided
+          if (subProjectId) {
+            const SubProject = require('../models/SubProject');
+            await SubProject.findByIdAndUpdate(
+              subProjectId,
+              { $inc: { structuralElementsCount: summary.totalElementsCreated } }
+            );
+          }
         }
 
         // Invalidate cache
         await invalidateCache(`/api/structural-elements?project=${projectId}`);
         await invalidateCache(`/api/projects/${projectId}/stats`);
         
-        // NEW: Trigger SubProject/Project aggregation if subProjectId is provided
+        // NEW: Invalidate subproject cache and trigger aggregation if subProjectId is provided
         if (subProjectId && summary.totalElementsCreated > 0) {
+          await invalidateCache(`/api/structural-elements?subProject=${subProjectId}`);
+          await invalidateCache(`/api/subprojects/${subProjectId}/stats`);
+          
           const { scheduleBatchAggregation } = require('../utils/aggregationQueue');
           scheduleBatchAggregation(subProjectId).catch(err =>
             console.error('[WORKER] Failed to queue aggregation job:', err)

@@ -34,7 +34,7 @@ import toast from 'react-hot-toast';
 import BatchProgressCard from './BatchProgressCard';
 import UploadSessionHistory from './UploadSessionHistory';
 
-const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
+const ExcelUpload = ({ open, onClose, projectId, subProjectId, onUploadSuccess }) => {
   const navigate = useRouter();
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -130,13 +130,21 @@ const ExcelUpload = ({ open, onClose, projectId, onUploadSuccess }) => {
 
     const formData = new FormData();
     formData.append('excelFile', selectedFile);
+    if (subProjectId) {
+      formData.append('subProjectId', subProjectId);
+    }
 
     try {
       setUploading(true);
       completionNotifiedRef.current = false;
       setUploadProgress({ stage: 'queued', percent: 0, message: 'Uploading file...', saved: 0, jobsCreated: 0 });
       
-      const response = await api.post(`/excel/upload/${projectId}`, formData, {
+      // Use subproject-specific endpoint if subProjectId is provided
+      const uploadEndpoint = subProjectId 
+        ? `/excel/upload/${projectId}/${subProjectId}`
+        : `/excel/upload/${projectId}`;
+      
+      const response = await api.post(uploadEndpoint, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

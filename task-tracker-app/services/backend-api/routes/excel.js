@@ -451,6 +451,74 @@ router.post('/preview', auth, upload.single('excel'), async (req, res) => {
   }
 });
 
+// Upload and process Excel file for a specific SubProject ASYNCHRONOUSLY
+router.post('/upload/:projectId/:subProjectId', auth, upload.single('excelFile'), async (req, res) => {
+  console.log('=== ASYNC Excel upload request received for SubProject ===');
+  console.log('Project ID:', req.params.projectId);
+  console.log('SubProject ID:', req.params.subProjectId);
+  console.log('File uploaded:', !!req.file);
+  console.log('User:', req.user?.email);
+  
+  try {
+    const { projectId, subProjectId } = req.params;
+    
+    // Verify project exists
+    const project = await Task.findById(projectId);
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Verify subproject exists and belongs to this project
+    const SubProject = require('../models/SubProject');
+    const subProject = await SubProject.findOne({ _id: subProjectId, project: projectId });
+    if (!subProject) {
+      return res.status(404).json({ message: 'SubProject not found or does not belong to this project' });
+    }
+
+    // Check if user has permission
+    if (req.user.role !== 'admin' && project.createdBy.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to upload to this project' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'No Excel file uploaded' });
+    }
+
+    console.log(`📁 File uploaded to: ${req.file.path}`);
+    console.log(`📊 File size: ${req.file.size} bytes`);
+    
+    // Queue the job for async processing with subProjectId
+    const job = await addExcelJob({
+      filePath: req.file.path,
+      projectId: projectId,
+      subProjectId: subProjectId,
+      userId: req.user.id,
+      projectName: project.projectName,
+      subProjectName: subProject.name
+    });
+    
+    console.log(`✅ Excel processing job queued for SubProject: ${job.id}`);
+    
+    // Return immediately with job ID
+    res.json({
+      success: true,
+      message: `Excel file uploaded successfully for ${subProject.name}. Processing in background...`,
+      jobId: job.id,
+      status: 'queued',
+      subProjectId: subProjectId,
+      tip: `Use GET /api/excel/status/${job.id} to check processing status`
+    });
+    
+  } catch (error) {
+    console.error('Error queuing Excel upload for SubProject:', error);
+    // Clean up file on error
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({ message: 'Error processing Excel file', error: error.message });
+  }
+});
+
 // Upload and process Excel file ASYNCHRONOUSLY using BullMQ (recommended for large files)
 router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, res) => {
   console.log('=== ASYNC Excel upload request received ===');
