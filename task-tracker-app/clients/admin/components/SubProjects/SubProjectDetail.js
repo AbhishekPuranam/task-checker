@@ -103,7 +103,7 @@ export default function SubProjectDetail() {
     try {
       const token = localStorage.getItem('token');
       await axios.put(
-        `${API_URL}/structural-elements/${selectedElement._id}`,
+        `${API_URL}/structuralElements/${selectedElement._id}`,
         { status: statusDialog.status },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -118,7 +118,7 @@ export default function SubProjectDetail() {
       alert('Status updated successfully');
     } catch (err) {
       console.error('Error updating status:', err);
-      alert('Failed to update status');
+      alert('Failed to update status: ' + (err.response?.data?.message || err.message));
     }
   };
 

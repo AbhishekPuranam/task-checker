@@ -22,7 +22,8 @@ router.post('/elements', auth, async (req, res) => {
       groupBy, // Primary grouping field
       subGroupBy, // Secondary grouping field (optional)
       page = 1,
-      limit = 100
+      limit = 100,
+      includeElements = false // New parameter to include all elements
     } = req.body;
     
     if (!groupBy) {
@@ -59,7 +60,8 @@ router.post('/elements', auth, async (req, res) => {
       groupBy, 
       subGroupBy: subGroupBy || 'none',
       page,
-      limit
+      limit,
+      includeElements: includeElements || false
     });
     
     // Use cache wrapper for automatic caching
@@ -129,17 +131,32 @@ router.post('/elements', auth, async (req, res) => {
         pipeline.push({ $skip: skip });
         pipeline.push({ $limit: parseInt(limit) });
         
-        // Limit elements array to first 5 per group (for preview)
-        pipeline.push({
-          $project: {
-            _id: 1,
-            count: 1,
-            totalSqm: 1,
-            totalQty: 1,
-            totalLengthMm: 1,
-            elements: { $slice: ['$elements', 5] }
-          }
-        });
+        // Limit elements array based on includeElements parameter
+        if (includeElements) {
+          // Include all elements in each group
+          pipeline.push({
+            $project: {
+              _id: 1,
+              count: 1,
+              totalSqm: 1,
+              totalQty: 1,
+              totalLengthMm: 1,
+              elements: 1 // Return all elements
+            }
+          });
+        } else {
+          // Limit elements array to first 5 per group (for preview)
+          pipeline.push({
+            $project: {
+              _id: 1,
+              count: 1,
+              totalSqm: 1,
+              totalQty: 1,
+              totalLengthMm: 1,
+              elements: { $slice: ['$elements', 5] }
+            }
+          });
+        }
         
         // Execute both pipelines in parallel
         const [groupResults, countResults] = await Promise.all([
@@ -180,11 +197,19 @@ router.post('/elements', auth, async (req, res) => {
           }));
         });
         
+        // Calculate totals across all groups
+        const totalElements = groupResults.reduce((sum, group) => sum + group.count, 0);
+        const totalSqm = groupResults.reduce((sum, group) => sum + (group.totalSqm || 0), 0);
+        const totalQty = groupResults.reduce((sum, group) => sum + (group.totalQty || 0), 0);
+        
         // Return formatted response
         return {
           groups: groupResults,
           groupBy,
           subGroupBy,
+          totalElements,
+          totalSqm,
+          totalQty,
           pagination: {
             total,
             page: parseInt(page),
