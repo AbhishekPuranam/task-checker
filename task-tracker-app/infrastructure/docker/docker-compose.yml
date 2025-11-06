@@ -242,7 +242,7 @@ services:
       - tasktracker-network
     labels:
       - "traefik.enable=true"
-      # Route all /dashboard/* to Uptime Kuma root
+      # Direct routing without path manipulation - Uptime Kuma handles /dashboard internally
       - "traefik.http.routers.uptime.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/dashboard`)"
       - "traefik.http.routers.uptime.entrypoints=web"
       - "traefik.http.routers.uptime.priority=200"
@@ -251,10 +251,10 @@ services:
       - "traefik.http.routers.uptime-secure.entrypoints=websecure"
       - "traefik.http.routers.uptime-secure.tls.certresolver=letsencrypt"
       - "traefik.http.routers.uptime-secure.priority=200"
-      # Strip /dashboard prefix to route to Uptime Kuma root
-      - "traefik.http.middlewares.uptime-stripprefix.stripprefix.prefixes=/dashboard"
-      - "traefik.http.routers.uptime.middlewares=uptime-stripprefix"
-      - "traefik.http.routers.uptime-secure.middlewares=uptime-stripprefix"
+      # Strip prefix and redirect root to dashboard
+      - "traefik.http.middlewares.uptime-strip.stripprefix.prefixes=/dashboard"
+      - "traefik.http.routers.uptime.middlewares=uptime-strip"
+      - "traefik.http.routers.uptime-secure.middlewares=uptime-strip"
       - "traefik.http.services.uptime.loadbalancer.server.port=3001"
 
   # Traefik Reverse Proxy
