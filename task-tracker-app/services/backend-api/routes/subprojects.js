@@ -59,7 +59,7 @@ router.post('/', adminAuth, async (req, res) => {
  *     summary: Get all SubProjects for a Project (CACHED)
  *     tags: [SubProjects]
  */
-router.get('/project/:projectId', isAuthenticated, async (req, res) => {
+router.get('/project/:projectId', auth, async (req, res) => {
   try {
     const { projectId } = req.params;
     const { status, page = 1, limit = 50 } = req.query;
@@ -118,7 +118,7 @@ router.get('/project/:projectId', isAuthenticated, async (req, res) => {
  *     summary: Get a specific SubProject
  *     tags: [SubProjects]
  */
-router.get('/:id', isAuthenticated, async (req, res) => {
+router.get('/:id', auth, async (req, res) => {
   try {
     const subProject = await SubProject.findById(req.params.id)
       .populate('project', 'title description')
@@ -230,7 +230,7 @@ router.delete('/:id', adminAuth, async (req, res) => {
  *     summary: Get aggregated statistics for a SubProject
  *     tags: [SubProjects]
  */
-router.get('/:id/statistics', isAuthenticated, async (req, res) => {
+router.get('/:id/statistics', auth, async (req, res) => {
   try {
     const subProject = await SubProject.findById(req.params.id);
     
@@ -277,7 +277,7 @@ router.post('/:id/recalculate', adminAuth, async (req, res) => {
  *     summary: Get aggregated statistics for all SubProjects in a Project
  *     tags: [SubProjects]
  */
-router.get('/project/:projectId/statistics', isAuthenticated, async (req, res) => {
+router.get('/project/:projectId/statistics', auth, async (req, res) => {
   try {
     const stats = await SubProject.recalculateProjectStatistics(req.params.projectId);
     
@@ -295,7 +295,7 @@ router.get('/project/:projectId/statistics', isAuthenticated, async (req, res) =
  *     summary: Get structural elements for a SubProject with section filtering
  *     tags: [SubProjects]
  */
-router.get('/:id/elements', isAuthenticated, async (req, res) => {
+router.get('/:id/elements', auth, async (req, res) => {
   try {
     const { section, page = 1, limit = 100 } = req.query;
     
