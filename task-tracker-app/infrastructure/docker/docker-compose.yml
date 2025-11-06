@@ -238,21 +238,12 @@ services:
     restart: unless-stopped
     environment:
       - UPTIME_KUMA_DISABLE_FRAME_SAMEORIGIN=true
+    ports:
+      - "3001:3001"
     volumes:
       - uptime_kuma_data:/app/data
     networks:
       - tasktracker-network
-    labels:
-      - "traefik.enable=true"
-      # HTTPS router - direct access without path manipulation
-      - "traefik.http.routers.uptime-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/uptime-kuma`)"
-      - "traefik.http.routers.uptime-secure.entrypoints=websecure"
-      - "traefik.http.routers.uptime-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.uptime-secure.priority=200"
-      # Middleware to strip the /uptime-kuma prefix
-      - "traefik.http.middlewares.uptime-strip.stripprefix.prefixes=/uptime-kuma"
-      - "traefik.http.routers.uptime-secure.middlewares=uptime-strip"
-      - "traefik.http.services.uptime.loadbalancer.server.port=3001"
 
   # Traefik Reverse Proxy
   traefik:
