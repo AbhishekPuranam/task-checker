@@ -33,7 +33,7 @@ export default function SubProjectManagement() {
       const token = localStorage.getItem('token');
       
       const [projectRes, subProjectsRes, statsRes] = await Promise.all([
-        axios.get(`${API_URL}/tasks/${projectId}`, {
+        axios.get(`${API_URL}/projects/${projectId}`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
         axios.get(`${API_URL}/subprojects/project/${projectId}`, {
