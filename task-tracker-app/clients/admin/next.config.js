@@ -6,6 +6,12 @@ const nextConfig = {
   // Enable standalone output for Docker
   output: 'standalone',
   
+  // Optimize build performance
+  swcMinify: true,
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
+  
   // API proxy to backend
   async rewrites() {
     return [
