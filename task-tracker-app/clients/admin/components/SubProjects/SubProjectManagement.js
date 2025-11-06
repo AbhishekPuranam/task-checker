@@ -2,6 +2,25 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import { titleToSlug } from '../../utils/slug';
+import {
+  Container,
+  Box,
+  Paper,
+  Typography,
+  Button,
+  Grid,
+  Card,
+  CardContent,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  MenuItem,
+} from '@mui/material';
+import { Add, Upload, Download, Folder, ArrowBack } from '@mui/icons-material';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -131,297 +150,515 @@ export default function SubProjectManagement() {
   };
 
   if (loading) {
-    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Container>
+    );
   }
 
   if (error) {
-    return <div className="text-red-600 p-4">Error: {error}</div>;
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4 }}>
+        <Paper sx={{ p: 4, bgcolor: '#fee', color: '#c00' }}>
+          <Typography variant="h6">Error: {error}</Typography>
+        </Paper>
+      </Container>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Breadcrumb Navigation */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3">
-        <div className="container mx-auto">
-          <div className="flex items-center gap-2 text-sm">
-            <a href="/admin/projects" className="text-blue-600 hover:text-blue-800 hover:underline">
-              Projects
-            </a>
-            <span className="text-gray-400">/</span>
-            <span className="text-gray-900 font-medium">{project?.title || 'Loading...'}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-6 py-6">
+    <Box 
+      sx={{ 
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        py: 3
+      }}
+    >
+      <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 2, md: 3 } }}>
         {/* Project Header */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{project?.title}</h1>
-              <p className="text-gray-600 mb-1">{project?.description}</p>
-              {project?.location && (
-                <p className="text-sm text-gray-500">📍 {project.location}</p>
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: { xs: 3, sm: 4, md: 5 }, 
+            mb: 3, 
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(106, 17, 203, 0.3)'
+          }}
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 3 }}>
+            <Box>
+              <Typography variant="h3" component="h1" fontWeight="bold" sx={{ color: '#6a11cb', mb: 1 }}>
+                {project?.title}
+              </Typography>
+              {project?.description && (
+                <Typography variant="body1" sx={{ color: '#666', mb: 1 }}>
+                  {project.description}
+                </Typography>
               )}
-            </div>
-          </div>
-        
-        {/* Project-level Statistics */}
-        {projectStats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-5 rounded-lg border border-blue-200 shadow-sm">
-              <div className="text-3xl font-bold text-blue-700 mb-1">{projectStats.totalElements || 0}</div>
-              <div className="text-sm font-medium text-blue-600">Total Elements</div>
-            </div>
-            <div className="bg-gradient-to-br from-green-50 to-green-100 p-5 rounded-lg border border-green-200 shadow-sm">
-              <div className="text-3xl font-bold text-green-700 mb-1">{projectStats.completedElements || 0}</div>
-              <div className="text-sm font-medium text-green-600">Completed</div>
-              <div className="text-xs text-green-500 mt-1">
-                {projectStats.totalElements > 0 ? Math.round((projectStats.completedElements / projectStats.totalElements) * 100) : 0}% complete
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-5 rounded-lg border border-purple-200 shadow-sm">
-              <div className="text-3xl font-bold text-purple-700 mb-1">{projectStats.totalSqm?.toFixed(2) || '0.00'}</div>
-              <div className="text-sm font-medium text-purple-600">Total SQM</div>
-            </div>
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-5 rounded-lg border border-orange-200 shadow-sm">
-              <div className="text-3xl font-bold text-orange-700 mb-1">{projectStats.completedSqm?.toFixed(2) || '0.00'}</div>
-              <div className="text-sm font-medium text-orange-600">Completed SQM</div>
-              <div className="text-xs text-orange-500 mt-1">
-                {projectStats.totalSqm > 0 ? Math.round((projectStats.completedSqm / projectStats.totalSqm) * 100) : 0}% complete
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Project-level Actions */}
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            onClick={() => downloadReport(null)}
-            className="px-5 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors shadow-sm hover:shadow-md"
-          >
-            📥 Download Full Project Report
-          </button>
-          <button
-            onClick={() => downloadReport(null, 'active')}
-            className="px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md"
-          >
-            📊 Active Report
-          </button>
-          <button
-            onClick={() => downloadReport(null, 'non clearance')}
-            className="px-5 py-2.5 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 transition-colors shadow-sm hover:shadow-md"
-          >
-            ⚠️ Non-Clearance Report
-          </button>
-          <button
-            onClick={() => downloadReport(null, 'complete')}
-            className="px-5 py-2.5 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors shadow-sm hover:shadow-md"
-          >
-            ✅ Complete Report
-          </button>
-        </div>
-      </div>
-
-      {/* SubProjects Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Sub-Projects</h2>
-            <p className="text-sm text-gray-500 mt-1">Organize your project into manageable sub-projects</p>
-          </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md flex items-center gap-2"
-          >
-            <span className="text-lg">+</span> Create Sub-Project
-          </button>
-        </div>
-
-        {subProjects.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="text-6xl mb-4">📂</div>
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">No Sub-Projects Yet</h3>
-            <p className="text-gray-500 mb-6">
-              Create your first sub-project to start organizing your structural elements.
-            </p>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg"
+              {project?.location && (
+                <Typography variant="body2" sx={{ color: '#999' }}>
+                  📍 {project.location}
+                </Typography>
+              )}
+            </Box>
+            <Button
+              startIcon={<ArrowBack />}
+              variant="outlined"
+              onClick={() => router.push('/projects')}
+              sx={{ borderColor: '#6a11cb', color: '#6a11cb' }}
             >
-              + Create Your First Sub-Project
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {subProjects.map((subProject) => (
-              <div
-                key={subProject._id}
-                className="border border-gray-200 rounded-lg p-5 hover:shadow-xl hover:border-blue-300 transition-all cursor-pointer bg-white"
-                onClick={() => navigateToSubProject(subProject._id)}
+              Back to Projects
+            </Button>
+          </Box>
+          
+          {/* Project-level Statistics */}
+          {projectStats && (
+            <Grid container spacing={2} sx={{ mt: 2 }}>
+              <Grid item xs={6} md={3}>
+                <Box sx={{ 
+                  background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
+                  p: 3,
+                  borderRadius: 2,
+                  border: '1px solid #90caf9'
+                }}>
+                  <Typography variant="h4" fontWeight="bold" sx={{ color: '#1565c0', mb: 0.5 }}>
+                    {projectStats.totalElements || 0}
+                  </Typography>
+                  <Typography variant="body2" fontWeight="medium" sx={{ color: '#1976d2' }}>
+                    Total Elements
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={6} md={3}>
+                <Box sx={{ 
+                  background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)',
+                  p: 3,
+                  borderRadius: 2,
+                  border: '1px solid #81c784'
+                }}>
+                  <Typography variant="h4" fontWeight="bold" sx={{ color: '#2e7d32', mb: 0.5 }}>
+                    {projectStats.completedElements || 0}
+                  </Typography>
+                  <Typography variant="body2" fontWeight="medium" sx={{ color: '#388e3c' }}>
+                    Completed
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#4caf50' }}>
+                    {projectStats.totalElements > 0 ? Math.round((projectStats.completedElements / projectStats.totalElements) * 100) : 0}% complete
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={6} md={3}>
+                <Box sx={{ 
+                  background: 'linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%)',
+                  p: 3,
+                  borderRadius: 2,
+                  border: '1px solid #ce93d8'
+                }}>
+                  <Typography variant="h4" fontWeight="bold" sx={{ color: '#6a1b9a', mb: 0.5 }}>
+                    {projectStats.totalSqm?.toFixed(2) || '0.00'}
+                  </Typography>
+                  <Typography variant="body2" fontWeight="medium" sx={{ color: '#7b1fa2' }}>
+                    Total SQM
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={6} md={3}>
+                <Box sx={{ 
+                  background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
+                  p: 3,
+                  borderRadius: 2,
+                  border: '1px solid #ffb74d'
+                }}>
+                  <Typography variant="h4" fontWeight="bold" sx={{ color: '#e65100', mb: 0.5 }}>
+                    {projectStats.completedSqm?.toFixed(2) || '0.00'}
+                  </Typography>
+                  <Typography variant="body2" fontWeight="medium" sx={{ color: '#ef6c00' }}>
+                    Completed SQM
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#f57c00' }}>
+                    {projectStats.totalSqm > 0 ? Math.round((projectStats.completedSqm / projectStats.totalSqm) * 100) : 0}% complete
+                  </Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          )}
+
+          {/* Project-level Actions */}
+          <Box sx={{ mt: 3, display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+            <Button
+              variant="contained"
+              startIcon={<Download />}
+              onClick={() => downloadReport(null)}
+              sx={{ 
+                bgcolor: '#4caf50', 
+                '&:hover': { bgcolor: '#45a049' },
+                textTransform: 'none',
+                fontWeight: 600
+              }}
+            >
+              Download Full Project Report
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<Download />}
+              onClick={() => downloadReport(null, 'active')}
+              sx={{ 
+                bgcolor: '#2196f3', 
+                '&:hover': { bgcolor: '#1976d2' },
+                textTransform: 'none',
+                fontWeight: 600
+              }}
+            >
+              Active Report
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<Download />}
+              onClick={() => downloadReport(null, 'non clearance')}
+              sx={{ 
+                bgcolor: '#ff9800', 
+                '&:hover': { bgcolor: '#f57c00' },
+                textTransform: 'none',
+                fontWeight: 600
+              }}
+            >
+              Non-Clearance Report
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<Download />}
+              onClick={() => downloadReport(null, 'complete')}
+              sx={{ 
+                bgcolor: '#757575', 
+                '&:hover': { bgcolor: '#616161' },
+                textTransform: 'none',
+                fontWeight: 600
+              }}
+            >
+              Complete Report
+            </Button>
+          </Box>
+        </Paper>
+
+        {/* SubProjects Section */}
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: { xs: 3, sm: 4, md: 5 }, 
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(106, 17, 203, 0.3)'
+          }}
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Box>
+              <Typography variant="h4" fontWeight="bold" sx={{ color: '#333' }}>
+                Sub-Projects
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#777', mt: 0.5 }}>
+                Organize your project into manageable sub-projects
+              </Typography>
+            </Box>
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => setShowCreateModal(true)}
+              sx={{ 
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                '&:hover': { 
+                  background: 'linear-gradient(135deg, #5568d3 0%, #63408b 100%)'
+                },
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 3,
+                py: 1.5
+              }}
+            >
+              Create Sub-Project
+            </Button>
+          </Box>
+
+          {subProjects.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 10 }}>
+              <Folder sx={{ fontSize: 80, color: '#ccc', mb: 2 }} />
+              <Typography variant="h5" fontWeight="600" sx={{ color: '#666', mb: 1 }}>
+                No Sub-Projects Yet
+              </Typography>
+              <Typography sx={{ color: '#999', mb: 4 }}>
+                Create your first sub-project to start organizing your structural elements.
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => setShowCreateModal(true)}
+                sx={{ 
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  '&:hover': { 
+                    background: 'linear-gradient(135deg, #5568d3 0%, #63408b 100%)'
+                  },
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  px: 4,
+                  py: 1.5
+                }}
               >
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="text-xl font-bold text-gray-900">{subProject.name}</h3>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    subProject.status === 'active' ? 'bg-green-100 text-green-800 border border-green-200' :
-                    subProject.status === 'completed' ? 'bg-gray-100 text-gray-800 border border-gray-200' :
-                    'bg-yellow-100 text-yellow-800 border border-yellow-200'
-                  }`}>
-                    {subProject.status.toUpperCase()}
-                  </span>
-                </div>
-                
-                <div className="text-sm text-gray-600 mb-3">
-                  Code: <span className="font-mono font-bold">{subProject.code}</span>
-                </div>
-
-                {subProject.description && (
-                  <p className="text-sm text-gray-600 mb-3">{subProject.description}</p>
-                )}
-
-                {/* SubProject Statistics */}
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                  <div className="bg-blue-50 p-2 rounded text-center">
-                    <div className="text-lg font-bold text-blue-600">
-                      {subProject.statistics?.totalElements || 0}
-                    </div>
-                    <div className="text-xs text-gray-600">Elements</div>
-                  </div>
-                  <div className="bg-green-50 p-2 rounded text-center">
-                    <div className="text-lg font-bold text-green-600">
-                      {subProject.completionPercentage || 0}%
-                    </div>
-                    <div className="text-xs text-gray-600">Complete</div>
-                  </div>
-                  <div className="bg-purple-50 p-2 rounded text-center">
-                    <div className="text-lg font-bold text-purple-600">
-                      {subProject.statistics?.totalSqm?.toFixed(1) || 0}
-                    </div>
-                    <div className="text-xs text-gray-600">Total SQM</div>
-                  </div>
-                  <div className="bg-orange-50 p-2 rounded text-center">
-                    <div className="text-lg font-bold text-orange-600">
-                      {subProject.sqmCompletionPercentage || 0}%
-                    </div>
-                    <div className="text-xs text-gray-600">SQM Complete</div>
-                  </div>
-                </div>
-
-                {/* Section Breakdown */}
-                <div className="text-xs text-gray-600 mb-3">
-                  <div>Active: {subProject.statistics?.sections?.active?.count || 0}</div>
-                  <div>Non-Clearance: {subProject.statistics?.sections?.nonClearance?.count || 0}</div>
-                  <div>No Job: {subProject.statistics?.sections?.noJob?.count || 0}</div>
-                  <div>Complete: {subProject.statistics?.sections?.complete?.count || 0}</div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigateToExcelUpload(subProject._id);
+                Create Your First Sub-Project
+              </Button>
+            </Box>
+          ) : (
+            <Grid container spacing={3}>
+              {subProjects.map((subProject) => (
+                <Grid item xs={12} md={6} lg={4} key={subProject._id}>
+                  <Card 
+                    sx={{ 
+                      height: '100%',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s',
+                      '&:hover': {
+                        boxShadow: '0 12px 24px rgba(106, 17, 203, 0.2)',
+                        transform: 'translateY(-4px)',
+                        borderColor: '#6a11cb'
+                      },
+                      border: '1px solid #e0e0e0',
+                      borderRadius: 2
                     }}
-                    className="flex-1 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                    onClick={() => navigateToSubProject(subProject._id)}
                   >
-                    Upload Excel
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      downloadReport(subProject._id);
-                    }}
-                    className="flex-1 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
-                  >
-                    Export
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+                    <CardContent sx={{ p: 3 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
+                        <Typography variant="h6" fontWeight="bold" sx={{ color: '#333' }}>
+                          {subProject.name}
+                        </Typography>
+                        <Chip 
+                          label={subProject.status.toUpperCase()}
+                          size="small"
+                          sx={{
+                            bgcolor: subProject.status === 'active' ? '#e8f5e9' : 
+                                     subProject.status === 'completed' ? '#f5f5f5' : '#fff3e0',
+                            color: subProject.status === 'active' ? '#2e7d32' : 
+                                   subProject.status === 'completed' ? '#616161' : '#e65100',
+                            border: `1px solid ${subProject.status === 'active' ? '#81c784' : 
+                                    subProject.status === 'completed' ? '#bdbdbd' : '#ffb74d'}`,
+                            fontWeight: 600
+                          }}
+                        />
+                      </Box>
+                      
+                      <Typography variant="body2" sx={{ color: '#666', mb: 2 }}>
+                        Code: <Box component="span" sx={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{subProject.code}</Box>
+                      </Typography>
 
-      {/* Create SubProject Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
-            <div className="border-b border-gray-200 px-6 py-4">
-              <h3 className="text-2xl font-bold text-gray-900">Create New Sub-Project</h3>
-              <p className="text-sm text-gray-500 mt-1">Add a new sub-project to organize your structural elements</p>
-            </div>
-            
-            <form onSubmit={handleCreateSubProject} className="px-6 py-5">
-              <div className="mb-5">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Name *</label>
-                <input
-                  type="text"
+                      {subProject.description && (
+                        <Typography variant="body2" sx={{ color: '#666', mb: 2 }}>
+                          {subProject.description}
+                        </Typography>
+                      )}
+
+                      {/* SubProject Statistics */}
+                      <Grid container spacing={1} sx={{ mb: 2 }}>
+                        <Grid item xs={6}>
+                          <Box sx={{ bgcolor: '#e3f2fd', p: 1, borderRadius: 1, textAlign: 'center' }}>
+                            <Typography variant="h6" fontWeight="bold" sx={{ color: '#1565c0' }}>
+                              {subProject.statistics?.totalElements || 0}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#666' }}>Elements</Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Box sx={{ bgcolor: '#e8f5e9', p: 1, borderRadius: 1, textAlign: 'center' }}>
+                            <Typography variant="h6" fontWeight="bold" sx={{ color: '#2e7d32' }}>
+                              {subProject.completionPercentage || 0}%
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#666' }}>Complete</Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Box sx={{ bgcolor: '#f3e5f5', p: 1, borderRadius: 1, textAlign: 'center' }}>
+                            <Typography variant="h6" fontWeight="bold" sx={{ color: '#6a1b9a' }}>
+                              {subProject.statistics?.totalSqm?.toFixed(1) || 0}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#666' }}>Total SQM</Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Box sx={{ bgcolor: '#fff3e0', p: 1, borderRadius: 1, textAlign: 'center' }}>
+                            <Typography variant="h6" fontWeight="bold" sx={{ color: '#e65100' }}>
+                              {subProject.sqmCompletionPercentage || 0}%
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#666' }}>SQM Complete</Typography>
+                          </Box>
+                        </Grid>
+                      </Grid>
+
+                      {/* Section Breakdown */}
+                      <Box sx={{ fontSize: '0.75rem', color: '#666', mb: 2 }}>
+                        <Typography variant="caption" display="block">Active: {subProject.statistics?.sections?.active?.count || 0}</Typography>
+                        <Typography variant="caption" display="block">Non-Clearance: {subProject.statistics?.sections?.nonClearance?.count || 0}</Typography>
+                        <Typography variant="caption" display="block">No Job: {subProject.statistics?.sections?.noJob?.count || 0}</Typography>
+                        <Typography variant="caption" display="block">Complete: {subProject.statistics?.sections?.complete?.count || 0}</Typography>
+                      </Box>
+
+                      {/* Actions */}
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button
+                          variant="contained"
+                          fullWidth
+                          startIcon={<Upload />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigateToExcelUpload(subProject._id);
+                          }}
+                          sx={{ 
+                            bgcolor: '#2196f3', 
+                            '&:hover': { bgcolor: '#1976d2' },
+                            textTransform: 'none'
+                          }}
+                        >
+                          Upload Excel
+                        </Button>
+                        <Button
+                          variant="contained"
+                          fullWidth
+                          startIcon={<Download />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            downloadReport(subProject._id);
+                          }}
+                          sx={{ 
+                            bgcolor: '#4caf50', 
+                            '&:hover': { bgcolor: '#45a049' },
+                            textTransform: 'none'
+                          }}
+                        >
+                          Export
+                        </Button>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Paper>
+
+        {/* Create SubProject Modal */}
+        <Dialog 
+          open={showCreateModal} 
+          onClose={() => setShowCreateModal(false)}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: { borderRadius: 3 }
+          }}
+        >
+          <DialogTitle sx={{ borderBottom: '1px solid #e0e0e0' }}>
+            <Typography variant="h5" fontWeight="bold" sx={{ color: '#333' }}>
+              Create New Sub-Project
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#777', mt: 0.5 }}>
+              Add a new sub-project to organize your structural elements
+            </Typography>
+          </DialogTitle>
+          
+          <form onSubmit={handleCreateSubProject}>
+            <DialogContent sx={{ pt: 3 }}>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="body2" fontWeight="600" sx={{ mb: 1, color: '#333' }}>
+                  Name *
+                </Typography>
+                <TextField
+                  fullWidth
                   required
                   value={newSubProject.name}
                   onChange={(e) => setNewSubProject({ ...newSubProject, name: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                   placeholder="e.g., Building A - Floor 1"
+                  variant="outlined"
                 />
-              </div>
+              </Box>
 
-              <div className="mb-5">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Code *</label>
-                <input
-                  type="text"
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="body2" fontWeight="600" sx={{ mb: 1, color: '#333' }}>
+                  Code *
+                </Typography>
+                <TextField
+                  fullWidth
                   required
                   value={newSubProject.code}
                   onChange={(e) => setNewSubProject({ ...newSubProject, code: e.target.value.toUpperCase() })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors font-mono"
                   placeholder="e.g., BA-F1"
+                  variant="outlined"
+                  inputProps={{ style: { fontFamily: 'monospace' } }}
                 />
-                <p className="text-xs text-gray-500 mt-1">Unique identifier for this sub-project</p>
-              </div>
+                <Typography variant="caption" sx={{ color: '#777', mt: 0.5, display: 'block' }}>
+                  Unique identifier for this sub-project
+                </Typography>
+              </Box>
 
-              <div className="mb-5">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
-                <textarea
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="body2" fontWeight="600" sx={{ mb: 1, color: '#333' }}>
+                  Description
+                </Typography>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={3}
                   value={newSubProject.description}
                   onChange={(e) => setNewSubProject({ ...newSubProject, description: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  rows="3"
                   placeholder="Optional description"
+                  variant="outlined"
                 />
-              </div>
+              </Box>
 
-              <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
-                <select
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body2" fontWeight="600" sx={{ mb: 1, color: '#333' }}>
+                  Status
+                </Typography>
+                <TextField
+                  fullWidth
+                  select
                   value={newSubProject.status}
                   onChange={(e) => setNewSubProject({ ...newSubProject, status: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  variant="outlined"
                 >
-                  <option value="active">Active</option>
-                  <option value="on_hold">On Hold</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </div>
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="on_hold">On Hold</MenuItem>
+                  <MenuItem value="completed">Completed</MenuItem>
+                  <MenuItem value="cancelled">Cancelled</MenuItem>
+                </TextField>
+              </Box>
+            </DialogContent>
 
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="flex-1 px-5 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-5 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md"
-                >
-                  Create Sub-Project
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      </div>
-    </div>
+            <DialogActions sx={{ px: 3, pb: 3, pt: 2, borderTop: '1px solid #e0e0e0' }}>
+              <Button
+                onClick={() => setShowCreateModal(false)}
+                variant="outlined"
+                sx={{ 
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  px: 3
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="contained"
+                sx={{ 
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  '&:hover': { 
+                    background: 'linear-gradient(135deg, #5568d3 0%, #63408b 100%)'
+                  },
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  px: 3
+                }}
+              >
+                Create Sub-Project
+              </Button>
+            </DialogActions>
+          </form>
+        </Dialog>
+      </Container>
+    </Box>
   );
 }
