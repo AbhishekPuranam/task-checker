@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
-import { titleToSlug } from '../../utils/slug';
+import { titleToSlug, getSubProjectUrl } from '../../utils/slug';
 import {
   Container,
   Box,
@@ -121,16 +121,16 @@ export default function SubProjectManagement() {
     }
   };
 
-  const navigateToSubProject = (subProjectId) => {
-    if (!project) return;
-    const slug = titleToSlug(project.title);
-    router.push(`/projects/${slug}/subprojects/${subProjectId}`);
+  const navigateToSubProject = (subProject) => {
+    if (!project || !subProject) return;
+    const url = getSubProjectUrl(project, subProject);
+    router.push(url);
   };
 
-  const navigateToExcelUpload = (subProjectId) => {
-    if (!project) return;
-    const slug = titleToSlug(project.title);
-    router.push(`/projects/${slug}/subprojects/${subProjectId}/upload`);
+  const navigateToExcelUpload = (subProject) => {
+    if (!project || !subProject) return;
+    const url = getSubProjectUrl(project, subProject);
+    router.push(`${url}/upload`);
   };
 
   const downloadReport = async (subProjectId, status = null) => {
@@ -422,7 +422,7 @@ export default function SubProjectManagement() {
                       border: '1px solid #e0e0e0',
                       borderRadius: 2
                     }}
-                    onClick={() => navigateToSubProject(subProject._id)}
+                    onClick={() => navigateToSubProject(subProject)}
                   >
                     <CardContent sx={{ p: 3 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
@@ -506,7 +506,7 @@ export default function SubProjectManagement() {
                           startIcon={<Upload />}
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigateToExcelUpload(subProject._id);
+                            navigateToExcelUpload(subProject);
                           }}
                           sx={{ 
                             bgcolor: '#2196f3', 

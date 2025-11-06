@@ -1,7 +1,24 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import axios from 'axios';
-import { titleToSlug } from '../../utils/slug';
+import { titleToSlug, getSubProjectUrl } from '../../utils/slug';
+import {
+  Container,
+  Box,
+  Paper,
+  Typography,
+  Button,
+  Grid,
+  Chip,
+  CircularProgress,
+  Tabs,
+  Tab,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
+} from '@mui/material';
+import { ArrowBack, Download } from '@mui/icons-material';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -45,27 +62,43 @@ export default function SubProjectDetail() {
       const token = localStorage.getItem('token');
       
       // Check if projectId looks like a MongoDB ObjectId
-      const isMongoId = /^[0-9a-fA-F]{24}$/.test(projectId);
-      const projectEndpoint = isMongoId 
+      const isProjectMongoId = /^[0-9a-fA-F]{24}$/.test(projectId);
+      const isSubProjectMongoId = /^[0-9a-fA-F]{24}$/.test(subProjectId);
+      
+      const projectEndpoint = isProjectMongoId 
         ? `${API_URL}/projects/${projectId}`
         : `${API_URL}/projects/by-name/${encodeURIComponent(projectId)}`;
       
-      const [projectRes, subProjectRes] = await Promise.all([
-        axios.get(projectEndpoint, {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get(`${API_URL}/subprojects/${subProjectId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-      ]);
+      // First fetch the project to get its ID for the subproject query
+      const projectRes = await axios.get(projectEndpoint, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       
       setProject(projectRes.data);
+      
+      // Now fetch subproject - use by-name endpoint if it's not a Mongo ID
+      let subProjectRes;
+      if (isSubProjectMongoId) {
+        subProjectRes = await axios.get(`${API_URL}/subprojects/${subProjectId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else {
+        // Use the by-name endpoint with project ID
+        subProjectRes = await axios.get(
+          `${API_URL}/subprojects/by-name/${projectRes.data._id}/${encodeURIComponent(subProjectId)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
+      
       setSubProject(subProjectRes.data);
       
-      // Update URL to use slug if we got an ID-based URL
-      if (isMongoId && projectRes.data.title) {
-        const slug = titleToSlug(projectRes.data.title);
-        router.replace(`/projects/${slug}/subprojects/${subProjectId}`, undefined, { shallow: true });
+      // Update URL to use slugs if we got ID-based URLs
+      const needsProjectSlug = isProjectMongoId && projectRes.data.title;
+      const needsSubProjectSlug = isSubProjectMongoId && (subProjectRes.data.code || subProjectRes.data.name);
+      
+      if (needsProjectSlug || needsSubProjectSlug) {
+        const url = getSubProjectUrl(projectRes.data, subProjectRes.data);
+        router.replace(url, undefined, { shallow: true });
       }
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -117,7 +150,8 @@ export default function SubProjectDetail() {
   const downloadReport = async (status = null) => {
     try {
       const token = localStorage.getItem('token');
-      const url = `${API_URL}/reports/excel/subproject/${subProjectId}${status ? `?status=${status}` : ''}`;
+      const subProjectIdToUse = subProject?._id || subProjectId;
+      const url = `${API_URL}/reports/excel/subproject/${subProjectIdToUse}${status ? `?status=${status}` : ''}`;
       window.open(url + `&token=${token}`, '_blank');
     } catch (err) {
       console.error('Error downloading report:', err);
@@ -126,236 +160,366 @@ export default function SubProjectDetail() {
   };
 
   if (loading) {
-    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Container>
+    );
   }
 
   if (!subProject) {
-    return <div className="text-red-600 p-4">SubProject not found</div>;
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4 }}>
+        <Paper sx={{ p: 4, bgcolor: '#fee', color: '#c00' }}>
+          <Typography variant="h6">SubProject not found</Typography>
+        </Paper>
+      </Container>
+    );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h1 className="text-3xl font-bold">{subProject.name}</h1>
-            <div className="text-sm text-gray-600 mt-1">
-              Code: <span className="font-mono font-bold">{subProject.code}</span>
-            </div>
-            {subProject.description && (
-              <p className="text-gray-600 mt-2">{subProject.description}</p>
-            )}
-          </div>
-          <button
-            onClick={() => {
-              if (project) {
-                const slug = titleToSlug(project.title);
-                router.push(`/projects/${slug}`);
+    <Box 
+      sx={{ 
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        py: 3
+      }}
+    >
+      <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 2, md: 3 } }}>
+        {/* Header */}
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: { xs: 3, sm: 4, md: 5 }, 
+            mb: 3, 
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(106, 17, 203, 0.3)'
+          }}
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 3 }}>
+            <Box>
+              <Typography variant="h3" component="h1" fontWeight="bold" sx={{ color: '#6a11cb', mb: 1 }}>
+                {subProject.name}
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#666', mb: 1 }}>
+                Code: <Box component="span" sx={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{subProject.code}</Box>
+              </Typography>
+              {subProject.description && (
+                <Typography variant="body1" sx={{ color: '#666' }}>
+                  {subProject.description}
+                </Typography>
+              )}
+            </Box>
+            <Button
+              startIcon={<ArrowBack />}
+              variant="outlined"
+              onClick={() => {
+                if (project) {
+                  const slug = titleToSlug(project.title);
+                  router.push(`/projects/${slug}`);
+                }
+              }}
+              sx={{ borderColor: '#6a11cb', color: '#6a11cb' }}
+            >
+              Back to Project
+            </Button>
+          </Box>
+
+          {/* Statistics */}
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={6} md={3}>
+              <Box sx={{ 
+                background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
+                p: 3,
+                borderRadius: 2,
+                border: '1px solid #90caf9'
+              }}>
+                <Typography variant="h4" fontWeight="bold" sx={{ color: '#1565c0', mb: 0.5 }}>
+                  {subProject.statistics?.totalElements || 0}
+                </Typography>
+                <Typography variant="body2" fontWeight="medium" sx={{ color: '#1976d2' }}>
+                  Total Elements
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={6} md={3}>
+              <Box sx={{ 
+                background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)',
+                p: 3,
+                borderRadius: 2,
+                border: '1px solid #81c784'
+              }}>
+                <Typography variant="h4" fontWeight="bold" sx={{ color: '#2e7d32', mb: 0.5 }}>
+                  {subProject.completionPercentage || 0}%
+                </Typography>
+                <Typography variant="body2" fontWeight="medium" sx={{ color: '#388e3c' }}>
+                  Completion
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={6} md={3}>
+              <Box sx={{ 
+                background: 'linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%)',
+                p: 3,
+                borderRadius: 2,
+                border: '1px solid #ce93d8'
+              }}>
+                <Typography variant="h4" fontWeight="bold" sx={{ color: '#6a1b9a', mb: 0.5 }}>
+                  {subProject.statistics?.totalSqm?.toFixed(2) || 0}
+                </Typography>
+                <Typography variant="body2" fontWeight="medium" sx={{ color: '#7b1fa2' }}>
+                  Total SQM
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={6} md={3}>
+              <Box sx={{ 
+                background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
+                p: 3,
+                borderRadius: 2,
+                border: '1px solid #ffb74d'
+              }}>
+                <Typography variant="h4" fontWeight="bold" sx={{ color: '#e65100', mb: 0.5 }}>
+                  {subProject.sqmCompletionPercentage || 0}%
+                </Typography>
+                <Typography variant="body2" fontWeight="medium" sx={{ color: '#ef6c00' }}>
+                  SQM Completion
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+
+          {/* Export Buttons */}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+            <Button
+              variant="contained"
+              startIcon={<Download />}
+              onClick={() => downloadReport()}
+              sx={{ 
+                bgcolor: '#4caf50', 
+                '&:hover': { bgcolor: '#45a049' },
+                textTransform: 'none',
+                fontWeight: 600
+              }}
+            >
+              Export All
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<Download />}
+              onClick={() => downloadReport(activeSection)}
+              sx={{ 
+                bgcolor: '#2196f3', 
+                '&:hover': { bgcolor: '#1976d2' },
+                textTransform: 'none',
+                fontWeight: 600
+              }}
+            >
+              Export {SECTIONS.find(s => s.id === activeSection)?.label}
+            </Button>
+          </Box>
+        </Paper>
+
+        {/* Sections Tabs */}
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            mb: 3, 
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(106, 17, 203, 0.3)'
+          }}
+        >
+          <Tabs
+            value={activeSection}
+            onChange={(e, newValue) => setActiveSection(newValue)}
+            variant="fullWidth"
+            sx={{
+              borderBottom: 1,
+              borderColor: 'divider',
+              '& .MuiTab-root': {
+                textTransform: 'none',
+                fontWeight: 600,
+                fontSize: '1rem'
               }
             }}
-            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
           >
-            ← Back to Project
-          </button>
-        </div>
+            {SECTIONS.map((section) => {
+              const count = subProject.statistics?.sections?.[section.id === 'non_clearance' ? 'nonClearance' : section.id === 'no_job' ? 'noJob' : section.id]?.count || 0;
+              const sqm = subProject.statistics?.sections?.[section.id === 'non_clearance' ? 'nonClearance' : section.id === 'no_job' ? 'noJob' : section.id]?.sqm || 0;
+              
+              return (
+                <Tab
+                  key={section.id}
+                  value={section.id}
+                  label={
+                    <Box>
+                      <Typography variant="body1" fontWeight="bold">
+                        {section.label}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#666' }}>
+                        {count} items • {sqm.toFixed(1)} SQM
+                      </Typography>
+                    </Box>
+                  }
+                />
+              );
+            })}
+          </Tabs>
+        </Paper>
 
-        {/* Statistics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-          <div className="bg-blue-50 p-4 rounded">
-            <div className="text-2xl font-bold text-blue-600">
-              {subProject.statistics?.totalElements || 0}
-            </div>
-            <div className="text-sm text-gray-600">Total Elements</div>
-          </div>
-          <div className="bg-green-50 p-4 rounded">
-            <div className="text-2xl font-bold text-green-600">
-              {subProject.completionPercentage || 0}%
-            </div>
-            <div className="text-sm text-gray-600">Completion</div>
-          </div>
-          <div className="bg-purple-50 p-4 rounded">
-            <div className="text-2xl font-bold text-purple-600">
-              {subProject.statistics?.totalSqm?.toFixed(2) || 0}
-            </div>
-            <div className="text-sm text-gray-600">Total SQM</div>
-          </div>
-          <div className="bg-orange-50 p-4 rounded">
-            <div className="text-2xl font-bold text-orange-600">
-              {subProject.sqmCompletionPercentage || 0}%
-            </div>
-            <div className="text-sm text-gray-600">SQM Completion</div>
-          </div>
-        </div>
+        {/* Grouping Controls */}
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: { xs: 3, sm: 4 }, 
+            mb: 3, 
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(106, 17, 203, 0.3)'
+          }}
+        >
+          <Typography variant="h5" fontWeight="bold" sx={{ mb: 3, color: '#333' }}>
+            Group & Analyze
+          </Typography>
+          
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
+                <InputLabel>Group By</InputLabel>
+                <Select
+                  value={groupBy}
+                  onChange={(e) => setGroupBy(e.target.value)}
+                  label="Group By"
+                >
+                  <MenuItem value="">-- Select Field --</MenuItem>
+                  {availableFields.map((field) => (
+                    <MenuItem key={field.value} value={field.value}>
+                      {field.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
 
-        {/* Export Buttons */}
-        <div className="flex gap-2">
-          <button
-            onClick={() => downloadReport()}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-          >
-            Export All
-          </button>
-          <button
-            onClick={() => downloadReport(activeSection)}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Export {SECTIONS.find(s => s.id === activeSection)?.label}
-          </button>
-        </div>
-      </div>
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth disabled={!groupBy}>
+                <InputLabel>Sub-Group By (Optional)</InputLabel>
+                <Select
+                  value={subGroupBy}
+                  onChange={(e) => setSubGroupBy(e.target.value)}
+                  label="Sub-Group By (Optional)"
+                >
+                  <MenuItem value="">-- No Sub-Grouping --</MenuItem>
+                  {availableFields
+                    .filter((field) => field.value !== groupBy)
+                    .map((field) => (
+                      <MenuItem key={field.value} value={field.value}>
+                        {field.label}
+                      </MenuItem>
+                    ))}
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
 
-      {/* Sections Tabs */}
-      <div className="bg-white rounded-lg shadow-md mb-6">
-        <div className="flex border-b">
-          {SECTIONS.map((section) => {
-            const count = subProject.statistics?.sections?.[section.id === 'non_clearance' ? 'nonClearance' : section.id === 'no_job' ? 'noJob' : section.id]?.count || 0;
-            const sqm = subProject.statistics?.sections?.[section.id === 'non_clearance' ? 'nonClearance' : section.id === 'no_job' ? 'noJob' : section.id]?.sqm || 0;
-            
-            return (
-              <button
-                key={section.id}
-                onClick={() => setActiveSection(section.id)}
-                className={`flex-1 px-6 py-4 text-center transition-colors ${
-                  activeSection === section.id
-                    ? `bg-${section.color}-100 border-b-2 border-${section.color}-600 font-semibold`
-                    : 'hover:bg-gray-50'
-                }`}
-              >
-                <div className="text-lg font-bold">{section.label}</div>
-                <div className="text-sm text-gray-600">
-                  {count} items • {sqm.toFixed(1)} SQM
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Grouping Controls */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-xl font-bold mb-4">Group & Analyze</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Group By</label>
-            <select
-              value={groupBy}
-              onChange={(e) => setGroupBy(e.target.value)}
-              className="w-full px-3 py-2 border rounded"
+          {groupBy && (
+            <Button
+              variant="contained"
+              onClick={fetchGroupedData}
+              disabled={loadingGroups}
+              sx={{ 
+                mt: 3,
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                '&:hover': { 
+                  background: 'linear-gradient(135deg, #5568d3 0%, #63408b 100%)'
+                },
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 4
+              }}
             >
-              <option value="">-- Select Field --</option>
-              {availableFields.map((field) => (
-                <option key={field.value} value={field.value}>
-                  {field.label}
-                </option>
-              ))}
-            </select>
-          </div>
+              {loadingGroups ? 'Loading...' : 'Apply Grouping'}
+            </Button>
+          )}
+        </Paper>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Sub-Group By (Optional)</label>
-            <select
-              value={subGroupBy}
-              onChange={(e) => setSubGroupBy(e.target.value)}
-              className="w-full px-3 py-2 border rounded"
-              disabled={!groupBy}
-            >
-              <option value="">-- No Sub-Grouping --</option>
-              {availableFields
-                .filter((field) => field.value !== groupBy)
-                .map((field) => (
-                  <option key={field.value} value={field.value}>
-                    {field.label}
-                  </option>
-                ))}
-            </select>
-          </div>
-        </div>
-
-        {groupBy && (
-          <button
-            onClick={fetchGroupedData}
-            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            disabled={loadingGroups}
+        {/* Grouped Results */}
+        {groupedData && (
+          <Paper 
+            elevation={3} 
+            sx={{ 
+              p: { xs: 3, sm: 4 }, 
+              borderRadius: 3,
+              boxShadow: '0 8px 32px rgba(106, 17, 203, 0.3)'
+            }}
           >
-            {loadingGroups ? 'Loading...' : 'Apply Grouping'}
-          </button>
-        )}
-      </div>
+            <Typography variant="h5" fontWeight="bold" sx={{ mb: 3, color: '#333' }}>
+              Grouped Results ({groupedData.groups?.length || 0} groups)
+            </Typography>
 
-      {/* Grouped Results */}
-      {groupedData && (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-bold mb-4">
-            Grouped Results ({groupedData.groups?.length || 0} groups)
-          </h2>
-
-          <div className="space-y-4">
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {groupedData.groups?.map((group, index) => (
-              <div key={index} className="border rounded-lg p-4">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h3 className="text-lg font-semibold">
-                      {group._id[groupBy] || '(Not Set)'}
-                      {subGroupBy && group._id[subGroupBy] && (
-                        <span className="text-gray-600 ml-2">
-                          → {group._id[subGroupBy]}
-                        </span>
-                      )}
-                    </h3>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm text-gray-600">
-                      {group.count} elements • {group.totalSqm?.toFixed(2)} SQM
-                    </div>
-                    {group.totalQty > 0 && (
-                      <div className="text-sm text-gray-600">
-                        Total Qty: {group.totalQty}
-                      </div>
+              <Paper key={index} sx={{ p: 3, border: '1px solid #e0e0e0', borderRadius: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
+                  <Typography variant="h6" fontWeight="600">
+                    {group._id[groupBy] || '(Not Set)'}
+                    {subGroupBy && group._id[subGroupBy] && (
+                      <Box component="span" sx={{ color: '#666', ml: 1 }}>
+                        → {group._id[subGroupBy]}
+                      </Box>
                     )}
-                  </div>
-                </div>
+                  </Typography>
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="body2" sx={{ color: '#666' }}>
+                      {group.count} elements • {group.totalSqm?.toFixed(2)} SQM
+                    </Typography>
+                    {group.totalQty > 0 && (
+                      <Typography variant="body2" sx={{ color: '#666' }}>
+                        Total Qty: {group.totalQty}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
 
                 {/* Sample Elements */}
                 {group.elements && group.elements.length > 0 && (
-                  <div className="mt-3">
-                    <div className="text-sm font-medium text-gray-700 mb-2">
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="body2" fontWeight="600" sx={{ color: '#333', mb: 1 }}>
                       Sample Elements (showing {Math.min(5, group.elements.length)} of {group.count}):
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm">
-                        <thead className="bg-gray-50">
+                    </Typography>
+                    <Box sx={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
+                        <thead style={{ backgroundColor: '#f5f5f5' }}>
                           <tr>
-                            <th className="px-3 py-2 text-left">Serial No</th>
-                            <th className="px-3 py-2 text-left">Structure No</th>
-                            <th className="px-3 py-2 text-left">Drawing No</th>
-                            <th className="px-3 py-2 text-left">Level</th>
-                            <th className="px-3 py-2 text-left">Section</th>
-                            <th className="px-3 py-2 text-left">SQM</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Serial No</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Structure No</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Drawing No</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Level</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Section</th>
+                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>SQM</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y">
+                        <tbody>
                           {group.elements.slice(0, 5).map((element) => (
-                            <tr key={element._id} className="hover:bg-gray-50">
-                              <td className="px-3 py-2">{element.serialNo}</td>
-                              <td className="px-3 py-2">{element.structureNumber}</td>
-                              <td className="px-3 py-2">{element.drawingNo}</td>
-                              <td className="px-3 py-2">{element.level}</td>
-                              <td className="px-3 py-2">{element.sectionSizes}</td>
-                              <td className="px-3 py-2">{element.surfaceAreaSqm?.toFixed(2)}</td>
+                            <tr key={element._id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                              <td style={{ padding: '8px 12px' }}>{element.serialNo}</td>
+                              <td style={{ padding: '8px 12px' }}>{element.structureNumber}</td>
+                              <td style={{ padding: '8px 12px' }}>{element.drawingNo}</td>
+                              <td style={{ padding: '8px 12px' }}>{element.level}</td>
+                              <td style={{ padding: '8px 12px' }}>{element.sectionSizes}</td>
+                              <td style={{ padding: '8px 12px' }}>{element.surfaceAreaSqm?.toFixed(2)}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
-                    </div>
-                  </div>
+                    </Box>
+                  </Box>
                 )}
-              </div>
+              </Paper>
             ))}
-          </div>
-        </div>
-      )}
-    </div>
+            </Box>
+          </Paper>
+        )}
+      </Container>
+    </Box>
   );
 }

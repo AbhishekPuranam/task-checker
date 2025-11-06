@@ -138,6 +138,43 @@ router.get('/:id', auth, async (req, res) => {
 
 /**
  * @swagger
+ * /api/subprojects/by-name/:projectId/:subProjectName:
+ *   get:
+ *     summary: Get a specific SubProject by name or code
+ *     tags: [SubProjects]
+ */
+router.get('/by-name/:projectId/:subProjectName', auth, async (req, res) => {
+  try {
+    const { projectId, subProjectName } = req.params;
+    
+    // Decode the subproject name from URL
+    const decodedName = decodeURIComponent(subProjectName);
+    
+    // Try to find by name or code (case insensitive)
+    const subProject = await SubProject.findOne({
+      project: projectId,
+      $or: [
+        { name: { $regex: new RegExp(`^${decodedName}$`, 'i') } },
+        { code: { $regex: new RegExp(`^${decodedName}$`, 'i') } }
+      ]
+    })
+      .populate('project', 'title description')
+      .populate('createdBy', 'name email')
+      .lean();
+    
+    if (!subProject) {
+      return res.status(404).json({ error: 'SubProject not found' });
+    }
+    
+    res.json(subProject);
+  } catch (error) {
+    console.error('Error fetching SubProject by name:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
  * /api/subprojects/:id:
  *   put:
  *     summary: Update a SubProject

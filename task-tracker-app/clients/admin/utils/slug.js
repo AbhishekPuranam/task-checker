@@ -49,3 +49,22 @@ export function getProjectUrl(project) {
   // Fallback to ID if no title
   return `/projects/${project._id}`;
 }
+
+/**
+ * Get subproject URL with slug (uses code or name)
+ * @param {object} project - Project object with _id and title
+ * @param {object} subProject - SubProject object with _id, code, and name
+ * @returns {string} - URL path
+ */
+export function getSubProjectUrl(project, subProject) {
+  if (!project || !subProject) return '';
+  
+  const projectSlug = project.title ? titleToSlug(project.title) : project._id;
+  
+  // Prefer code over name for subproject slug (more concise)
+  const subProjectSlug = subProject.code 
+    ? titleToSlug(subProject.code) 
+    : titleToSlug(subProject.name);
+  
+  return `/projects/${projectSlug}/subprojects/${subProjectSlug}`;
+}
