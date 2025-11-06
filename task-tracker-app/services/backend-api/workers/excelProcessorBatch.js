@@ -28,9 +28,10 @@ function parseExcelFile(filePath) {
 /**
  * Transform Excel row to structural element
  */
-function transformExcelRow(row, projectId, userId, project) {
+function transformExcelRow(row, projectId, userId, project, subProjectId = null) {
   const transformed = {
     project: projectId,
+    subProject: subProjectId, // NEW: Support for SubProject
     projectName: project.title || 'Untitled Project',
     siteLocation: project.location || 'Not specified',
     serialNo: row['Sl No'] || row['Serial No'] || row['S.No'],
@@ -172,7 +173,7 @@ async function processBatch(uploadSession, batchNumber, excelData, project, user
 
     for (const row of batchRows) {
       try {
-        const elementData = transformExcelRow(row, project._id, userId, project);
+        const elementData = transformExcelRow(row, project._id, userId, project, subProjectId);
 
         if (!elementData.structureNumber) {
           console.warn(`⚠️ [BATCH ${batchNumber}] Skipping row - no structure number`);
@@ -180,7 +181,7 @@ async function processBatch(uploadSession, batchNumber, excelData, project, user
         }
 
         // Check for duplicate
-        const existingElement = await StructuralElement.findOne({
+        const duplicateQuery = {
           project: project._id,
           structureNumber: elementData.structureNumber,
           drawingNo: elementData.drawingNo,
@@ -188,7 +189,14 @@ async function processBatch(uploadSession, batchNumber, excelData, project, user
           memberType: elementData.memberType,
           gridNo: elementData.gridNo,
           partMarkNo: elementData.partMarkNo,
-        }).session(session);
+        };
+        
+        // If subProjectId is provided, check duplicates within subproject
+        if (subProjectId) {
+          duplicateQuery.subProject = subProjectId;
+        }
+        
+        const existingElement = await StructuralElement.findOne(duplicateQuery).session(session);
 
         if (existingElement) {
           console.log(`⚠️ [BATCH ${batchNumber}] Skipping duplicate: ${elementData.structureNumber}`);
@@ -278,7 +286,7 @@ function createBatchExcelWorker() {
       const startTime = Date.now();
       console.log(`🔄 [WORKER] Processing job ${job.id} with batch-based approach`);
 
-      const { filePath, projectId, userId, userEmail } = job.data;
+      const { filePath, projectId, userId, userEmail, subProjectId } = job.data;
 
       try {
         // Stage 1: Parse Excel (0-10%)
@@ -376,6 +384,14 @@ function createBatchExcelWorker() {
         // Invalidate cache
         await invalidateCache(`/api/structural-elements?project=${projectId}`);
         await invalidateCache(`/api/projects/${projectId}/stats`);
+        
+        // NEW: Trigger SubProject/Project aggregation if subProjectId is provided
+        if (subProjectId && summary.totalElementsCreated > 0) {
+          const { scheduleBatchAggregation } = require('../utils/aggregationQueue');
+          scheduleBatchAggregation(subProjectId).catch(err =>
+            console.error('[WORKER] Failed to queue aggregation job:', err)
+          );
+        }
 
         // Trigger progress calculation
         if (summary.totalElementsCreated > 0) {

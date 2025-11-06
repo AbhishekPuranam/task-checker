@@ -1,11 +1,20 @@
 const mongoose = require('mongoose');
 
 const structuralElementSchema = new mongoose.Schema({
-  // Link to parent project
+  // Link to parent project (for backward compatibility)
   project: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Task', // Using existing Task model as Project
-    required: true
+    required: true,
+    index: true
+  },
+  
+  // Link to SubProject (new hierarchy)
+  subProject: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'SubProject',
+    required: false, // Optional for backward compatibility
+    index: true
   },
   
   // Excel column data
@@ -79,8 +88,9 @@ const structuralElementSchema = new mongoose.Schema({
   // Status tracking
   status: {
     type: String,
-    enum: ['active', 'complete', 'completed', 'non clearance', 'on_hold', 'cancelled'],
-    default: 'active'
+    enum: ['active', 'complete', 'completed', 'non clearance', 'no_job', 'on_hold', 'cancelled'],
+    default: 'active',
+    index: true
   },
   // Admin who created this entry
   createdBy: {
@@ -121,6 +131,8 @@ const structuralElementSchema = new mongoose.Schema({
 // Different projects CAN have elements with the same serialNo
 structuralElementSchema.index({ project: 1, serialNo: 1 }, { unique: true });
 structuralElementSchema.index({ project: 1, structureNumber: 1 });
+structuralElementSchema.index({ subProject: 1, status: 1 }); // New index for SubProject queries
+structuralElementSchema.index({ subProject: 1, serialNo: 1 }); // New index for SubProject queries
 structuralElementSchema.index({ drawingNo: 1 });
 structuralElementSchema.index({ level: 1 });
 structuralElementSchema.index({ memberType: 1 });

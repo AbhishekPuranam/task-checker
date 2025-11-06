@@ -826,4 +826,304 @@ router.get('/debug-data', adminAuth, async (req, res) => {
   }
 });
 
+// ============= NEW: PROJECT/SUBPROJECT EXCEL REPORTS =============
+
+/**
+ * Generate Excel report for entire Project (all SubProjects)
+ * GET /api/reports/excel/project/:projectId?status=active|non%20clearance|no_job|complete
+ */
+router.get('/excel/project/:projectId', adminAuth, async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { status } = req.query; // Filter: active, non clearance, no_job, complete
+    
+    const SubProject = require('../models/SubProject');
+    
+    // Set response headers for Excel file
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=project-${projectId}-${status || 'all'}-${Date.now()}.xlsx`
+    );
+    
+    // Create workbook
+    const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+      stream: res,
+      useStyles: true,
+      useSharedStrings: true
+    });
+    
+    // Get all subprojects
+    const subProjects = await SubProject.find({ project: projectId })
+      .select('name code')
+      .sort({ name: 1 })
+      .lean();
+    
+    // Build query
+    const query = { project: projectId };
+    if (status) {
+      if (status === 'complete') {
+        query.status = { $in: ['complete', 'completed'] };
+      } else {
+        query.status = status;
+      }
+    }
+    
+    // Create summary worksheet
+    const summarySheet = workbook.addWorksheet('Summary');
+    summarySheet.columns = [
+      { header: 'SubProject Code', key: 'code', width: 20 },
+      { header: 'SubProject Name', key: 'name', width: 30 },
+      { header: 'Total Elements', key: 'totalElements', width: 15 },
+      { header: 'Total SQM', key: 'totalSqm', width: 15 }
+    ];
+    
+    // Add subproject summaries
+    for (const subProject of subProjects) {
+      const count = await StructuralElement.countDocuments({
+        ...query,
+        subProject: subProject._id
+      });
+      
+      const stats = await StructuralElement.aggregate([
+        { $match: { ...query, subProject: subProject._id } },
+        { $group: { _id: null, totalSqm: { $sum: '$surfaceAreaSqm' } } }
+      ]);
+      
+      summarySheet.addRow({
+        code: subProject.code,
+        name: subProject.name,
+        totalElements: count,
+        totalSqm: stats[0]?.totalSqm || 0
+      }).commit();
+    }
+    
+    // Create detailed worksheet
+    const detailSheet = workbook.addWorksheet('Detailed Elements');
+    detailSheet.columns = [
+      { header: 'SubProject', key: 'subProject', width: 20 },
+      { header: 'Serial No', key: 'serialNo', width: 15 },
+      { header: 'Structure Number', key: 'structureNumber', width: 20 },
+      { header: 'Drawing No', key: 'drawingNo', width: 20 },
+      { header: 'Level', key: 'level', width: 15 },
+      { header: 'Member Type', key: 'memberType', width: 20 },
+      { header: 'Grid No', key: 'gridNo', width: 15 },
+      { header: 'Part Mark No', key: 'partMarkNo', width: 20 },
+      { header: 'Section Sizes', key: 'sectionSizes', width: 20 },
+      { header: 'Length (mm)', key: 'lengthMm', width: 15 },
+      { header: 'Qty', key: 'qty', width: 10 },
+      { header: 'Section Depth (mm)', key: 'sectionDepthMm', width: 18 },
+      { header: 'Flange Width (mm)', key: 'flangeWidthMm', width: 18 },
+      { header: 'Web Thickness (mm)', key: 'webThicknessMm', width: 20 },
+      { header: 'Flange Thickness (mm)', key: 'flangeThicknessMm', width: 22 },
+      { header: 'Fireproofing Thickness', key: 'fireproofingThickness', width: 22 },
+      { header: 'Surface Area (SQM)', key: 'surfaceAreaSqm', width: 18 },
+      { header: 'Fire Proofing Workflow', key: 'fireProofingWorkflow', width: 25 },
+      { header: 'Status', key: 'status', width: 15 }
+    ];
+    
+    // Stream elements in batches
+    const BATCH_SIZE = 500;
+    let skip = 0;
+    let hasMore = true;
+    
+    while (hasMore) {
+      const elements = await StructuralElement.find(query)
+        .populate('subProject', 'code name')
+        .sort({ subProject: 1, serialNo: 1 })
+        .skip(skip)
+        .limit(BATCH_SIZE)
+        .lean();
+      
+      if (elements.length === 0) {
+        hasMore = false;
+        break;
+      }
+      
+      for (const element of elements) {
+        detailSheet.addRow({
+          subProject: element.subProject?.code || 'N/A',
+          serialNo: element.serialNo,
+          structureNumber: element.structureNumber,
+          drawingNo: element.drawingNo,
+          level: element.level,
+          memberType: element.memberType,
+          gridNo: element.gridNo,
+          partMarkNo: element.partMarkNo,
+          sectionSizes: element.sectionSizes,
+          lengthMm: element.lengthMm,
+          qty: element.qty,
+          sectionDepthMm: element.sectionDepthMm,
+          flangeWidthMm: element.flangeWidthMm,
+          webThicknessMm: element.webThicknessMm,
+          flangeThicknessMm: element.flangeThicknessMm,
+          fireproofingThickness: element.fireproofingThickness,
+          surfaceAreaSqm: element.surfaceAreaSqm,
+          fireProofingWorkflow: element.fireProofingWorkflow,
+          status: element.status
+        }).commit();
+      }
+      
+      skip += BATCH_SIZE;
+      
+      if (elements.length < BATCH_SIZE) {
+        hasMore = false;
+      }
+    }
+    
+    await workbook.commit();
+  } catch (error) {
+    console.error('Error generating project Excel report:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+});
+
+/**
+ * Generate Excel report for a specific SubProject
+ * GET /api/reports/excel/subproject/:subProjectId?status=active|non%20clearance|no_job|complete
+ */
+router.get('/excel/subproject/:subProjectId', adminAuth, async (req, res) => {
+  try {
+    const { subProjectId } = req.params;
+    const { status } = req.query;
+    
+    const SubProject = require('../models/SubProject');
+    
+    // Get subproject details
+    const subProject = await SubProject.findById(subProjectId)
+      .populate('project', 'title')
+      .lean();
+    
+    if (!subProject) {
+      return res.status(404).json({ error: 'SubProject not found' });
+    }
+    
+    // Set response headers
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=subproject-${subProject.code}-${status || 'all'}-${Date.now()}.xlsx`
+    );
+    
+    // Create workbook
+    const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+      stream: res,
+      useStyles: true,
+      useSharedStrings: true
+    });
+    
+    // Add metadata worksheet
+    const metaSheet = workbook.addWorksheet('SubProject Info');
+    metaSheet.columns = [
+      { header: 'Field', key: 'field', width: 30 },
+      { header: 'Value', key: 'value', width: 50 }
+    ];
+    
+    metaSheet.addRow({ field: 'Project', value: subProject.project?.title || 'N/A' }).commit();
+    metaSheet.addRow({ field: 'SubProject Code', value: subProject.code }).commit();
+    metaSheet.addRow({ field: 'SubProject Name', value: subProject.name }).commit();
+    metaSheet.addRow({ field: 'Status', value: subProject.status }).commit();
+    metaSheet.addRow({ field: 'Total Elements', value: subProject.statistics.totalElements }).commit();
+    metaSheet.addRow({ field: 'Completed Elements', value: subProject.statistics.completedElements }).commit();
+    metaSheet.addRow({ field: 'Total SQM', value: subProject.statistics.totalSqm }).commit();
+    metaSheet.addRow({ field: 'Completed SQM', value: subProject.statistics.completedSqm }).commit();
+    metaSheet.addRow({ field: 'Report Generated', value: new Date().toISOString() }).commit();
+    
+    // Build query
+    const query = { subProject: subProjectId };
+    if (status) {
+      if (status === 'complete') {
+        query.status = { $in: ['complete', 'completed'] };
+      } else {
+        query.status = status;
+      }
+    }
+    
+    // Create elements worksheet
+    const elementsSheet = workbook.addWorksheet('Structural Elements');
+    elementsSheet.columns = [
+      { header: 'Serial No', key: 'serialNo', width: 15 },
+      { header: 'Structure Number', key: 'structureNumber', width: 20 },
+      { header: 'Drawing No', key: 'drawingNo', width: 20 },
+      { header: 'Level', key: 'level', width: 15 },
+      { header: 'Member Type', key: 'memberType', width: 20 },
+      { header: 'Grid No', key: 'gridNo', width: 15 },
+      { header: 'Part Mark No', key: 'partMarkNo', width: 20 },
+      { header: 'Section Sizes', key: 'sectionSizes', width: 20 },
+      { header: 'Length (mm)', key: 'lengthMm', width: 15 },
+      { header: 'Qty', key: 'qty', width: 10 },
+      { header: 'Section Depth (mm)', key: 'sectionDepthMm', width: 18 },
+      { header: 'Flange Width (mm)', key: 'flangeWidthMm', width: 18 },
+      { header: 'Web Thickness (mm)', key: 'webThicknessMm', width: 20 },
+      { header: 'Flange Thickness (mm)', key: 'flangeThicknessMm', width: 22 },
+      { header: 'Fireproofing Thickness', key: 'fireproofingThickness', width: 22 },
+      { header: 'Surface Area (SQM)', key: 'surfaceAreaSqm', width: 18 },
+      { header: 'Fire Proofing Workflow', key: 'fireProofingWorkflow', width: 25 },
+      { header: 'Status', key: 'status', width: 15 }
+    ];
+    
+    // Stream elements in batches
+    const BATCH_SIZE = 500;
+    let skip = 0;
+    let hasMore = true;
+    
+    while (hasMore) {
+      const elements = await StructuralElement.find(query)
+        .sort({ serialNo: 1 })
+        .skip(skip)
+        .limit(BATCH_SIZE)
+        .lean();
+      
+      if (elements.length === 0) {
+        hasMore = false;
+        break;
+      }
+      
+      for (const element of elements) {
+        elementsSheet.addRow({
+          serialNo: element.serialNo,
+          structureNumber: element.structureNumber,
+          drawingNo: element.drawingNo,
+          level: element.level,
+          memberType: element.memberType,
+          gridNo: element.gridNo,
+          partMarkNo: element.partMarkNo,
+          sectionSizes: element.sectionSizes,
+          lengthMm: element.lengthMm,
+          qty: element.qty,
+          sectionDepthMm: element.sectionDepthMm,
+          flangeWidthMm: element.flangeWidthMm,
+          webThicknessMm: element.webThicknessMm,
+          flangeThicknessMm: element.flangeThicknessMm,
+          fireproofingThickness: element.fireproofingThickness,
+          surfaceAreaSqm: element.surfaceAreaSqm,
+          fireProofingWorkflow: element.fireProofingWorkflow,
+          status: element.status
+        }).commit();
+      }
+      
+      skip += BATCH_SIZE;
+      
+      if (elements.length < BATCH_SIZE) {
+        hasMore = false;
+      }
+    }
+    
+    await workbook.commit();
+  } catch (error) {
+    console.error('Error generating subproject Excel report:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+});
+
 module.exports = router;
