@@ -6,8 +6,13 @@ const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumenta
 const { Resource } = require('@opentelemetry/resources');
 const { SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_SERVICE_VERSION } = require('@opentelemetry/semantic-conventions');
 const { PeriodicExportingMetricReader } = require('@opentelemetry/sdk-metrics');
+const { DiagConsoleLogger, DiagLogLevel, diag } = require('@opentelemetry/api');
+
+// Enable diagnostic logging
+diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
 
 console.log('🔍 Initializing OpenTelemetry SDK...');
+console.log(`📍 OTEL Endpoint: ${process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://otel-collector:4318'}`);
 
 // Configure the OpenTelemetry SDK
 const sdk = new NodeSDK({
