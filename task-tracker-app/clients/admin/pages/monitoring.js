@@ -29,7 +29,7 @@ export default function Monitoring() {
           }}
         >
           <iframe
-            src="http://62.72.56.99:3001"
+            src="https://status.sapcindia.com"
             style={{
               width: '100%',
               height: '100%',
