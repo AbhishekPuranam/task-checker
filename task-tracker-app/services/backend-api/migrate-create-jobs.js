@@ -11,8 +11,8 @@
 
 require('dotenv').config();
 const mongoose = require('mongoose');
-const StructuralElement = require('../services/backend-api/models/StructuralElement');
-const Job = require('../services/backend-api/models/Job');
+const StructuralElement = require('./models/StructuralElement');
+const Job = require('./models/Job');
 
 // MongoDB connection string
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://tasktracker-mongodb:27017/tasktracker';
