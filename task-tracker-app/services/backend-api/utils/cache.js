@@ -4,12 +4,23 @@
  */
 
 const Redis = require('ioredis');
+const fs = require('fs');
+
+// Read Redis password from secret if available
+let redisPassword;
+try {
+  if (fs.existsSync('/run/secrets/redis_password')) {
+    redisPassword = fs.readFileSync('/run/secrets/redis_password', 'utf8').trim();
+  }
+} catch (error) {
+  console.warn('⚠️  Could not read Redis password from secret, using env var');
+}
 
 // Redis connection configuration
 const redisConfig = {
   host: process.env.REDIS_HOST || 'localhost',
   port: process.env.REDIS_PORT || 6379,
-  password: process.env.REDIS_PASSWORD,
+  password: redisPassword || process.env.REDIS_PASSWORD,
   db: process.env.REDIS_CACHE_DB || 1, // Use separate DB for caching
   retryStrategy(times) {
     const delay = Math.min(times * 50, 2000);
