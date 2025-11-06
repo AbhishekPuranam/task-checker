@@ -235,38 +235,6 @@ services:
       - "traefik.http.services.engineer.loadbalancer.sticky.cookie=true"
       - "traefik.http.services.engineer.loadbalancer.sticky.cookie.name=engineer_sticky"
 
-  # Netdata - Real-time Monitoring & Observability
-  netdata:
-    image: netdata/netdata:latest
-    container_name: tasktracker-netdata
-    hostname: tasktracker-production
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:19999:19999"
-    cap_add:
-      - SYS_PTRACE
-      - SYS_ADMIN
-    security_opt:
-      - apparmor:unconfined
-    volumes:
-      - netdata_config:/etc/netdata
-      - netdata_lib:/var/lib/netdata
-      - netdata_cache:/var/cache/netdata
-      - /etc/passwd:/host/etc/passwd:ro
-      - /etc/group:/host/etc/group:ro
-      - /etc/localtime:/etc/localtime:ro
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /etc/os-release:/host/etc/os-release:ro
-      - /var/log:/host/var/log:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    environment:
-      - NETDATA_CLAIM_TOKEN=${NETDATA_CLAIM_TOKEN:-}
-      - NETDATA_CLAIM_URL=https://app.netdata.cloud
-      - DOCKER_HOST=/var/run/docker.sock
-    networks:
-      - tasktracker-network
-
   # Traefik Reverse Proxy
   traefik:
     image: traefik:v2.10
@@ -307,12 +275,6 @@ volumes:
   vault_data:
     driver: local
   vault_logs:
-    driver: local
-  netdata_config:
-    driver: local
-  netdata_lib:
-    driver: local
-  netdata_cache:
     driver: local
 
 networks:

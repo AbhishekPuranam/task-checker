@@ -2,9 +2,9 @@ const { NodeSDK } = require('@opentelemetry/sdk-node');
 const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
 const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');
 const { OTLPMetricExporter } = require('@opentelemetry/exporter-metrics-otlp-http');
-const { OTLPLogExporter } = require('@opentelemetry/exporter-logs-otlp-http');
+// const { OTLPLogExporter } = require('@opentelemetry/exporter-logs-otlp-http');
 const { PeriodicExportingMetricReader } = require('@opentelemetry/sdk-metrics');
-const { LoggerProvider, BatchLogRecordProcessor } = require('@opentelemetry/sdk-logs');
+// const { LoggerProvider, BatchLogRecordProcessor } = require('@opentelemetry/sdk-logs');
 const { Resource } = require('@opentelemetry/resources');
 const { SemanticResourceAttributes } = require('@opentelemetry/semantic-conventions');
 
@@ -24,7 +24,7 @@ const { SemanticResourceAttributes } = require('@opentelemetry/semantic-conventi
  * - OTEL_SERVICE_NAME: Service name for telemetry (default: task-tracker-backend)
  * - OTEL_TRACES_ENABLED: Enable trace collection (default: true)
  * - OTEL_METRICS_ENABLED: Enable metrics collection (default: true)
- * - OTEL_LOGS_ENABLED: Enable log collection (default: true)
+ * - OTEL_LOGS_ENABLED: Enable log collection (default: false - not yet installed)
  * - OTEL_METRICS_INTERVAL: Metrics export interval in ms (default: 60000)
  */
 
@@ -33,7 +33,7 @@ const OTEL_ENDPOINT = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://otel-co
 const SERVICE_NAME = process.env.OTEL_SERVICE_NAME || 'task-tracker-backend';
 const TRACES_ENABLED = process.env.OTEL_TRACES_ENABLED !== 'false';
 const METRICS_ENABLED = process.env.OTEL_METRICS_ENABLED !== 'false';
-const LOGS_ENABLED = process.env.OTEL_LOGS_ENABLED !== 'false';
+const LOGS_ENABLED = false; // Disabled until dependencies are installed
 const METRICS_INTERVAL = parseInt(process.env.OTEL_METRICS_INTERVAL || '60000', 10);
 
 // Service resource attributes
@@ -63,28 +63,28 @@ const metricReader = METRICS_ENABLED
     })
   : undefined;
 
-// Log exporter configuration for Loki
-const loggerProvider = LOGS_ENABLED
-  ? (() => {
-      const provider = new LoggerProvider({ resource });
-      provider.addLogRecordProcessor(
-        new BatchLogRecordProcessor(
-          new OTLPLogExporter({
-            url: `${OTEL_ENDPOINT}/v1/logs`,
-            headers: {},
-          })
-        )
-      );
-      return provider;
-    })()
-  : undefined;
+// Log exporter configuration for Loki (temporarily disabled)
+// const loggerProvider = LOGS_ENABLED
+//   ? (() => {
+//       const provider = new LoggerProvider({ resource });
+//       provider.addLogRecordProcessor(
+//         new BatchLogRecordProcessor(
+//           new OTLPLogExporter({
+//             url: `${OTEL_ENDPOINT}/v1/logs`,
+//             headers: {},
+//           })
+//         )
+//       );
+//       return provider;
+//     })()
+//   : undefined;
 
 // Initialize OpenTelemetry SDK
 const sdk = new NodeSDK({
   resource,
   traceExporter,
   metricReader,
-  logRecordProcessor: loggerProvider ? loggerProvider.getActiveLogRecordProcessor() : undefined,
+  // logRecordProcessor: loggerProvider ? loggerProvider.getActiveLogRecordProcessor() : undefined,
   instrumentations: [
     getNodeAutoInstrumentations({
       // Specific instrumentation configuration
