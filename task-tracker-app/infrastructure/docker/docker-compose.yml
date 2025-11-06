@@ -108,11 +108,13 @@ services:
       - "traefik.http.routers.backend.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api`)"
       - "traefik.http.routers.backend.entrypoints=web"
       - "traefik.http.routers.backend.service=backend"
+      - "traefik.http.routers.backend.priority=50"
       # HTTPS router
       - "traefik.http.routers.backend-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api`)"
       - "traefik.http.routers.backend-secure.entrypoints=websecure"
       - "traefik.http.routers.backend-secure.tls.certresolver=letsencrypt"
       - "traefik.http.routers.backend-secure.service=backend"
+      - "traefik.http.routers.backend-secure.priority=50"
       # Load balancer configuration
       - "traefik.http.services.backend.loadbalancer.server.port=5000"
       - "traefik.http.services.backend.loadbalancer.sticky.cookie=true"
