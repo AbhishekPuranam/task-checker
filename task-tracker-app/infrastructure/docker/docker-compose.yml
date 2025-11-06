@@ -83,12 +83,6 @@ services:
       PORT: 5000
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN_FILE: /run/secrets/vault_token
-      # OpenTelemetry configuration for Grafana (Tempo + Loki)
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-      OTEL_SERVICE_NAME: task-tracker-backend
-      OTEL_TRACES_ENABLED: "true"
-      OTEL_METRICS_ENABLED: "true"
-      OTEL_LOGS_ENABLED: "true"
       # Secrets are fetched from Vault at runtime
     volumes:
       - ../../uploads:/app/uploads
@@ -134,12 +128,6 @@ services:
       PORT: 4000
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN_FILE: /run/secrets/vault_token
-      # OpenTelemetry configuration for Grafana (Tempo + Loki)
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-      OTEL_SERVICE_NAME: task-tracker-auth
-      OTEL_TRACES_ENABLED: "true"
-      OTEL_METRICS_ENABLED: "true"
-      OTEL_LOGS_ENABLED: "true"
     secrets:
       - vault_token
       - mongodb_password
