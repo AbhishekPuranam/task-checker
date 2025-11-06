@@ -4,8 +4,8 @@
   "description": "Web-based task tracking system for admins and site engineers",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
+    "start": "node --require ./tracing.js server.js",
+    "dev": "nodemon --require ./tracing.js server.js",
     "build": "cd client && npm run build",
     "install-client": "cd client && npm install",
     "install-all": "npm install && npm run install-client",

@@ -4,8 +4,8 @@
   "description": "Unified authentication and authorization service",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node --require ./tracing.js server.js",
+    "dev": "nodemon --require ./tracing.js server.js"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.7.0",

@@ -1,6 +1,3 @@
-// Initialize OpenTelemetry tracing FIRST
-require('./tracing');
-
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');

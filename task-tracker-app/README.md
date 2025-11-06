@@ -71,8 +71,6 @@ A comprehensive web-based task tracking system designed for **Office Admins** an
 - **Traefik v2.10** as reverse proxy with SSL/TLS
 - **Let's Encrypt** for automatic SSL certificates
 - **Microservices Architecture** with separate services
-- **Jaeger** for distributed tracing and monitoring
-- **Redis** for caching and BullMQ job queuing
 
 ## 📁 Project Structure
 
@@ -416,15 +414,6 @@ GET /api/reports/combined-report?projectName=Building A
 - **Socket.IO Integration** for instant notifications
 - **Real-time Dashboard** showing current status
 - **Live Comments** and status changes
-
-## Monitoring & Observability
-
-- **Jaeger Distributed Tracing** - Track requests across microservices
-- **OpenTelemetry Integration** - Industry-standard observability
-- **Real-time Metrics** - Monitor application performance
-- **Health Checks** - Automated service health monitoring
-
-Access Jaeger UI: `https://your-domain.com/admin/jaeger`
 
 ## Mobile Responsiveness
 
