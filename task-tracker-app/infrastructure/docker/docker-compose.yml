@@ -86,6 +86,7 @@ services:
       REDIS_HOST: tasktracker-redis
       REDIS_PORT: 6379
       REDIS_CACHE_DB: 1
+      EXCEL_BATCH_MODE: 'true'
       # Secrets are fetched from Vault at runtime
     volumes:
       - ../../uploads:/app/uploads

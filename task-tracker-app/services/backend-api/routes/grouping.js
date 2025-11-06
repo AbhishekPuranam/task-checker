@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const StructuralElement = require('../models/StructuralElement');
 const { auth } = require('../middleware/auth');
 const cache = require('../utils/cache');
@@ -31,9 +32,9 @@ router.post('/elements', auth, async (req, res) => {
     const matchStage = {};
     
     if (subProjectId) {
-      matchStage.subProject = require('mongoose').Types.ObjectId(subProjectId);
+      matchStage.subProject = new mongoose.Types.ObjectId(subProjectId);
     } else if (projectId) {
-      matchStage.project = require('mongoose').Types.ObjectId(projectId);
+      matchStage.project = new mongoose.Types.ObjectId(projectId);
     } else {
       return res.status(400).json({ 
         error: 'Either projectId or subProjectId is required' 

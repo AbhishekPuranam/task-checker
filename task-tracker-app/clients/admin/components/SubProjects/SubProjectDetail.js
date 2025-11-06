@@ -16,9 +16,18 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  TablePagination,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Switch,
+  FormControlLabel,
+  IconButton,
+  Tooltip
 } from '@mui/material';
-import { ArrowBack, Download } from '@mui/icons-material';
+import { ArrowBack, Download, ViewModule as ViewModuleIcon, Settings as SettingsIcon } from '@mui/icons-material';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -36,12 +45,50 @@ export default function SubProjectDetail() {
   const [subProject, setSubProject] = useState(null);
   const [project, setProject] = useState(null);
   const [activeSection, setActiveSection] = useState('active');
-  const [groupBy, setGroupBy] = useState('level'); // Default to 'level' grouping
+  const [groupBy, setGroupBy] = useState(''); // Start empty, set to 'level' after fields load
   const [subGroupBy, setSubGroupBy] = useState('');
   const [groupedData, setGroupedData] = useState(null);
   const [availableFields, setAvailableFields] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingGroups, setLoadingGroups] = useState(false);
+  
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  
+  // Column visibility state
+  const [visibleColumns, setVisibleColumns] = useState({
+    serialNo: true,
+    structureNumber: true,
+    drawingNo: true,
+    level: true,
+    memberType: true,
+    gridNo: true,
+    sectionSizes: true,
+    surfaceAreaSqm: true,
+    qty: true
+  });
+  const [showColumnSettings, setShowColumnSettings] = useState(false);
+  
+  // Define available columns
+  const availableColumns = [
+    { key: 'serialNo', label: 'Serial No' },
+    { key: 'structureNumber', label: 'Structure No' },
+    { key: 'drawingNo', label: 'Drawing No' },
+    { key: 'level', label: 'Level' },
+    { key: 'memberType', label: 'Member Type' },
+    { key: 'gridNo', label: 'Grid No' },
+    { key: 'partMarkNo', label: 'Part Mark No' },
+    { key: 'sectionSizes', label: 'Section' },
+    { key: 'lengthMm', label: 'Length (mm)' },
+    { key: 'qty', label: 'Qty' },
+    { key: 'surfaceAreaSqm', label: 'SQM' },
+    { key: 'fireproofingThickness', label: 'FP Thickness' },
+    { key: 'sectionDepthMm', label: 'Depth (mm)' },
+    { key: 'flangeWidthMm', label: 'Flange Width (mm)' },
+    { key: 'webThicknessMm', label: 'Web Thickness (mm)' },
+    { key: 'flangeThicknessMm', label: 'Flange Thickness (mm)' }
+  ];
 
   useEffect(() => {
     if (projectId && subProjectId) {
@@ -51,8 +98,12 @@ export default function SubProjectDetail() {
   }, [projectId, subProjectId]);
 
   useEffect(() => {
+    console.log('🔍 [SubProjectDetail] useEffect triggered:', { groupBy, subProjectId: subProject?._id, activeSection });
     if (groupBy && subProject?._id) {
+      console.log('✅ [SubProjectDetail] Calling fetchGroupedData');
       fetchGroupedData();
+    } else {
+      console.log('❌ [SubProjectDetail] NOT calling fetchGroupedData - groupBy:', groupBy, 'subProject._id:', subProject?._id);
     }
   }, [groupBy, subGroupBy, activeSection, subProject]);
 
@@ -92,6 +143,13 @@ export default function SubProjectDetail() {
       
       setSubProject(subProjectRes.data);
       
+      console.log('✅ [fetchData] SubProject loaded:', subProjectRes.data._id);
+      
+      // Trigger fetch if groupBy is already set
+      if (groupBy) {
+        console.log('📊 [fetchData] groupBy already set, will trigger fetchGroupedData via useEffect');
+      }
+      
       // Update URL to use slugs if we got ID-based URLs
       const needsProjectSlug = isProjectMongoId && projectRes.data.title;
       const needsSubProjectSlug = isSubProjectMongoId && (subProjectRes.data.code || subProjectRes.data.name);
@@ -114,7 +172,16 @@ export default function SubProjectDetail() {
       const res = await axios.get(`${API_URL}/grouping/available-fields`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setAvailableFields(res.data.fields || []);
+      const fields = res.data.fields || [];
+      setAvailableFields(fields);
+      
+      console.log('✅ [fetchAvailableFields] Loaded', fields.length, 'fields');
+      
+      // Set default groupBy to 'level' after fields are loaded
+      if (fields.length > 0 && !groupBy) {
+        console.log('📊 [fetchAvailableFields] Setting groupBy to level');
+        setGroupBy('level');
+      }
     } catch (err) {
       console.error('Error fetching fields:', err);
     }
@@ -124,6 +191,14 @@ export default function SubProjectDetail() {
     try {
       setLoadingGroups(true);
       const token = localStorage.getItem('token');
+      
+      console.log('📊 [fetchGroupedData] Request params:', {
+        subProjectId: subProject._id,
+        status: activeSection,
+        groupBy,
+        subGroupBy: subGroupBy || undefined
+      });
+      
       const res = await axios.post(
         `${API_URL}/grouping/elements`,
         {
@@ -138,9 +213,12 @@ export default function SubProjectDetail() {
           headers: { Authorization: `Bearer ${token}` }
         }
       );
+      
+      console.log('📊 [fetchGroupedData] Response:', res.data);
       setGroupedData(res.data);
     } catch (err) {
-      console.error('Error fetching grouped data:', err);
+      console.error('❌ [fetchGroupedData] Error fetching grouped data:', err);
+      console.error('Error response:', err.response?.data);
       alert('Failed to load grouped data');
     } finally {
       setLoadingGroups(false);
@@ -156,6 +234,68 @@ export default function SubProjectDetail() {
     } catch (err) {
       console.error('Error downloading report:', err);
       alert('Failed to download report');
+    }
+  };
+  
+  // Pagination handlers
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+  
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+  
+  // Column visibility handlers
+  const toggleColumnVisibility = (columnKey) => {
+    setVisibleColumns(prev => ({
+      ...prev,
+      [columnKey]: !prev[columnKey]
+    }));
+  };
+  
+  const getVisibleColumns = () => {
+    return availableColumns.filter(col => visibleColumns[col.key]);
+  };
+  
+  // Get cell value helper
+  const getCellValue = (element, columnKey) => {
+    switch (columnKey) {
+      case 'serialNo':
+        return element.serialNo;
+      case 'structureNumber':
+        return element.structureNumber;
+      case 'drawingNo':
+        return element.drawingNo;
+      case 'level':
+        return element.level;
+      case 'memberType':
+        return element.memberType;
+      case 'gridNo':
+        return element.gridNo;
+      case 'partMarkNo':
+        return element.partMarkNo;
+      case 'sectionSizes':
+        return element.sectionSizes;
+      case 'lengthMm':
+        return element.lengthMm;
+      case 'qty':
+        return element.qty;
+      case 'surfaceAreaSqm':
+        return element.surfaceAreaSqm?.toFixed(2);
+      case 'fireproofingThickness':
+        return element.fireproofingThickness;
+      case 'sectionDepthMm':
+        return element.sectionDepthMm;
+      case 'flangeWidthMm':
+        return element.flangeWidthMm;
+      case 'webThicknessMm':
+        return element.webThicknessMm;
+      case 'flangeThicknessMm':
+        return element.flangeThicknessMm;
+      default:
+        return '';
     }
   };
 
@@ -377,9 +517,23 @@ export default function SubProjectDetail() {
             boxShadow: '0 8px 32px rgba(106, 17, 203, 0.3)'
           }}
         >
-          <Typography variant="h5" fontWeight="bold" sx={{ mb: 3, color: '#333' }}>
-            Group & Analyze
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography variant="h5" fontWeight="bold" sx={{ color: '#333' }}>
+              Group & Analyze
+            </Typography>
+            <Tooltip title="Customize visible columns">
+              <IconButton 
+                onClick={() => setShowColumnSettings(true)}
+                sx={{ 
+                  bgcolor: 'primary.main', 
+                  color: 'white',
+                  '&:hover': { bgcolor: 'primary.dark' }
+                }}
+              >
+                <SettingsIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
           
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
@@ -484,34 +638,48 @@ export default function SubProjectDetail() {
                 {group.elements && group.elements.length > 0 && (
                   <Box sx={{ mt: 2 }}>
                     <Typography variant="body2" fontWeight="600" sx={{ color: '#333', mb: 1 }}>
-                      Sample Elements (showing {Math.min(5, group.elements.length)} of {group.count}):
+                      Elements (showing {Math.min(rowsPerPage, group.elements.length)} of {group.count}):
                     </Typography>
                     <Box sx={{ overflowX: 'auto' }}>
                       <table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
                         <thead style={{ backgroundColor: '#f5f5f5' }}>
                           <tr>
-                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Serial No</th>
-                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Structure No</th>
-                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Drawing No</th>
-                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Level</th>
-                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Section</th>
-                            <th style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>SQM</th>
+                            {getVisibleColumns().map((column) => (
+                              <th key={column.key} style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>
+                                {column.label}
+                              </th>
+                            ))}
                           </tr>
                         </thead>
                         <tbody>
-                          {group.elements.slice(0, 5).map((element) => (
-                            <tr key={element._id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                              <td style={{ padding: '8px 12px' }}>{element.serialNo}</td>
-                              <td style={{ padding: '8px 12px' }}>{element.structureNumber}</td>
-                              <td style={{ padding: '8px 12px' }}>{element.drawingNo}</td>
-                              <td style={{ padding: '8px 12px' }}>{element.level}</td>
-                              <td style={{ padding: '8px 12px' }}>{element.sectionSizes}</td>
-                              <td style={{ padding: '8px 12px' }}>{element.surfaceAreaSqm?.toFixed(2)}</td>
-                            </tr>
-                          ))}
+                          {group.elements
+                            .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                            .map((element) => (
+                              <tr key={element._id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                                {getVisibleColumns().map((column) => (
+                                  <td key={column.key} style={{ padding: '8px 12px' }}>
+                                    {getCellValue(element, column.key)}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
                         </tbody>
                       </table>
                     </Box>
+                    
+                    {/* Pagination */}
+                    {group.elements.length > 5 && (
+                      <TablePagination
+                        component="div"
+                        count={group.elements.length}
+                        page={page}
+                        onPageChange={handleChangePage}
+                        rowsPerPage={rowsPerPage}
+                        onRowsPerPageChange={handleChangeRowsPerPage}
+                        rowsPerPageOptions={[5, 10, 25, 50]}
+                        sx={{ borderTop: '1px solid #e0e0e0', mt: 1 }}
+                      />
+                    )}
                   </Box>
                 )}
               </Paper>
@@ -520,6 +688,88 @@ export default function SubProjectDetail() {
           </Paper>
         )}
       </Container>
+      
+      {/* Column Settings Dialog */}
+      <Dialog 
+        open={showColumnSettings} 
+        onClose={() => setShowColumnSettings(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ViewModuleIcon />
+            <Typography variant="h6">Customize Columns</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Select which columns to show in the table.
+          </Typography>
+          
+          <Grid container spacing={2}>
+            {availableColumns.map(column => (
+              <Grid item xs={12} sm={6} key={column.key}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={visibleColumns[column.key]}
+                      onChange={() => toggleColumnVisibility(column.key)}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" fontWeight={visibleColumns[column.key] ? 600 : 400}>
+                      {column.label}
+                    </Typography>
+                  }
+                  sx={{ 
+                    width: '100%',
+                    m: 0,
+                    p: 1,
+                    borderRadius: 1,
+                    '&:hover': {
+                      backgroundColor: 'grey.50'
+                    }
+                  }}
+                />
+              </Grid>
+            ))}
+          </Grid>
+
+          <Box sx={{ mt: 3, p: 2, backgroundColor: '#e3f2fd', borderRadius: 1 }}>
+            <Typography variant="body2" color="primary" fontWeight="500">
+              💡 Tip: Customize columns to show only the data you need.
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              // Reset to default columns
+              setVisibleColumns({
+                serialNo: true,
+                structureNumber: true,
+                drawingNo: true,
+                level: true,
+                memberType: true,
+                gridNo: true,
+                sectionSizes: true,
+                surfaceAreaSqm: true,
+                qty: true
+              });
+            }}
+          >
+            Reset to Default
+          </Button>
+          <Button
+            onClick={() => setShowColumnSettings(false)}
+            variant="contained"
+          >
+            Done
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

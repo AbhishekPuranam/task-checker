@@ -175,6 +175,8 @@ async function processBatch(uploadSession, batchNumber, excelData, project, user
       try {
         const elementData = transformExcelRow(row, project._id, userId, project, subProjectId);
 
+        console.log(`🔍 [DEBUG] SubProjectId passed to transform: ${subProjectId}, elementData.subProject: ${elementData.subProject}`);
+
         if (!elementData.structureNumber) {
           console.warn(`⚠️ [BATCH ${batchNumber}] Skipping row - no structure number`);
           continue;
