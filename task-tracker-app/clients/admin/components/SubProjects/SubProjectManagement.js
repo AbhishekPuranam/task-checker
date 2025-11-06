@@ -20,7 +20,7 @@ import {
   TextField,
   MenuItem,
 } from '@mui/material';
-import { Add, Upload, Download, Folder, ArrowBack } from '@mui/icons-material';
+import { Add, Upload, Download, Folder, ArrowBack, Edit, Delete } from '@mui/icons-material';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -34,6 +34,9 @@ export default function SubProjectManagement() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedSubProject, setSelectedSubProject] = useState(null);
   const [newSubProject, setNewSubProject] = useState({
     name: '',
     code: '',
@@ -119,6 +122,70 @@ export default function SubProjectManagement() {
       console.error('Error creating SubProject:', err);
       alert(err.response?.data?.error || 'Failed to create SubProject');
     }
+  };
+
+  const handleEditSubProject = (subProject, e) => {
+    e.stopPropagation();
+    setSelectedSubProject(subProject);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateSubProject = async (e) => {
+    e.preventDefault();
+    
+    if (!selectedSubProject) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(
+        `${API_URL}/subprojects/${selectedSubProject._id}`,
+        {
+          name: selectedSubProject.name,
+          code: selectedSubProject.code,
+          description: selectedSubProject.description,
+          status: selectedSubProject.status
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      setShowEditModal(false);
+      setSelectedSubProject(null);
+      fetchData();
+    } catch (err) {
+      console.error('Error updating SubProject:', err);
+      alert(err.response?.data?.error || 'Failed to update SubProject');
+    }
+  };
+
+  const handleDeleteSubProject = (subProject, e) => {
+    e.stopPropagation();
+    setSelectedSubProject(subProject);
+    setShowDeleteDialog(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedSubProject) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`${API_URL}/subprojects/${selectedSubProject._id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setShowDeleteDialog(false);
+      setSelectedSubProject(null);
+      fetchData();
+    } catch (err) {
+      console.error('Error deleting SubProject:', err);
+      alert(err.response?.data?.error || 'Failed to delete SubProject. It may contain structural elements.');
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteDialog(false);
+    setSelectedSubProject(null);
   };
 
   const navigateToSubProject = (subProject) => {
@@ -499,39 +566,81 @@ export default function SubProjectManagement() {
                       </Box>
 
                       {/* Actions */}
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <Button
-                          variant="contained"
-                          fullWidth
-                          startIcon={<Upload />}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigateToExcelUpload(subProject);
-                          }}
-                          sx={{ 
-                            bgcolor: '#2196f3', 
-                            '&:hover': { bgcolor: '#1976d2' },
-                            textTransform: 'none'
-                          }}
-                        >
-                          Upload Excel
-                        </Button>
-                        <Button
-                          variant="contained"
-                          fullWidth
-                          startIcon={<Download />}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            downloadReport(subProject._id);
-                          }}
-                          sx={{ 
-                            bgcolor: '#4caf50', 
-                            '&:hover': { bgcolor: '#45a049' },
-                            textTransform: 'none'
-                          }}
-                        >
-                          Export
-                        </Button>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button
+                            variant="contained"
+                            fullWidth
+                            startIcon={<Upload />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateToExcelUpload(subProject);
+                            }}
+                            sx={{ 
+                              bgcolor: '#2196f3', 
+                              '&:hover': { bgcolor: '#1976d2' },
+                              textTransform: 'none',
+                              fontSize: '0.75rem'
+                            }}
+                          >
+                            Upload
+                          </Button>
+                          <Button
+                            variant="contained"
+                            fullWidth
+                            startIcon={<Download />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadReport(subProject._id);
+                            }}
+                            sx={{ 
+                              bgcolor: '#4caf50', 
+                              '&:hover': { bgcolor: '#45a049' },
+                              textTransform: 'none',
+                              fontSize: '0.75rem'
+                            }}
+                          >
+                            Export
+                          </Button>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button
+                            variant="outlined"
+                            fullWidth
+                            startIcon={<Edit />}
+                            onClick={(e) => handleEditSubProject(subProject, e)}
+                            sx={{ 
+                              borderColor: '#ff9800',
+                              color: '#ff9800',
+                              '&:hover': { 
+                                borderColor: '#f57c00',
+                                bgcolor: '#fff3e0'
+                              },
+                              textTransform: 'none',
+                              fontSize: '0.75rem'
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outlined"
+                            fullWidth
+                            startIcon={<Delete />}
+                            onClick={(e) => handleDeleteSubProject(subProject, e)}
+                            sx={{ 
+                              borderColor: '#f44336',
+                              color: '#f44336',
+                              '&:hover': { 
+                                borderColor: '#d32f2f',
+                                bgcolor: '#ffebee'
+                              },
+                              textTransform: 'none',
+                              fontSize: '0.75rem'
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        </Box>
                       </Box>
                     </CardContent>
                   </Card>
@@ -657,6 +766,179 @@ export default function SubProjectManagement() {
               </Button>
             </DialogActions>
           </form>
+        </Dialog>
+
+        {/* Edit SubProject Modal */}
+        <Dialog 
+          open={showEditModal} 
+          onClose={() => setShowEditModal(false)}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: { borderRadius: 3 }
+          }}
+        >
+          <DialogTitle sx={{ borderBottom: '1px solid #e0e0e0' }}>
+            <Typography variant="h5" fontWeight="bold" sx={{ color: '#333' }}>
+              Edit Sub-Project
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#777', mt: 0.5 }}>
+              Update sub-project details
+            </Typography>
+          </DialogTitle>
+          
+          <form onSubmit={handleUpdateSubProject}>
+            <DialogContent sx={{ pt: 3 }}>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="body2" fontWeight="600" sx={{ mb: 1, color: '#333' }}>
+                  Name *
+                </Typography>
+                <TextField
+                  fullWidth
+                  required
+                  value={selectedSubProject?.name || ''}
+                  onChange={(e) => setSelectedSubProject({ ...selectedSubProject, name: e.target.value })}
+                  placeholder="e.g., Building A - Floor 1"
+                  variant="outlined"
+                />
+              </Box>
+
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="body2" fontWeight="600" sx={{ mb: 1, color: '#333' }}>
+                  Code *
+                </Typography>
+                <TextField
+                  fullWidth
+                  required
+                  value={selectedSubProject?.code || ''}
+                  onChange={(e) => setSelectedSubProject({ ...selectedSubProject, code: e.target.value.toUpperCase() })}
+                  placeholder="e.g., BA-F1"
+                  variant="outlined"
+                  inputProps={{ style: { fontFamily: 'monospace' } }}
+                />
+                <Typography variant="caption" sx={{ color: '#777', mt: 0.5, display: 'block' }}>
+                  Unique identifier for this sub-project
+                </Typography>
+              </Box>
+
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="body2" fontWeight="600" sx={{ mb: 1, color: '#333' }}>
+                  Description
+                </Typography>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={3}
+                  value={selectedSubProject?.description || ''}
+                  onChange={(e) => setSelectedSubProject({ ...selectedSubProject, description: e.target.value })}
+                  placeholder="Optional description"
+                  variant="outlined"
+                />
+              </Box>
+
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body2" fontWeight="600" sx={{ mb: 1, color: '#333' }}>
+                  Status
+                </Typography>
+                <TextField
+                  fullWidth
+                  select
+                  value={selectedSubProject?.status || 'active'}
+                  onChange={(e) => setSelectedSubProject({ ...selectedSubProject, status: e.target.value })}
+                  variant="outlined"
+                >
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="on_hold">On Hold</MenuItem>
+                  <MenuItem value="completed">Completed</MenuItem>
+                  <MenuItem value="cancelled">Cancelled</MenuItem>
+                </TextField>
+              </Box>
+            </DialogContent>
+
+            <DialogActions sx={{ px: 3, pb: 3, pt: 2, borderTop: '1px solid #e0e0e0' }}>
+              <Button
+                onClick={() => setShowEditModal(false)}
+                variant="outlined"
+                sx={{ 
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  px: 3
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="contained"
+                sx={{ 
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  '&:hover': { 
+                    background: 'linear-gradient(135deg, #5568d3 0%, #63408b 100%)'
+                  },
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  px: 3
+                }}
+              >
+                Update Sub-Project
+              </Button>
+            </DialogActions>
+          </form>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog
+          open={showDeleteDialog}
+          onClose={handleCancelDelete}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: { borderRadius: 3 }
+          }}
+        >
+          <DialogTitle sx={{ borderBottom: '1px solid #e0e0e0' }}>
+            <Typography variant="h5" fontWeight="bold" sx={{ color: '#d32f2f' }}>
+              Delete Sub-Project
+            </Typography>
+          </DialogTitle>
+          
+          <DialogContent sx={{ pt: 3 }}>
+            <Typography variant="body1" sx={{ mb: 2 }}>
+              Are you sure you want to delete <strong>{selectedSubProject?.name}</strong>?
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#f57c00', bgcolor: '#fff3e0', p: 2, borderRadius: 1 }}>
+              ⚠️ Warning: This action cannot be undone. The sub-project can only be deleted if it contains no structural elements.
+            </Typography>
+          </DialogContent>
+
+          <DialogActions sx={{ px: 3, pb: 3, pt: 2, borderTop: '1px solid #e0e0e0' }}>
+            <Button
+              onClick={handleCancelDelete}
+              variant="outlined"
+              sx={{ 
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 3
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmDelete}
+              variant="contained"
+              sx={{ 
+                bgcolor: '#d32f2f',
+                '&:hover': { 
+                  bgcolor: '#c62828'
+                },
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 3
+              }}
+            >
+              Delete Sub-Project
+            </Button>
+            </DialogActions>
         </Dialog>
       </Container>
     </Box>
