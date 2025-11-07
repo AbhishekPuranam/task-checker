@@ -56,6 +56,9 @@ export default function SubProjectDetail() {
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Client-side cache for grouped data by section
+  const [cachedGroupedData, setCachedGroupedData] = useState({});
+  
   // Pagination state - per group
   const [groupPages, setGroupPages] = useState({});
   const [groupRowsPerPage, setGroupRowsPerPage] = useState({});
@@ -217,12 +220,22 @@ export default function SubProjectDetail() {
     }
   };
 
-  const fetchGroupedData = async () => {
+  const fetchGroupedData = async (forceRefresh = false) => {
     try {
+      // Create cache key based on current parameters
+      const cacheKey = `${activeSection}-${groupBy}-${subGroupBy || 'none'}`;
+      
+      // Check if we have cached data for this section (unless forcing refresh)
+      if (!forceRefresh && cachedGroupedData[cacheKey]) {
+        console.log('✅ [fetchGroupedData] Using cached data for:', cacheKey);
+        setGroupedData(cachedGroupedData[cacheKey]);
+        return;
+      }
+      
       setLoadingGroups(true);
       const token = localStorage.getItem('token');
       
-      console.log('📊 [fetchGroupedData] Request params:', {
+      console.log('📊 [fetchGroupedData] Fetching from server:', {
         subProjectId: subProject._id,
         status: activeSection,
         groupBy,
@@ -245,8 +258,14 @@ export default function SubProjectDetail() {
         }
       );
       
-      console.log('📊 [fetchGroupedData] Response:', res.data);
+      console.log('📊 [fetchGroupedData] Response received');
       setGroupedData(res.data);
+      
+      // Cache the data
+      setCachedGroupedData(prev => ({
+        ...prev,
+        [cacheKey]: res.data
+      }));
     } catch (err) {
       console.error('❌ [fetchGroupedData] Error fetching grouped data:', err);
       console.error('Error response:', err.response?.data);
@@ -311,11 +330,14 @@ export default function SubProjectDetail() {
   };
   
   const handleJobsUpdated = async () => {
+    // Clear client-side cache since data has changed
+    setCachedGroupedData({});
+    
     // Wait a moment for backend to finish updating element status and cache invalidation
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    // Refresh both grouped data and subproject statistics in parallel
-    const promises = [fetchGroupedData()];
+    // Force refresh of current section data
+    const promises = [fetchGroupedData(true)]; // Pass true to force refresh
     
     if (subProject?._id) {
       const token = localStorage.getItem('token');
