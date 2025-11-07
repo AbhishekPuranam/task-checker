@@ -360,32 +360,24 @@ router.post('/elements/group-details', auth, async (req, res) => {
  */
 router.get('/available-fields', auth, async (req, res) => {
   try {
-    // Cache this as it rarely changes
-    const cacheKey = 'grouping:available-fields';
-    
-    const fields = await cache.cacheWrapper(
-      cacheKey,
-      cache.CACHE_TTL.AVAILABLE_FIELDS,
-      async () => {
-        return [
-          { value: 'status', label: 'Status' },
-          { value: 'level', label: 'Level' },
-          { value: 'memberType', label: 'Member Type' },
-          { value: 'gridNo', label: 'Grid No' },
-          { value: 'drawingNo', label: 'Drawing No' },
-          { value: 'structureNumber', label: 'Structure Number' },
-          { value: 'sectionSizes', label: 'Section Sizes' },
-          { value: 'fireProofingWorkflow', label: 'Fire Proofing Workflow' },
-          { value: 'currentJob', label: 'Current Job' },
-          { value: 'partMarkNo', label: 'Part Mark No' },
-          { value: 'sectionDepthMm', label: 'Section Depth (mm)' },
-          { value: 'flangeWidthMm', label: 'Flange Width (mm)' },
-          { value: 'webThicknessMm', label: 'Web Thickness (mm)' },
-          { value: 'flangeThicknessMm', label: 'Flange Thickness (mm)' },
-          { value: 'fireproofingThickness', label: 'Fireproofing Thickness' }
-        ];
-      }
-    );
+    // Don't cache this anymore to ensure changes are immediately visible
+    const fields = [
+      { value: 'currentJob', label: 'Current Job' },
+      { value: 'drawingNo', label: 'Drawing No' },
+      { value: 'fireProofingWorkflow', label: 'Fire Proofing Workflow' },
+      { value: 'fireproofingThickness', label: 'Fireproofing Thickness' },
+      { value: 'flangeThicknessMm', label: 'Flange Thickness (mm)' },
+      { value: 'flangeWidthMm', label: 'Flange Width (mm)' },
+      { value: 'gridNo', label: 'Grid No' },
+      { value: 'level', label: 'Level' },
+      { value: 'memberType', label: 'Member Type' },
+      { value: 'partMarkNo', label: 'Part Mark No' },
+      { value: 'sectionDepthMm', label: 'Section Depth (mm)' },
+      { value: 'sectionSizes', label: 'Section Sizes' },
+      { value: 'status', label: 'Status' },
+      { value: 'structureNumber', label: 'Structure Number' },
+      { value: 'webThicknessMm', label: 'Web Thickness (mm)' }
+    ];
     
     res.json({ fields });
   } catch (error) {
