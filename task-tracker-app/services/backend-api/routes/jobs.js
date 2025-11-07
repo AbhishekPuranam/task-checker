@@ -837,10 +837,12 @@ router.put('/:id', auth, async (req, res) => {
       await invalidateCache(`cache:structural:summary:${updatedJob.project}:*`);
     }
 
-    // Update structural element status based on job statuses
+    // Update structural element status based on job statuses (non-blocking)
     if (updatedJob.structuralElement) {
       const elementId = updatedJob.structuralElement._id || updatedJob.structuralElement;
-      await updateStructuralElementStatus(elementId);
+      updateStructuralElementStatus(elementId).catch(err => 
+        console.error('Failed to update structural element status:', err)
+      );
     }
 
     // Trigger progress calculation if job was just completed
