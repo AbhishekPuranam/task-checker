@@ -50,13 +50,14 @@ try {
  * Cache TTL (Time To Live) configurations in seconds
  */
 const CACHE_TTL = {
-  GROUPING: 10,            // 10 seconds - grouping results (reduced for very fresh data)
-  STATISTICS: 10,          // 10 seconds - SubProject/Project statistics (reduced for very fresh data)
-  SUBPROJECT_LIST: 60,     // 1 minute - SubProject list
-  ELEMENTS_LIST: 10,       // 10 seconds - Elements list (reduced for very fresh data)
-  AVAILABLE_FIELDS: 3600,  // 1 hour - Available grouping fields (rarely changes)
+  GROUPING: 10,            // 10 seconds - grouping results
+  STATISTICS: 10,          // 10 seconds - SubProject/Project statistics  
+  SUBPROJECT_LIST: 10,     // 10 seconds - SubProject list
+  ELEMENTS_LIST: 10,       // 10 seconds - Elements list
+  AVAILABLE_FIELDS: 10,    // 10 seconds - Available grouping fields
   SHORT: 10,               // 10 seconds - Short-lived cache
-  LONG: 1800               // 30 minutes - Long-lived cache
+  MEDIUM: 30,              // 30 seconds - Medium duration cache
+  LONG: 180                // 3 minutes - Long-lived cache
 };
 
 /**
@@ -166,7 +167,7 @@ async function invalidateProject(projectId) {
   const patterns = [
     `grouping:*projectId:${projectId}*`,
     `statistics:project:${projectId}`,
-    `subprojects:*projectId:${projectId}*`, // Fixed: match the actual cache key format
+    `subprojects:project:${projectId}*`,
     `elements:*projectId:${projectId}*`
   ];
 
