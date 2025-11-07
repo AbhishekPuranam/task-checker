@@ -1,13 +1,12 @@
 import React from 'react';
-import { Box, Typography, Alert, Button } from '@mui/material';
+import { Box, Typography, Paper, Alert, Button } from '@mui/material';
 import { MonitorHeart, OpenInNew } from '@mui/icons-material';
 import ProtectedRoute from '../components/ProtectedRoute';
 import Navbar from '../components/Navbar';
 
 export default function Monitoring() {
   const handleOpenDashboard = () => {
-    // Open in new window to avoid iframe/CORS issues
-    window.open('http://62.72.56.99:3001', '_blank', 'width=1400,height=900');
+    window.open('https://projects.sapcindia.com/dashboard', '_blank');
   };
 
   return (
@@ -25,13 +24,20 @@ export default function Monitoring() {
           Real-time monitoring dashboard powered by Uptime Kuma. Monitor service health, uptime, and response times.
         </Alert>
 
-        <Box sx={{ textAlign: 'center', my: 5 }}>
-          <MonitorHeart sx={{ fontSize: 100, color: 'primary.main', mb: 3 }} />
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            p: 4,
+            textAlign: 'center',
+            borderRadius: 2
+          }}
+        >
+          <MonitorHeart sx={{ fontSize: 80, color: 'primary.main', mb: 2 }} />
           <Typography variant="h5" gutterBottom>
             Uptime Kuma Monitoring Dashboard
           </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: 600, mx: 'auto' }}>
-            Click below to open the monitoring dashboard in a new window. Track service availability, response times, and system health metrics.
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            Track service availability, response times, and system health metrics
           </Typography>
           <Button
             variant="contained"
@@ -39,13 +45,38 @@ export default function Monitoring() {
             startIcon={<OpenInNew />}
             onClick={handleOpenDashboard}
             sx={{ 
-              px: 5,
-              py: 2,
+              px: 4,
+              py: 1.5,
               fontSize: '1.1rem'
             }}
           >
             Open Monitoring Dashboard
           </Button>
+        </Paper>
+
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            What You Can Monitor:
+          </Typography>
+          <Paper sx={{ p: 3 }}>
+            <Box component="ul" sx={{ pl: 2 }}>
+              <Typography component="li" sx={{ mb: 1 }}>
+                <strong>Backend API:</strong> Monitor API response times and availability
+              </Typography>
+              <Typography component="li" sx={{ mb: 1 }}>
+                <strong>Admin Portal:</strong> Track admin interface uptime
+              </Typography>
+              <Typography component="li" sx={{ mb: 1 }}>
+                <strong>Engineer Portal:</strong> Monitor engineer portal availability
+              </Typography>
+              <Typography component="li" sx={{ mb: 1 }}>
+                <strong>Database Services:</strong> Track MongoDB and Redis health
+              </Typography>
+              <Typography component="li" sx={{ mb: 1 }}>
+                <strong>Authentication Service:</strong> Monitor auth service status
+              </Typography>
+            </Box>
+          </Paper>
         </Box>
       </Box>
     </ProtectedRoute>

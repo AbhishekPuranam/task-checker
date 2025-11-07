@@ -22,7 +22,8 @@ router.post('/elements', auth, async (req, res) => {
       groupBy, // Primary grouping field
       subGroupBy, // Secondary grouping field (optional)
       page = 1,
-      limit = 100
+      limit = 100,
+      includeElements = false // Whether to include full element details
     } = req.body;
     
     if (!groupBy) {
@@ -59,7 +60,8 @@ router.post('/elements', auth, async (req, res) => {
       groupBy, 
       subGroupBy: subGroupBy || 'none',
       page,
-      limit
+      limit,
+      includeElements: includeElements ? 'true' : 'false'
     });
     
     // Use cache wrapper for automatic caching
@@ -129,17 +131,32 @@ router.post('/elements', auth, async (req, res) => {
         pipeline.push({ $skip: skip });
         pipeline.push({ $limit: parseInt(limit) });
         
-        // Limit elements array to first 5 per group (for preview)
-        pipeline.push({
-          $project: {
-            _id: 1,
-            count: 1,
-            totalSqm: 1,
-            totalQty: 1,
-            totalLengthMm: 1,
-            elements: { $slice: ['$elements', 5] }
-          }
-        });
+        // If includeElements is true, keep all elements; otherwise limit to 5 for preview
+        if (includeElements) {
+          // Keep all elements in each group
+          pipeline.push({
+            $project: {
+              _id: 1,
+              count: 1,
+              totalSqm: 1,
+              totalQty: 1,
+              totalLengthMm: 1,
+              elements: 1  // Include all elements
+            }
+          });
+        } else {
+          // Limit elements array to first 5 per group (for preview)
+          pipeline.push({
+            $project: {
+              _id: 1,
+              count: 1,
+              totalSqm: 1,
+              totalQty: 1,
+              totalLengthMm: 1,
+              elements: { $slice: ['$elements', 5] }
+            }
+          });
+        }
         
         // Execute both pipelines in parallel
         const [groupResults, countResults] = await Promise.all([
@@ -154,30 +171,39 @@ router.post('/elements', auth, async (req, res) => {
           group.elements.map(el => el._id)
         );
         
-        // Get current (pending) job for each element
+        // Get ALL jobs for each element (not just pending/in_progress)
+        // This is critical for allowing users to see, edit, and manage all job statuses
         const jobs = await Job.find({
-          structuralElement: { $in: allElementIds },
-          status: { $in: ['pending', 'in_progress'] }
+          structuralElement: { $in: allElementIds }
         })
         .sort({ orderIndex: 1 })
-        .limit(allElementIds.length)
         .lean();
         
-        // Create a map of elementId -> currentJob
-        const jobMap = {};
+        // Create a map of elementId -> array of jobs
+        const jobsMap = {};
         jobs.forEach(job => {
           const elementId = job.structuralElement.toString();
-          if (!jobMap[elementId]) {
-            jobMap[elementId] = job;
+          if (!jobsMap[elementId]) {
+            jobsMap[elementId] = [];
           }
+          jobsMap[elementId].push(job);
         });
         
         // Add job information to elements
         groupResults.forEach(group => {
-          group.elements = group.elements.map(element => ({
-            ...element,
-            currentJob: jobMap[element._id.toString()] || null
-          }));
+          group.elements = group.elements.map(element => {
+            const elementJobs = jobsMap[element._id.toString()] || [];
+            // Find the current active job (first pending or in_progress job)
+            const currentJob = elementJobs.find(j => 
+              j.status === 'pending' || j.status === 'in_progress'
+            ) || null;
+            
+            return {
+              ...element,
+              currentJob: currentJob,
+              allJobs: elementJobs  // Include all jobs for the element
+            };
+          });
         });
         
         // Return formatted response
