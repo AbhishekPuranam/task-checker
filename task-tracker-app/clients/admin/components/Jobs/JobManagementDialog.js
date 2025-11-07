@@ -471,24 +471,22 @@ export default function JobManagementDialog({ open, onClose, element, projectId,
                           <Edit fontSize="small" />
                         </IconButton>
                         
-                        {/* Delete Button - only for custom jobs */}
-                        {job.jobType === 'custom' && (
-                          <IconButton
-                            size="small"
-                            onClick={() => handleDeleteClick(job)}
-                            sx={{ 
-                              color: 'error.main',
-                              '&:hover': { bgcolor: 'error.50' }
-                            }}
-                            title="Delete job"
-                          >
-                            <Delete fontSize="small" />
-                          </IconButton>
-                        )}
+                        {/* Delete Button - for all jobs */}
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDeleteClick(job)}
+                          sx={{ 
+                            color: 'error.main',
+                            '&:hover': { bgcolor: 'error.50' }
+                          }}
+                          title="Delete job"
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
                       </Box>
                     </ListItemSecondaryAction>
                   </ListItem>
-                </Box>
+```                </Box>
               );
             })}
             
@@ -728,18 +726,33 @@ export default function JobManagementDialog({ open, onClose, element, projectId,
         <Alert severity="warning" sx={{ mb: 2 }}>
           This action cannot be undone!
         </Alert>
+        {jobToDelete?.jobType !== 'custom' && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            <strong>Warning:</strong> You are deleting a pre-defined workflow job. This may affect the standard workflow process.
+          </Alert>
+        )}
         <Typography>
           Are you sure you want to delete this job?
         </Typography>
         <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>
-            {jobToDelete?.jobTitle}
-          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 0.5 }}>
+            <Typography variant="subtitle2" fontWeight={600}>
+              {jobToDelete?.jobTitle}
+            </Typography>
+            {jobToDelete?.jobType === 'custom' ? (
+              <Chip label="Custom" size="small" color="secondary" />
+            ) : (
+              <Chip label="Pre-defined" size="small" color="primary" />
+            )}
+          </Box>
           {jobToDelete?.jobDescription && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
               {jobToDelete.jobDescription}
             </Typography>
           )}
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            Type: {jobToDelete?.jobType?.replace(/_/g, ' ')}
+          </Typography>
         </Box>
       </DialogContent>
       
