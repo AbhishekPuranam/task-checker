@@ -22,6 +22,7 @@ router.use((req, res, next) => {
  * 4. Otherwise -> 'active'
  */
 async function updateStructuralElementStatus(elementId) {
+  console.log(`🚨 FUNCTION ENTRY - updateStructuralElementStatus called with elementId: ${elementId}`);
   try {
     console.log(`🔄 Checking element status for ${elementId}`);
     const element = await StructuralElement.findById(elementId);
@@ -854,12 +855,17 @@ router.put('/:id', auth, async (req, res) => {
       await invalidateCache(`cache:structural:summary:${updatedJob.project}:*`);
     }
 
+    console.log('🚀 BEFORE STATUS UPDATE CHECK - updatedJob.structuralElement:', updatedJob.structuralElement);
+
     // Update structural element status based on job statuses (non-blocking)
     if (updatedJob.structuralElement) {
       const elementId = updatedJob.structuralElement._id || updatedJob.structuralElement;
+      console.log('🎯 CALLING updateStructuralElementStatus with elementId:', elementId);
       updateStructuralElementStatus(elementId).catch(err => 
-        console.error('Failed to update structural element status:', err)
+        console.error('❌ Failed to update structural element status:', err)
       );
+    } else {
+      console.log('⚠️ NO STRUCTURAL ELEMENT FOUND ON UPDATED JOB');
     }
 
     // Trigger progress calculation if job was just completed
