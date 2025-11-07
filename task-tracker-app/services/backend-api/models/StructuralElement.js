@@ -92,6 +92,11 @@ const structuralElementSchema = new mongoose.Schema({
     default: 'active',
     index: true
   },
+  // Date when status was changed to complete
+  completedDate: {
+    type: Date,
+    index: true
+  },
   // Admin who created this entry
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,

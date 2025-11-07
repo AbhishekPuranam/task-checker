@@ -1067,7 +1067,8 @@ router.get('/excel/subproject/:subProjectId', adminAuth, async (req, res) => {
       { header: 'Fireproofing Thickness', key: 'fireproofingThickness', width: 22 },
       { header: 'Surface Area (SQM)', key: 'surfaceAreaSqm', width: 18 },
       { header: 'Fire Proofing Workflow', key: 'fireProofingWorkflow', width: 25 },
-      { header: 'Status', key: 'status', width: 15 }
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Completed Date', key: 'completedDate', width: 20 }
     ];
     
     // Stream elements in batches
@@ -1106,7 +1107,8 @@ router.get('/excel/subproject/:subProjectId', adminAuth, async (req, res) => {
           fireproofingThickness: element.fireproofingThickness,
           surfaceAreaSqm: element.surfaceAreaSqm,
           fireProofingWorkflow: element.fireProofingWorkflow,
-          status: element.status
+          status: element.status,
+          completedDate: element.completedDate ? new Date(element.completedDate).toLocaleDateString() : ''
         }).commit();
       }
       

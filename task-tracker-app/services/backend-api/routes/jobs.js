@@ -76,9 +76,20 @@ async function updateStructuralElementStatus(elementId) {
 
     // Update status if changed
     if (newStatus && element.status !== newStatus) {
+      const updateData = { status: newStatus };
+      
+      // Set completedDate when status changes to complete
+      if (newStatus === 'complete') {
+        updateData.completedDate = new Date();
+      }
+      // Clear completedDate if status changes away from complete
+      else if (element.status === 'complete') {
+        updateData.completedDate = null;
+      }
+      
       await StructuralElement.findByIdAndUpdate(
         elementId,
-        { status: newStatus },
+        updateData,
         { runValidators: true }
       );
       console.log(`✅ Element ${elementId}: ${element.status} -> ${newStatus}`);
