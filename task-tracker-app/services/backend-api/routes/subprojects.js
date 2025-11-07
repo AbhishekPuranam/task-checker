@@ -104,6 +104,10 @@ router.get('/project/:projectId', auth, async (req, res) => {
       }
     );
     
+    // Prevent browser caching - always get fresh data from server
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.json(result);
   } catch (error) {
     console.error('Error fetching SubProjects:', error);
@@ -134,6 +138,10 @@ router.get('/:id', auth, async (req, res) => {
     const stats = await SubProject.recalculateStatistics(req.params.id);
     subProject.statistics = stats;
     
+    // Prevent browser caching - always get fresh data from server
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.json(subProject);
   } catch (error) {
     console.error('Error fetching SubProject:', error);
@@ -329,6 +337,10 @@ router.get('/project/:projectId/statistics', auth, async (req, res) => {
   try {
     const stats = await SubProject.recalculateProjectStatistics(req.params.projectId);
     
+    // Prevent browser caching - always get fresh data from server
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.json(stats);
   } catch (error) {
     console.error('Error fetching Project statistics:', error);
