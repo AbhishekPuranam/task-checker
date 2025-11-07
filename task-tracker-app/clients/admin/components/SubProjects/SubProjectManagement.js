@@ -534,9 +534,9 @@ export default function SubProjectManagement() {
                         <Grid item xs={6}>
                           <Box sx={{ bgcolor: '#e8f5e9', p: 1, borderRadius: 1, textAlign: 'center' }}>
                             <Typography variant="h6" fontWeight="bold" sx={{ color: '#2e7d32' }}>
-                              {subProject.completionPercentage || 0}%
+                              {subProject.statistics?.completedElements || 0}
                             </Typography>
-                            <Typography variant="caption" sx={{ color: '#666' }}>Complete</Typography>
+                            <Typography variant="caption" sx={{ color: '#666' }}>Completed</Typography>
                           </Box>
                         </Grid>
                         <Grid item xs={6}>
@@ -550,9 +550,9 @@ export default function SubProjectManagement() {
                         <Grid item xs={6}>
                           <Box sx={{ bgcolor: '#fff3e0', p: 1, borderRadius: 1, textAlign: 'center' }}>
                             <Typography variant="h6" fontWeight="bold" sx={{ color: '#e65100' }}>
-                              {subProject.sqmCompletionPercentage || 0}%
+                              {subProject.statistics?.completedSqm?.toFixed(1) || 0}
                             </Typography>
-                            <Typography variant="caption" sx={{ color: '#666' }}>SQM Complete</Typography>
+                            <Typography variant="caption" sx={{ color: '#666' }}>Completed SQM</Typography>
                           </Box>
                         </Grid>
                       </Grid>
