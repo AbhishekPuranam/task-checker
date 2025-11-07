@@ -253,14 +253,52 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
             </Typography>
           </Box>
         ) : (
-          <List>
+          <List sx={{ py: 0 }}>
             {jobs.map((job, index) => {
               const statusInfo = getStatusInfo(job.status);
               const StatusIcon = statusInfo.icon;
               
               return (
                 <Box key={job._id}>
-                  {index > 0 && <Divider />}
+                  {/* Add Job Button Between Jobs */}
+                  {index > 0 && (
+                    <Box sx={{ 
+                      display: 'flex', 
+                      justifyContent: 'center', 
+                      alignItems: 'center',
+                      py: 0.5,
+                      position: 'relative'
+                    }}>
+                      <Divider sx={{ position: 'absolute', width: '100%' }} />
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<Add />}
+                        onClick={() => handleInsertCustomJobAfter(jobs[index - 1]._id)}
+                        sx={{
+                          zIndex: 1,
+                          bgcolor: 'white',
+                          px: 2,
+                          py: 0.5,
+                          borderRadius: 2,
+                          fontSize: '0.75rem',
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          borderColor: 'primary.main',
+                          color: 'primary.main',
+                          '&:hover': {
+                            bgcolor: 'primary.50',
+                            borderColor: 'primary.dark',
+                            transform: 'scale(1.05)',
+                          },
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        Add Job Here
+                      </Button>
+                    </Box>
+                  )}
+                  
                   <ListItem
                     sx={{
                       py: 2,
@@ -272,6 +310,9 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
                     <ListItemText
                       primary={
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                          <Typography variant="body2" color="text.secondary" sx={{ minWidth: 30 }}>
+                            #{index + 1}
+                          </Typography>
                           <StatusIcon 
                             fontSize="small" 
                             color={statusInfo.color}
@@ -285,7 +326,7 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
                         </Box>
                       }
                       secondary={
-                        <Box sx={{ mt: 1 }}>
+                        <Box sx={{ mt: 1, ml: 5 }}>
                           <Typography variant="body2" color="text.secondary">
                             Type: {job.jobType?.replace(/_/g, ' ')}
                           </Typography>
@@ -294,48 +335,67 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
                               {job.jobDescription}
                             </Typography>
                           )}
-                          <Typography variant="caption" color="text.secondary">
-                            Order: #{job.orderIndex || 0}
-                          </Typography>
                         </Box>
                       }
                     />
                     <ListItemSecondaryAction>
-                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                        <FormControl size="small" sx={{ minWidth: 180 }}>
-                          <InputLabel>Status</InputLabel>
-                          <Select
-                            value={job.status || 'pending'}
-                            label="Status"
-                            onChange={(e) => handleStatusChange(job._id, e.target.value)}
-                          >
-                            {JOB_STATUS_OPTIONS.map((option) => (
-                              <MenuItem key={option.value} value={option.value}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <Chip 
-                                    label={option.label} 
-                                    color={option.color}
-                                    size="small"
-                                  />
-                                </Box>
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                        <Button
-                          size="small"
-                          startIcon={<Add />}
-                          onClick={() => handleInsertCustomJobAfter(job._id)}
-                          sx={{ minWidth: 'auto' }}
+                      <FormControl size="small" sx={{ minWidth: 180 }}>
+                        <InputLabel>Status</InputLabel>
+                        <Select
+                          value={job.status || 'pending'}
+                          label="Status"
+                          onChange={(e) => handleStatusChange(job._id, e.target.value)}
                         >
-                          Add After
-                        </Button>
-                      </Box>
+                          {JOB_STATUS_OPTIONS.map((option) => (
+                            <MenuItem key={option.value} value={option.value}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Chip 
+                                  label={option.label} 
+                                  color={option.color}
+                                  size="small"
+                                />
+                              </Box>
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
                     </ListItemSecondaryAction>
                   </ListItem>
                 </Box>
               );
             })}
+            
+            {/* Add Job at the End */}
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center',
+              py: 1,
+              mt: 1
+            }}>
+              <Button
+                size="medium"
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => {
+                  if (jobs.length > 0) {
+                    handleInsertCustomJobAfter(jobs[jobs.length - 1]._id);
+                  } else {
+                    setShowCustomJobForm(true);
+                    setInsertAfterJobId(null);
+                  }
+                }}
+                sx={{
+                  px: 3,
+                  py: 1,
+                  borderRadius: 2,
+                  fontWeight: 600,
+                  boxShadow: 2
+                }}
+              >
+                Add Job at End
+              </Button>
+            </Box>
             
             {/* Add custom job form */}
             <Box sx={{ mt: 3 }}>
