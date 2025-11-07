@@ -118,17 +118,27 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
       return;
     }
 
+    if (!element?.project) {
+      setError('Project information is missing. Please close and reopen this dialog.');
+      return;
+    }
+
     try {
       setError(null);
       const token = localStorage.getItem('token');
       
+      // Get project ID - handle both ObjectId and populated project
+      const projectId = typeof element.project === 'object' ? element.project._id : element.project;
+      
       const jobData = {
         structuralElement: element._id,
-        project: element.project,
+        project: projectId,
         jobTitle: customJobForm.jobTitle.trim(),
         jobDescription: customJobForm.jobDescription.trim() || customJobForm.jobTitle.trim(),
         insertAfterJobId: insertAfterJobId || undefined
       };
+
+      console.log('Creating custom job with data:', jobData);
 
       await axios.post(
         `${API_URL}/jobs/custom`,
@@ -152,7 +162,9 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
       }
     } catch (err) {
       console.error('Error creating custom job:', err);
-      setError(err.response?.data?.message || 'Failed to create custom job');
+      const errorMsg = err.response?.data?.message || 'Failed to create custom job';
+      setError(errorMsg);
+      toast.error(errorMsg);
       toast.error('Failed to create custom job');
     }
   };
@@ -326,62 +338,99 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
             })}
             
             {/* Add custom job form */}
-            <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+            <Box sx={{ mt: 3 }}>
+              <Divider sx={{ mb: 2 }} />
               <Button
                 fullWidth
-                variant="outlined"
-                startIcon={showCustomJobForm ? <ExpandLess /> : <Add />}
+                variant={showCustomJobForm ? "outlined" : "contained"}
+                color={showCustomJobForm ? "error" : "primary"}
+                startIcon={showCustomJobForm ? <Close /> : <Add />}
                 onClick={() => {
                   setShowCustomJobForm(!showCustomJobForm);
                   if (showCustomJobForm) {
                     setInsertAfterJobId(null);
                     setCustomJobForm({ jobTitle: '', jobDescription: '' });
+                    setError(null);
                   }
                 }}
+                sx={{
+                  py: 1.5,
+                  fontWeight: 600,
+                  boxShadow: showCustomJobForm ? 'none' : 2
+                }}
               >
-                {showCustomJobForm ? 'Cancel' : 'Add Custom Job'}
+                {showCustomJobForm ? 'Cancel Custom Job' : 'Add Custom Job'}
               </Button>
               
               <Collapse in={showCustomJobForm}>
-                <Box sx={{ mt: 2 }}>
+                <Box sx={{ mt: 3, p: 3, bgcolor: 'primary.50', borderRadius: 2, border: '2px solid', borderColor: 'primary.200' }}>
                   {insertAfterJobId && (
-                    <Alert severity="info" sx={{ mb: 2 }}>
-                      Job will be inserted after: {jobs.find(j => j._id === insertAfterJobId)?.jobTitle}
+                    <Alert severity="info" sx={{ mb: 2 }} icon={<Add />}>
+                      <Typography variant="body2" fontWeight={600}>
+                        Job will be inserted after: <strong>{jobs.find(j => j._id === insertAfterJobId)?.jobTitle}</strong>
+                      </Typography>
                     </Alert>
                   )}
+                  
+                  <Typography variant="subtitle2" color="primary" gutterBottom fontWeight={600} sx={{ mb: 2 }}>
+                    Create Custom Job
+                  </Typography>
+                  
                   <TextField
                     fullWidth
-                    label="Job Name *"
-                    placeholder="e.g., Custom Inspection"
+                    required
+                    label="Job Name"
+                    placeholder="e.g., Custom Inspection, Special Check"
                     value={customJobForm.jobTitle}
                     onChange={(e) => setCustomJobForm({ ...customJobForm, jobTitle: e.target.value })}
-                    sx={{ mb: 2 }}
+                    sx={{ 
+                      mb: 2,
+                      '& .MuiOutlinedInput-root': {
+                        bgcolor: 'white'
+                      }
+                    }}
+                    helperText="Enter a descriptive name for this custom job"
                   />
                   <TextField
                     fullWidth
-                    label="Job Description (Optional)"
-                    placeholder="Enter job description..."
+                    label="Job Description"
+                    placeholder="Enter detailed description (optional)..."
                     multiline
-                    rows={2}
+                    rows={3}
                     value={customJobForm.jobDescription}
                     onChange={(e) => setCustomJobForm({ ...customJobForm, jobDescription: e.target.value })}
-                    sx={{ mb: 2 }}
+                    sx={{ 
+                      mb: 3,
+                      '& .MuiOutlinedInput-root': {
+                        bgcolor: 'white'
+                      }
+                    }}
                   />
-                  <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Box sx={{ display: 'flex', gap: 2 }}>
                     <Button
+                      fullWidth
                       variant="contained"
+                      size="large"
                       onClick={handleCreateCustomJob}
                       disabled={!customJobForm.jobTitle.trim()}
+                      sx={{
+                        py: 1.5,
+                        fontWeight: 600,
+                        boxShadow: 3
+                      }}
                     >
-                      Create Job
+                      Create Custom Job
                     </Button>
                     <Button
                       variant="outlined"
+                      size="large"
                       onClick={() => {
                         setShowCustomJobForm(false);
                         setInsertAfterJobId(null);
                         setCustomJobForm({ jobTitle: '', jobDescription: '' });
+                        setError(null);
                       }}
+                      sx={{ minWidth: 100 }}
                     >
                       Cancel
                     </Button>
