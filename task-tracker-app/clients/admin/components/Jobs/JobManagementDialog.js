@@ -27,7 +27,6 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 const JOB_STATUS_OPTIONS = [
   { value: 'pending', label: 'Pending', color: 'warning', icon: HourglassEmpty },
-  { value: 'in_progress', label: 'In Progress', color: 'info', icon: HourglassEmpty },
   { value: 'completed', label: 'Completed', color: 'success', icon: CheckCircle },
   { value: 'not_applicable', label: 'Non-Clearance', color: 'default', icon: Cancel }
 ];

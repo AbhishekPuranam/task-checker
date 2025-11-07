@@ -29,59 +29,48 @@ async function updateStructuralElementStatus(elementId) {
       return;
     }
 
+    let newStatus = null;
+
     // Rule 1: No fireProofingWorkflow -> 'no_job'
     if (!element.fireProofingWorkflow) {
-      if (element.status !== 'no_job') {
-        element.status = 'no_job';
-        await element.save();
-        console.log(`✅ Element ${elementId} -> no_job (no fireProofingWorkflow)`);
+      newStatus = 'no_job';
+    } else {
+      // Get all jobs for this element
+      const jobs = await Job.find({ structuralElement: elementId });
+      
+      if (jobs.length === 0) {
+        // Has workflow but no jobs created yet -> no_job
+        newStatus = 'no_job';
+      } else {
+        // Rule 2: If any job is 'not_applicable' -> 'non clearance'
+        const hasNonClearance = jobs.some(job => job.status === 'not_applicable');
+        if (hasNonClearance) {
+          newStatus = 'non clearance';
+        } else {
+          // Rule 3: If all jobs are 'completed' -> 'complete'
+          const allCompleted = jobs.every(job => job.status === 'completed');
+          if (allCompleted) {
+            newStatus = 'complete';
+          } else {
+            // Otherwise -> 'active'
+            newStatus = 'active';
+          }
+        }
       }
-      return;
     }
 
-    // Get all jobs for this element
-    const jobs = await Job.find({ structuralElement: elementId });
-    
-    if (jobs.length === 0) {
-      // Has workflow but no jobs created yet -> keep active or set no_job
-      if (element.status !== 'no_job') {
-        element.status = 'no_job';
-        await element.save();
-        console.log(`✅ Element ${elementId} -> no_job (no jobs)`);
-      }
-      return;
-    }
-
-    // Rule 2: If any job is 'not_applicable' -> 'non clearance'
-    const hasNonClearance = jobs.some(job => job.status === 'not_applicable');
-    if (hasNonClearance) {
-      if (element.status !== 'non clearance') {
-        element.status = 'non clearance';
-        await element.save();
-        console.log(`✅ Element ${elementId} -> non clearance (has not_applicable jobs)`);
-      }
-      return;
-    }
-
-    // Rule 3: If all jobs are 'completed' -> 'complete'
-    const allCompleted = jobs.every(job => job.status === 'completed');
-    if (allCompleted) {
-      if (element.status !== 'complete') {
-        element.status = 'complete';
-        await element.save();
-        console.log(`✅ Element ${elementId} -> complete (all jobs completed)`);
-      }
-      return;
-    }
-
-    // Otherwise -> 'active'
-    if (element.status !== 'active') {
-      element.status = 'active';
-      await element.save();
-      console.log(`✅ Element ${elementId} -> active (default)`);
+    // Update status if changed
+    if (newStatus && element.status !== newStatus) {
+      await StructuralElement.findByIdAndUpdate(
+        elementId,
+        { status: newStatus },
+        { runValidators: true }
+      );
+      console.log(`✅ Element ${elementId} -> ${newStatus}`);
     }
   } catch (error) {
     console.error(`Error updating structural element ${elementId} status:`, error);
+    console.error(error.stack);
   }
 }
 
