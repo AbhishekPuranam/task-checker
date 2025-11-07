@@ -829,6 +829,7 @@ router.put('/:id', auth, async (req, res) => {
 
     // Invalidate cache for this project
     await invalidateCache(`cache:jobs:project:${updatedJob.project}:*`);
+    await invalidateCache(`cache:jobs:project:all:*`); // Also invalidate 'all' project cache
     await invalidateCache(`cache:stats:project:${updatedJob.project}`);
     
     // Invalidate structural element job cache
