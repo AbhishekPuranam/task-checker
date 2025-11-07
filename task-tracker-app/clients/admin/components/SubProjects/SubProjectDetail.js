@@ -311,8 +311,23 @@ export default function SubProjectDetail() {
   };
   
   const handleJobsUpdated = () => {
-    // Refresh the grouped data
+    // Refresh the grouped data and subproject statistics
     fetchGroupedData();
+    
+    // Also refresh the subproject to get updated statistics
+    if (subProject?._id) {
+      const token = localStorage.getItem('token');
+      axios.get(`${API_URL}/subprojects/${subProject._id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      .then(res => {
+        setSubProject(res.data);
+        console.log('✅ SubProject statistics refreshed');
+      })
+      .catch(err => {
+        console.error('Error refreshing subproject:', err);
+      });
+    }
   };
   
   // Get cell value helper
