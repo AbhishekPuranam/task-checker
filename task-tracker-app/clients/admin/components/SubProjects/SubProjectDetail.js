@@ -25,9 +25,11 @@ import {
   Switch,
   FormControlLabel,
   IconButton,
-  Tooltip
+  Tooltip,
+  TextField,
+  InputAdornment
 } from '@mui/material';
-import { ArrowBack, Download, ViewModule as ViewModuleIcon, Settings as SettingsIcon } from '@mui/icons-material';
+import { ArrowBack, Download, ViewModule as ViewModuleIcon, Settings as SettingsIcon, Search as SearchIcon } from '@mui/icons-material';
 import JobManagementDialog from '../Jobs/JobManagementDialog';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -52,6 +54,7 @@ export default function SubProjectDetail() {
   const [availableFields, setAvailableFields] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingGroups, setLoadingGroups] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Pagination state - per group
   const [groupPages, setGroupPages] = useState({});
@@ -275,6 +278,24 @@ export default function SubProjectDetail() {
   
   const getVisibleColumns = () => {
     return availableColumns.filter(col => visibleColumns[col.key]);
+  };
+  
+  // Filter elements based on search query
+  const filterElements = (elements) => {
+    if (!searchQuery.trim()) return elements;
+    
+    const query = searchQuery.toLowerCase();
+    return elements.filter(element => {
+      return (
+        element.serialNumber?.toString().toLowerCase().includes(query) ||
+        element.structureNumber?.toString().toLowerCase().includes(query) ||
+        element.drawingNo?.toString().toLowerCase().includes(query) ||
+        element.memberType?.toLowerCase().includes(query) ||
+        element.level?.toLowerCase().includes(query) ||
+        element.gridNo?.toLowerCase().includes(query) ||
+        element.sectionSizes?.toLowerCase().includes(query)
+      );
+    });
   };
   
   // Handle row click to open job management
@@ -572,6 +593,23 @@ export default function SubProjectDetail() {
             </Tooltip>
           </Box>
           
+          {/* Search Field */}
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Search by Serial No, Structure No, Drawing No, Member Type..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ mb: 3 }}
+          />
+          
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
               <FormControl fullWidth>
@@ -672,10 +710,12 @@ export default function SubProjectDetail() {
                 </Box>
 
                 {/* All Elements */}
-                {group.elements && group.elements.length > 0 && (
+                {group.elements && group.elements.length > 0 && (() => {
+                  const filteredElements = filterElements(group.elements);
+                  return (
                   <Box sx={{ mt: 2 }}>
                     <Typography variant="body2" fontWeight="600" sx={{ color: '#333', mb: 1 }}>
-                      All Elements ({group.elements.length} total):
+                      All Elements ({filteredElements.length} {searchQuery ? 'matching' : 'total'}):
                     </Typography>
                     <Box sx={{ overflowX: 'auto' }}>
                       <table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
@@ -689,7 +729,7 @@ export default function SubProjectDetail() {
                           </tr>
                         </thead>
                         <tbody>
-                          {group.elements
+                          {filteredElements
                             .slice(
                               getGroupPage(index) * getGroupRowsPerPage(index), 
                               getGroupPage(index) * getGroupRowsPerPage(index) + getGroupRowsPerPage(index)
@@ -720,7 +760,7 @@ export default function SubProjectDetail() {
                     {/* Pagination */}
                     <TablePagination
                       component="div"
-                      count={group.elements.length}
+                      count={filteredElements.length}
                       page={getGroupPage(index)}
                       onPageChange={(event, newPage) => handleGroupPageChange(index, newPage)}
                       rowsPerPage={getGroupRowsPerPage(index)}
@@ -729,7 +769,8 @@ export default function SubProjectDetail() {
                       sx={{ borderTop: '1px solid #e0e0e0', mt: 1 }}
                     />
                   </Box>
-                )}
+                  );
+                })()}
               </Paper>
             ))}
             </Box>
