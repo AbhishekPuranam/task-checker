@@ -174,6 +174,7 @@ router.get('/by-name/:projectId/:subProjectName', auth, async (req, res) => {
     // Always calculate statistics on-the-fly to ensure fresh data
     console.log('📊 Calculating statistics for subproject:', subProject._id);
     const stats = await SubProject.recalculateStatistics(subProject._id);
+    console.log('📊 Calculated statistics:', JSON.stringify(stats, null, 2));
     subProject.statistics = stats;
     
     res.json(subProject);
