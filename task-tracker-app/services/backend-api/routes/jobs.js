@@ -1411,17 +1411,26 @@ router.post('/refresh-element-status/:elementId', auth, async (req, res) => {
       return res.status(404).json({ message: 'Element not found' });
     }
     
-    // Invalidate ALL related caches to ensure UI refreshes
+    // Invalidate only the affected caches (not all grouping cache)
     await invalidateCache(`cache:structural:summary:${element.project}:*`);
-    await invalidateCache(`cache:grouping:*`); // Invalidate all grouping cache
-    await invalidateCache(`cache:structural:elements:*`); // Invalidate element lists
     
-    // Recalculate subproject statistics if element belongs to a subproject
+    // Only invalidate grouping cache for the specific subproject, not all
     if (element.subProject) {
+      await invalidateCache(`grouping:*subProjectId:${element.subProject}*`);
       console.log(`📊 Recalculating statistics for subproject: ${element.subProject}`);
       const SubProject = require('../models/SubProject');
       await SubProject.recalculateStatistics(element.subProject);
       console.log(`✅ Subproject statistics updated`);
+    } else {
+      // If no subproject, invalidate by project
+      await invalidateCache(`grouping:*projectId:${element.project}*`);
+    }
+    
+    // Invalidate element lists for this specific project/subproject
+    if (element.subProject) {
+      await invalidateCache(`cache:structural:elements:*subProject:${element.subProject}*`);
+    } else {
+      await invalidateCache(`cache:structural:elements:*project:${element.project}*`);
     }
     
     console.log(`✅ Element ${elementId} status updated to: ${element.status}, caches invalidated`);
