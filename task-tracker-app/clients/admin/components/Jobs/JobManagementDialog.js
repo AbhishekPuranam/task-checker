@@ -124,6 +124,12 @@ export default function JobManagementDialog({ open, onClose, element, projectId,
       finalProjectId = typeof element.project === 'object' ? element.project._id : element.project;
     }
 
+    console.log('Debug project ID:', {
+      'projectId prop': projectId,
+      'element.project': element?.project,
+      'finalProjectId': finalProjectId
+    });
+
     if (!finalProjectId) {
       setError('Project information is missing. Please close and reopen this dialog.');
       return;
@@ -210,6 +216,7 @@ export default function JobManagementDialog({ open, onClose, element, projectId,
   };
 
   return (
+    <>
     <Dialog 
       open={open} 
       onClose={handleClose}
@@ -399,108 +406,6 @@ export default function JobManagementDialog({ open, onClose, element, projectId,
                 Add Job at End
               </Button>
             </Box>
-            
-            {/* Add custom job form */}
-            <Box sx={{ mt: 3 }}>
-              <Divider sx={{ mb: 2 }} />
-              <Button
-                fullWidth
-                variant={showCustomJobForm ? "outlined" : "contained"}
-                color={showCustomJobForm ? "error" : "primary"}
-                startIcon={showCustomJobForm ? <Close /> : <Add />}
-                onClick={() => {
-                  setShowCustomJobForm(!showCustomJobForm);
-                  if (showCustomJobForm) {
-                    setInsertAfterJobId(null);
-                    setCustomJobForm({ jobTitle: '', jobDescription: '' });
-                    setError(null);
-                  }
-                }}
-                sx={{
-                  py: 1.5,
-                  fontWeight: 600,
-                  boxShadow: showCustomJobForm ? 'none' : 2
-                }}
-              >
-                {showCustomJobForm ? 'Cancel Custom Job' : 'Add Custom Job'}
-              </Button>
-              
-              <Collapse in={showCustomJobForm}>
-                <Box sx={{ mt: 3, p: 3, bgcolor: 'primary.50', borderRadius: 2, border: '2px solid', borderColor: 'primary.200' }}>
-                  {insertAfterJobId && (
-                    <Alert severity="info" sx={{ mb: 2 }} icon={<Add />}>
-                      <Typography variant="body2" fontWeight={600}>
-                        Job will be inserted after: <strong>{jobs.find(j => j._id === insertAfterJobId)?.jobTitle}</strong>
-                      </Typography>
-                    </Alert>
-                  )}
-                  
-                  <Typography variant="subtitle2" color="primary" gutterBottom fontWeight={600} sx={{ mb: 2 }}>
-                    Create Custom Job
-                  </Typography>
-                  
-                  <TextField
-                    fullWidth
-                    required
-                    label="Job Name"
-                    placeholder="e.g., Custom Inspection, Special Check"
-                    value={customJobForm.jobTitle}
-                    onChange={(e) => setCustomJobForm({ ...customJobForm, jobTitle: e.target.value })}
-                    sx={{ 
-                      mb: 2,
-                      '& .MuiOutlinedInput-root': {
-                        bgcolor: 'white'
-                      }
-                    }}
-                    helperText="Enter a descriptive name for this custom job"
-                  />
-                  <TextField
-                    fullWidth
-                    label="Job Description"
-                    placeholder="Enter detailed description (optional)..."
-                    multiline
-                    rows={3}
-                    value={customJobForm.jobDescription}
-                    onChange={(e) => setCustomJobForm({ ...customJobForm, jobDescription: e.target.value })}
-                    sx={{ 
-                      mb: 3,
-                      '& .MuiOutlinedInput-root': {
-                        bgcolor: 'white'
-                      }
-                    }}
-                  />
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      size="large"
-                      onClick={handleCreateCustomJob}
-                      disabled={!customJobForm.jobTitle.trim()}
-                      sx={{
-                        py: 1.5,
-                        fontWeight: 600,
-                        boxShadow: 3
-                      }}
-                    >
-                      Create Custom Job
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      size="large"
-                      onClick={() => {
-                        setShowCustomJobForm(false);
-                        setInsertAfterJobId(null);
-                        setCustomJobForm({ jobTitle: '', jobDescription: '' });
-                        setError(null);
-                      }}
-                      sx={{ minWidth: 100 }}
-                    >
-                      Cancel
-                    </Button>
-                  </Box>
-                </Box>
-              </Collapse>
-            </Box>
           </List>
         )}
         
@@ -520,5 +425,91 @@ export default function JobManagementDialog({ open, onClose, element, projectId,
         </Button>
       </DialogActions>
     </Dialog>
+    
+    {/* Custom Job Creation Dialog */}
+    <Dialog 
+      open={showCustomJobForm} 
+      onClose={() => {
+        setShowCustomJobForm(false);
+        setInsertAfterJobId(null);
+        setCustomJobForm({ jobTitle: '', jobDescription: '' });
+        setError(null);
+      }}
+      maxWidth="sm"
+      fullWidth
+    >
+      <DialogTitle>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6">Create Custom Job</Typography>
+          <IconButton 
+            onClick={() => {
+              setShowCustomJobForm(false);
+              setInsertAfterJobId(null);
+              setCustomJobForm({ jobTitle: '', jobDescription: '' });
+              setError(null);
+            }} 
+            size="small"
+          >
+            <Close />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+      
+      <DialogContent dividers>
+        {insertAfterJobId && (
+          <Alert severity="info" sx={{ mb: 3 }} icon={<Add />}>
+            <Typography variant="body2">
+              Job will be inserted after: <strong>{jobs.find(j => j._id === insertAfterJobId)?.jobTitle}</strong>
+            </Typography>
+          </Alert>
+        )}
+        
+        <TextField
+          fullWidth
+          required
+          label="Job Name"
+          placeholder="e.g., Custom Inspection, Special Check"
+          value={customJobForm.jobTitle}
+          onChange={(e) => setCustomJobForm({ ...customJobForm, jobTitle: e.target.value })}
+          sx={{ mb: 3 }}
+          helperText="Enter a descriptive name for this custom job"
+          autoFocus
+        />
+        
+        <TextField
+          fullWidth
+          label="Job Description"
+          placeholder="Enter detailed description (optional)..."
+          multiline
+          rows={4}
+          value={customJobForm.jobDescription}
+          onChange={(e) => setCustomJobForm({ ...customJobForm, jobDescription: e.target.value })}
+          helperText="Add additional details about this job (optional)"
+        />
+      </DialogContent>
+      
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button
+          onClick={() => {
+            setShowCustomJobForm(false);
+            setInsertAfterJobId(null);
+            setCustomJobForm({ jobTitle: '', jobDescription: '' });
+            setError(null);
+          }}
+          variant="outlined"
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleCreateCustomJob}
+          disabled={!customJobForm.jobTitle.trim()}
+          variant="contained"
+          startIcon={<Add />}
+        >
+          Create Job
+        </Button>
+      </DialogActions>
+    </Dialog>
+  </>
   );
 }
