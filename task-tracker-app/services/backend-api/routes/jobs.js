@@ -23,9 +23,10 @@ router.use((req, res, next) => {
  */
 async function updateStructuralElementStatus(elementId) {
   try {
+    console.log(`🔄 Checking element status for ${elementId}`);
     const element = await StructuralElement.findById(elementId);
     if (!element) {
-      console.log(`Element ${elementId} not found`);
+      console.log(`❌ Element ${elementId} not found`);
       return;
     }
 
@@ -34,26 +35,39 @@ async function updateStructuralElementStatus(elementId) {
     // Rule 1: No fireProofingWorkflow -> 'no_job'
     if (!element.fireProofingWorkflow) {
       newStatus = 'no_job';
+      console.log(`📋 Element ${elementId}: No fireProofingWorkflow -> no_job`);
     } else {
       // Get all jobs for this element
       const jobs = await Job.find({ structuralElement: elementId });
+      console.log(`📋 Element ${elementId}: Found ${jobs.length} jobs`);
       
       if (jobs.length === 0) {
         // Has workflow but no jobs created yet -> no_job
         newStatus = 'no_job';
+        console.log(`📋 Element ${elementId}: No jobs found -> no_job`);
       } else {
+        // Log job statuses
+        const statusCounts = jobs.reduce((acc, job) => {
+          acc[job.status] = (acc[job.status] || 0) + 1;
+          return acc;
+        }, {});
+        console.log(`📋 Element ${elementId}: Job statuses:`, JSON.stringify(statusCounts));
+        
         // Rule 2: If any job is 'not_applicable' -> 'non clearance'
         const hasNonClearance = jobs.some(job => job.status === 'not_applicable');
         if (hasNonClearance) {
           newStatus = 'non clearance';
+          console.log(`📋 Element ${elementId}: Has not_applicable jobs -> non clearance`);
         } else {
           // Rule 3: If all jobs are 'completed' -> 'complete'
           const allCompleted = jobs.every(job => job.status === 'completed');
           if (allCompleted) {
             newStatus = 'complete';
+            console.log(`📋 Element ${elementId}: All jobs completed -> complete`);
           } else {
             // Otherwise -> 'active'
             newStatus = 'active';
+            console.log(`📋 Element ${elementId}: Mixed statuses -> active`);
           }
         }
       }
@@ -66,10 +80,12 @@ async function updateStructuralElementStatus(elementId) {
         { status: newStatus },
         { runValidators: true }
       );
-      console.log(`✅ Element ${elementId} -> ${newStatus}`);
+      console.log(`✅ Element ${elementId}: ${element.status} -> ${newStatus}`);
+    } else {
+      console.log(`ℹ️  Element ${elementId}: Status unchanged (${element.status})`);
     }
   } catch (error) {
-    console.error(`Error updating structural element ${elementId} status:`, error);
+    console.error(`❌ Error updating structural element ${elementId} status:`, error.message);
     console.error(error.stack);
   }
 }
