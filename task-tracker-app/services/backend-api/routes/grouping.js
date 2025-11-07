@@ -77,6 +77,48 @@ router.post('/elements', auth, async (req, res) => {
           { $match: matchStage }
         ];
         
+        // If grouping by currentJob, we need to lookup jobs first
+        if (groupBy === 'currentJob' || subGroupBy === 'currentJob') {
+          // Add lookup stage to join with jobs
+          pipeline.push({
+            $lookup: {
+              from: 'jobs',
+              localField: '_id',
+              foreignField: 'structuralElement',
+              as: 'jobs'
+            }
+          });
+          
+          // Add field to compute current job title
+          pipeline.push({
+            $addFields: {
+              currentJob: {
+                $let: {
+                  vars: {
+                    currentJobObj: {
+                      $arrayElemAt: [
+                        {
+                          $filter: {
+                            input: '$jobs',
+                            as: 'job',
+                            cond: {
+                              $in: ['$$job.status', ['pending', 'in_progress']]
+                            }
+                          }
+                        },
+                        0
+                      ]
+                    }
+                  },
+                  in: {
+                    $ifNull: ['$$currentJobObj.jobTitle', 'No Active Job']
+                  }
+                }
+              }
+            }
+          });
+        }
+        
         // Build group stage
         const groupId = {};
         const groupStage = {
@@ -334,6 +376,7 @@ router.get('/available-fields', auth, async (req, res) => {
           { value: 'structureNumber', label: 'Structure Number' },
           { value: 'sectionSizes', label: 'Section Sizes' },
           { value: 'fireProofingWorkflow', label: 'Fire Proofing Workflow' },
+          { value: 'currentJob', label: 'Current Job' },
           { value: 'partMarkNo', label: 'Part Mark No' },
           { value: 'sectionDepthMm', label: 'Section Depth (mm)' },
           { value: 'flangeWidthMm', label: 'Flange Width (mm)' },
