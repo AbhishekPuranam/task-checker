@@ -181,6 +181,15 @@ subProjectSchema.statics.recalculateStatistics = async function(subProjectId) {
     }
   });
   
+  // Calculate completion percentages
+  stats.completionPercentage = stats.totalElements > 0 
+    ? Math.round((stats.completedElements / stats.totalElements) * 100) 
+    : 0;
+  
+  stats.sqmCompletionPercentage = stats.totalSqm > 0 
+    ? Math.round((stats.completedSqm / stats.totalSqm) * 100) 
+    : 0;
+  
   // Update the subproject with new statistics
   await this.findByIdAndUpdate(subProjectId, { statistics: stats });
   
