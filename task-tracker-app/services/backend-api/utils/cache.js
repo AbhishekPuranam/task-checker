@@ -50,10 +50,10 @@ try {
  * Cache TTL (Time To Live) configurations in seconds
  */
 const CACHE_TTL = {
-  GROUPING: 300,           // 5 minutes - grouping results
-  STATISTICS: 600,         // 10 minutes - SubProject/Project statistics
-  SUBPROJECT_LIST: 180,    // 3 minutes - SubProject list
-  ELEMENTS_LIST: 120,      // 2 minutes - Elements list
+  GROUPING: 60,            // 1 minute - grouping results (reduced for fresher data)
+  STATISTICS: 120,         // 2 minutes - SubProject/Project statistics (also reduced)
+  SUBPROJECT_LIST: 120,    // 2 minutes - SubProject list
+  ELEMENTS_LIST: 60,       // 1 minute - Elements list (reduced for fresher data)
   AVAILABLE_FIELDS: 3600,  // 1 hour - Available grouping fields (rarely changes)
   SHORT: 60,               // 1 minute - Short-lived cache
   LONG: 1800               // 30 minutes - Long-lived cache
