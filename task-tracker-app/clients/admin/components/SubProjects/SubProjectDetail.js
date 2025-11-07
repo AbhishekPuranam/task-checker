@@ -36,8 +36,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 const SECTIONS = [
   { id: 'active', label: 'Active', color: 'blue' },
-  { id: 'non_clearance', label: 'Non-Clearance', color: 'yellow' },
-  { id: 'no_job', label: 'No Job', color: 'gray' },
+  { id: 'non_clearance', label: 'Non-Clearance', color: 'red' },
+  { id: 'no_job', label: 'No Job', color: 'purple' },
   { id: 'complete', label: 'Complete', color: 'green' }
 ];
 

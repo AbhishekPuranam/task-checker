@@ -1220,7 +1220,7 @@ const StructuralElementsList = ({ projectSlug }) => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'complete': return 'success';
-      case 'active': return 'primary';
+      case 'active': return 'info';
       case 'pending': return 'warning';
       case 'no jobs': return 'purple';
       case 'non clearance': return 'error';
