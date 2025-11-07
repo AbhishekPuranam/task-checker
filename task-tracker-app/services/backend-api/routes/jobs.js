@@ -389,8 +389,8 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
-// Get all jobs (with filters) - WITH REDIS CACHING
-router.get('/', auth, cacheMiddleware(180, jobsCacheKeyGenerator), async (req, res) => {
+// Get all jobs (with filters) - NO CACHING to prevent confusion with job status updates
+router.get('/', auth, async (req, res) => {
   try {
     const startTime = Date.now();
     const {
@@ -482,8 +482,8 @@ router.get('/', auth, cacheMiddleware(180, jobsCacheKeyGenerator), async (req, r
   }
 });
 
-// Get job statistics for a project (fast aggregation)
-router.get('/stats/:projectId', auth, cacheMiddleware(300, (req) => `cache:stats:project:${req.params.projectId}`), async (req, res) => {
+// Get job statistics for a project (fast aggregation) - NO CACHING
+router.get('/stats/:projectId', auth, async (req, res) => {
   try {
     const { projectId } = req.params;
     const mongoose = require('mongoose');
@@ -1404,6 +1404,14 @@ router.post('/refresh-element-status/:elementId', auth, async (req, res) => {
     await invalidateCache(`cache:structural:summary:${element.project}:*`);
     await invalidateCache(`cache:grouping:*`); // Invalidate all grouping cache
     await invalidateCache(`cache:structural:elements:*`); // Invalidate element lists
+    
+    // Recalculate subproject statistics if element belongs to a subproject
+    if (element.subProject) {
+      console.log(`📊 Recalculating statistics for subproject: ${element.subProject}`);
+      const SubProject = require('../models/SubProject');
+      await SubProject.recalculateStatistics(element.subProject);
+      console.log(`✅ Subproject statistics updated`);
+    }
     
     console.log(`✅ Element ${elementId} status updated to: ${element.status}, caches invalidated`);
     

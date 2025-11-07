@@ -115,7 +115,7 @@ router.get('/project/:projectId', auth, async (req, res) => {
  * @swagger
  * /api/subprojects/:id:
  *   get:
- *     summary: Get a specific SubProject
+ *     summary: Get a specific SubProject with statistics
  *     tags: [SubProjects]
  */
 router.get('/:id', auth, async (req, res) => {
@@ -127,6 +127,13 @@ router.get('/:id', auth, async (req, res) => {
     
     if (!subProject) {
       return res.status(404).json({ error: 'SubProject not found' });
+    }
+    
+    // Calculate statistics on-the-fly if they don't exist or are stale
+    if (!subProject.statistics || !subProject.statistics.lastCalculated) {
+      console.log('📊 Calculating statistics for subproject:', req.params.id);
+      const stats = await SubProject.recalculateStatistics(req.params.id);
+      subProject.statistics = stats;
     }
     
     res.json(subProject);

@@ -472,6 +472,15 @@ function createExcelWorker() {
           addProgressJob(projectId).catch(err => 
             console.error('[WORKER] Failed to queue progress job:', err)
           );
+          
+          // Recalculate subproject statistics if this upload was for a subproject
+          if (subProjectId) {
+            console.log(`📊 [WORKER] Recalculating statistics for subproject ${subProjectId}`);
+            const SubProject = require('../models/SubProject');
+            SubProject.recalculateStatistics(subProjectId).catch(err =>
+              console.error('[WORKER] Failed to recalculate subproject statistics:', err)
+            );
+          }
         }
         
         // Clean up file
