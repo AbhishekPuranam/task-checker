@@ -47,6 +47,9 @@ router.post('/elements', auth, async (req, res) => {
     if (status) {
       if (status === 'complete') {
         matchStage.status = { $in: ['complete', 'completed'] };
+      } else if (status === 'non_clearance') {
+        // Map frontend 'non_clearance' to backend 'non clearance'
+        matchStage.status = 'non clearance';
       } else {
         matchStage.status = status;
       }
@@ -261,6 +264,9 @@ router.post('/elements/group-details', auth, async (req, res) => {
     if (status) {
       if (status === 'complete') {
         query.status = { $in: ['complete', 'completed'] };
+      } else if (status === 'non_clearance') {
+        // Map frontend 'non_clearance' to backend 'non clearance'
+        query.status = 'non clearance';
       } else {
         query.status = status;
       }
