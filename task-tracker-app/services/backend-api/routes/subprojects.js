@@ -129,12 +129,10 @@ router.get('/:id', auth, async (req, res) => {
       return res.status(404).json({ error: 'SubProject not found' });
     }
     
-    // Calculate statistics on-the-fly if they don't exist or are stale
-    if (!subProject.statistics || !subProject.statistics.lastCalculated) {
-      console.log('📊 Calculating statistics for subproject:', req.params.id);
-      const stats = await SubProject.recalculateStatistics(req.params.id);
-      subProject.statistics = stats;
-    }
+    // Always calculate statistics on-the-fly to ensure fresh data
+    console.log('📊 Calculating statistics for subproject:', req.params.id);
+    const stats = await SubProject.recalculateStatistics(req.params.id);
+    subProject.statistics = stats;
     
     res.json(subProject);
   } catch (error) {
@@ -173,12 +171,10 @@ router.get('/by-name/:projectId/:subProjectName', auth, async (req, res) => {
       return res.status(404).json({ error: 'SubProject not found' });
     }
     
-    // Calculate statistics on-the-fly if they don't exist or are stale
-    if (!subProject.statistics || !subProject.statistics.lastCalculated) {
-      console.log('📊 Calculating statistics for subproject:', subProject._id);
-      const stats = await SubProject.recalculateStatistics(subProject._id);
-      subProject.statistics = stats;
-    }
+    // Always calculate statistics on-the-fly to ensure fresh data
+    console.log('📊 Calculating statistics for subproject:', subProject._id);
+    const stats = await SubProject.recalculateStatistics(subProject._id);
+    subProject.statistics = stats;
     
     res.json(subProject);
   } catch (error) {
