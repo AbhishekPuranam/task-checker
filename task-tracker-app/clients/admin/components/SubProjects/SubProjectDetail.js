@@ -306,7 +306,7 @@ export default function SubProjectDetail() {
     const query = searchQuery.toLowerCase();
     return elements.filter(element => {
       return (
-        element.serialNumber?.toString().toLowerCase().includes(query) ||
+        element.serialNo?.toString().toLowerCase().includes(query) ||
         element.structureNumber?.toString().toLowerCase().includes(query) ||
         element.drawingNo?.toString().toLowerCase().includes(query) ||
         element.memberType?.toLowerCase().includes(query) ||
