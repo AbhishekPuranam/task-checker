@@ -427,7 +427,7 @@ export default function SubProjectDetail() {
                 border: '1px solid #81c784'
               }}>
                 <Typography variant="h4" fontWeight="bold" sx={{ color: '#2e7d32', mb: 0.5 }}>
-                  {subProject.completionPercentage || 0}%
+                  {subProject.statistics?.completionPercentage || 0}%
                 </Typography>
                 <Typography variant="body2" fontWeight="medium" sx={{ color: '#388e3c' }}>
                   Completion
@@ -457,7 +457,7 @@ export default function SubProjectDetail() {
                 border: '1px solid #ffb74d'
               }}>
                 <Typography variant="h4" fontWeight="bold" sx={{ color: '#e65100', mb: 0.5 }}>
-                  {subProject.sqmCompletionPercentage || 0}%
+                  {subProject.statistics?.sqmCompletionPercentage || 0}%
                 </Typography>
                 <Typography variant="body2" fontWeight="medium" sx={{ color: '#ef6c00' }}>
                   SQM Completion
