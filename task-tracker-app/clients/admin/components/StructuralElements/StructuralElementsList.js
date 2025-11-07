@@ -1433,12 +1433,21 @@ const StructuralElementsList = ({ projectSlug }) => {
           <Chip 
             label={element.status} 
             size="small" 
-            color={['warning', 'purple', 'error'].includes(getStatusColor(element.status)) ? undefined : getStatusColor(element.status)}
+            color={['warning', 'purple', 'error', 'info'].includes(getStatusColor(element.status)) ? undefined : getStatusColor(element.status)}
             sx={{ 
               borderRadius: 1,
               fontWeight: 500,
               textTransform: 'capitalize',
-              // Custom styling for warning/orange status
+              // Custom styling for info status (active) - blue
+              ...(getStatusColor(element.status) === 'info' && {
+                backgroundColor: '#2196f3',
+                color: '#ffffff',
+                border: 'none',
+                '& .MuiChip-label': {
+                  color: '#ffffff'
+                }
+              }),
+              // Custom styling for warning/orange status (pending)
               ...(getStatusColor(element.status) === 'warning' && {
                 backgroundColor: '#ff9800',
                 color: '#ffffff',
