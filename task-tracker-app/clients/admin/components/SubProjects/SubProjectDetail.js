@@ -202,13 +202,18 @@ export default function SubProjectDetail() {
   const fetchAvailableFields = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`${API_URL}/grouping/available-fields`, {
-        headers: { Authorization: `Bearer ${token}` }
+      // Add cache busting timestamp to ensure fresh data
+      const res = await axios.get(`${API_URL}/grouping/available-fields?t=${Date.now()}`, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
       });
       const fields = res.data.fields || [];
       setAvailableFields(fields);
       
-      console.log('✅ [fetchAvailableFields] Loaded', fields.length, 'fields');
+      console.log('✅ [fetchAvailableFields] Loaded', fields.length, 'fields:', fields.map(f => f.label).join(', '));
       
       // Set default groupBy to 'level' after fields are loaded
       if (fields.length > 0 && !groupBy) {
