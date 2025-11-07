@@ -166,7 +166,7 @@ async function invalidateProject(projectId) {
   const patterns = [
     `grouping:*projectId:${projectId}*`,
     `statistics:project:${projectId}`,
-    `subprojects:project:${projectId}*`,
+    `subprojects:*projectId:${projectId}*`, // Fixed: match the actual cache key format
     `elements:*projectId:${projectId}*`
   ];
 
