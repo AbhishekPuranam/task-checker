@@ -107,9 +107,31 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
     return JOB_STATUS_OPTIONS.find(opt => opt.value === status) || JOB_STATUS_OPTIONS[0];
   };
 
-  const handleClose = () => {
+  const handleClose = async () => {
+    // Refresh element status before closing
+    if (element?._id) {
+      try {
+        const token = localStorage.getItem('token');
+        await axios.post(
+          `${API_URL}/jobs/refresh-element-status/${element._id}`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        console.log('Element status refreshed');
+      } catch (err) {
+        console.error('Error refreshing element status:', err);
+        // Don't show error to user, just log it
+      }
+    }
+    
     setError(null);
     setSuccess(null);
+    
+    // Notify parent to refresh
+    if (onJobsUpdated) {
+      onJobsUpdated();
+    }
+    
     onClose();
   };
 

@@ -1384,4 +1384,33 @@ router.delete('/:id', auth, async (req, res) => {
   }
 });
 
+// Refresh structural element status based on jobs
+router.post('/refresh-element-status/:elementId', auth, async (req, res) => {
+  try {
+    const elementId = req.params.elementId;
+    
+    console.log(`🔄 Manual refresh element status requested for: ${elementId}`);
+    
+    // Call the update function and wait for it
+    await updateStructuralElementStatus(elementId);
+    
+    // Get updated element
+    const element = await StructuralElement.findById(elementId);
+    if (!element) {
+      return res.status(404).json({ message: 'Element not found' });
+    }
+    
+    // Invalidate cache
+    await invalidateCache(`cache:structural:summary:${element.project}:*`);
+    
+    res.json({ 
+      message: 'Element status refreshed successfully',
+      status: element.status 
+    });
+  } catch (error) {
+    console.error('Error refreshing element status:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 module.exports = router;
