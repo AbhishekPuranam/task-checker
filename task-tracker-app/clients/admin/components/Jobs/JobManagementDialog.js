@@ -18,10 +18,13 @@ import {
   FormControl,
   InputLabel,
   Divider,
-  Alert
+  Alert,
+  TextField,
+  Collapse
 } from '@mui/material';
-import { Close, CheckCircle, Cancel, HourglassEmpty } from '@mui/icons-material';
+import { Close, CheckCircle, Cancel, HourglassEmpty, Add, ExpandMore, ExpandLess } from '@mui/icons-material';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -36,6 +39,12 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [showCustomJobForm, setShowCustomJobForm] = useState(false);
+  const [insertAfterJobId, setInsertAfterJobId] = useState(null);
+  const [customJobForm, setCustomJobForm] = useState({
+    jobTitle: '',
+    jobDescription: ''
+  });
 
   useEffect(() => {
     if (open && element) {
@@ -101,6 +110,56 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
       console.error('Error updating job status:', err);
       setError(err.response?.data?.message || 'Failed to update job status');
     }
+  };
+
+  const handleCreateCustomJob = async () => {
+    if (!customJobForm.jobTitle.trim()) {
+      setError('Job title is required');
+      return;
+    }
+
+    try {
+      setError(null);
+      const token = localStorage.getItem('token');
+      
+      const jobData = {
+        structuralElement: element._id,
+        project: element.project,
+        jobTitle: customJobForm.jobTitle.trim(),
+        jobDescription: customJobForm.jobDescription.trim() || customJobForm.jobTitle.trim(),
+        insertAfterJobId: insertAfterJobId || undefined
+      };
+
+      await axios.post(
+        `${API_URL}/jobs/custom`,
+        jobData,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      toast.success('Custom job created successfully');
+      
+      // Reset form
+      setCustomJobForm({ jobTitle: '', jobDescription: '' });
+      setShowCustomJobForm(false);
+      setInsertAfterJobId(null);
+      
+      // Refresh jobs list
+      await fetchJobs();
+      
+      // Notify parent component
+      if (onJobsUpdated) {
+        onJobsUpdated();
+      }
+    } catch (err) {
+      console.error('Error creating custom job:', err);
+      setError(err.response?.data?.message || 'Failed to create custom job');
+      toast.error('Failed to create custom job');
+    }
+  };
+
+  const handleInsertCustomJobAfter = (jobId) => {
+    setInsertAfterJobId(jobId);
+    setShowCustomJobForm(true);
   };
 
   const getStatusInfo = (status) => {
@@ -208,6 +267,9 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
                           <Typography variant="subtitle1" fontWeight="600">
                             {job.jobTitle}
                           </Typography>
+                          {job.jobType === 'custom' && (
+                            <Chip label="Custom" size="small" color="secondary" />
+                          )}
                         </Box>
                       }
                       secondary={
@@ -227,31 +289,106 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
                       }
                     />
                     <ListItemSecondaryAction>
-                      <FormControl size="small" sx={{ minWidth: 180 }}>
-                        <InputLabel>Status</InputLabel>
-                        <Select
-                          value={job.status || 'pending'}
-                          label="Status"
-                          onChange={(e) => handleStatusChange(job._id, e.target.value)}
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                        <FormControl size="small" sx={{ minWidth: 180 }}>
+                          <InputLabel>Status</InputLabel>
+                          <Select
+                            value={job.status || 'pending'}
+                            label="Status"
+                            onChange={(e) => handleStatusChange(job._id, e.target.value)}
+                          >
+                            {JOB_STATUS_OPTIONS.map((option) => (
+                              <MenuItem key={option.value} value={option.value}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Chip 
+                                    label={option.label} 
+                                    color={option.color}
+                                    size="small"
+                                  />
+                                </Box>
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <Button
+                          size="small"
+                          startIcon={<Add />}
+                          onClick={() => handleInsertCustomJobAfter(job._id)}
+                          sx={{ minWidth: 'auto' }}
                         >
-                          {JOB_STATUS_OPTIONS.map((option) => (
-                            <MenuItem key={option.value} value={option.value}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Chip 
-                                  label={option.label} 
-                                  color={option.color}
-                                  size="small"
-                                />
-                              </Box>
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
+                          Add After
+                        </Button>
+                      </Box>
                     </ListItemSecondaryAction>
                   </ListItem>
                 </Box>
               );
             })}
+            
+            {/* Add custom job form */}
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={showCustomJobForm ? <ExpandLess /> : <Add />}
+                onClick={() => {
+                  setShowCustomJobForm(!showCustomJobForm);
+                  if (showCustomJobForm) {
+                    setInsertAfterJobId(null);
+                    setCustomJobForm({ jobTitle: '', jobDescription: '' });
+                  }
+                }}
+              >
+                {showCustomJobForm ? 'Cancel' : 'Add Custom Job'}
+              </Button>
+              
+              <Collapse in={showCustomJobForm}>
+                <Box sx={{ mt: 2 }}>
+                  {insertAfterJobId && (
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                      Job will be inserted after: {jobs.find(j => j._id === insertAfterJobId)?.jobTitle}
+                    </Alert>
+                  )}
+                  <TextField
+                    fullWidth
+                    label="Job Name *"
+                    placeholder="e.g., Custom Inspection"
+                    value={customJobForm.jobTitle}
+                    onChange={(e) => setCustomJobForm({ ...customJobForm, jobTitle: e.target.value })}
+                    sx={{ mb: 2 }}
+                  />
+                  <TextField
+                    fullWidth
+                    label="Job Description (Optional)"
+                    placeholder="Enter job description..."
+                    multiline
+                    rows={2}
+                    value={customJobForm.jobDescription}
+                    onChange={(e) => setCustomJobForm({ ...customJobForm, jobDescription: e.target.value })}
+                    sx={{ mb: 2 }}
+                  />
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      variant="contained"
+                      onClick={handleCreateCustomJob}
+                      disabled={!customJobForm.jobTitle.trim()}
+                    >
+                      Create Job
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      onClick={() => {
+                        setShowCustomJobForm(false);
+                        setInsertAfterJobId(null);
+                        setCustomJobForm({ jobTitle: '', jobDescription: '' });
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </Box>
+                </Box>
+              </Collapse>
+            </Box>
           </List>
         )}
         
