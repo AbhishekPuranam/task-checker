@@ -384,8 +384,8 @@ export default function SubProjectManagement() {
               startIcon={<Download />}
               onClick={() => downloadReport(null, 'non clearance')}
               sx={{ 
-                bgcolor: '#ff9800', 
-                '&:hover': { bgcolor: '#f57c00' },
+                bgcolor: '#f44336', 
+                '&:hover': { bgcolor: '#d32f2f' },
                 textTransform: 'none',
                 fontWeight: 600
               }}
@@ -395,10 +395,23 @@ export default function SubProjectManagement() {
             <Button
               variant="contained"
               startIcon={<Download />}
+              onClick={() => downloadReport(null, 'no jobs')}
+              sx={{ 
+                bgcolor: '#9c27b0', 
+                '&:hover': { bgcolor: '#7b1fa2' },
+                textTransform: 'none',
+                fontWeight: 600
+              }}
+            >
+              No Job Report
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<Download />}
               onClick={() => downloadReport(null, 'complete')}
               sx={{ 
-                bgcolor: '#757575', 
-                '&:hover': { bgcolor: '#616161' },
+                bgcolor: '#4caf50', 
+                '&:hover': { bgcolor: '#45a049' },
                 textTransform: 'none',
                 fontWeight: 600
               }}
