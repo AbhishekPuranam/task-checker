@@ -941,6 +941,7 @@ export default function SubProjectDetail() {
           setSelectedElement(null);
         }}
         element={selectedElement}
+        projectId={subProject?.project?._id || subProject?.project}
         onJobsUpdated={handleJobsUpdated}
       />
     </Box>

@@ -34,7 +34,7 @@ const JOB_STATUS_OPTIONS = [
   { value: 'not_applicable', label: 'Non-Clearance', color: 'error', icon: Cancel }
 ];
 
-export default function JobManagementDialog({ open, onClose, element, onJobsUpdated }) {
+export default function JobManagementDialog({ open, onClose, element, projectId, onJobsUpdated }) {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -118,7 +118,13 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
       return;
     }
 
-    if (!element?.project) {
+    // Get project ID from element.project, or use the projectId prop as fallback
+    let finalProjectId = projectId;
+    if (element?.project) {
+      finalProjectId = typeof element.project === 'object' ? element.project._id : element.project;
+    }
+
+    if (!finalProjectId) {
       setError('Project information is missing. Please close and reopen this dialog.');
       return;
     }
@@ -127,12 +133,9 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
       setError(null);
       const token = localStorage.getItem('token');
       
-      // Get project ID - handle both ObjectId and populated project
-      const projectId = typeof element.project === 'object' ? element.project._id : element.project;
-      
       const jobData = {
         structuralElement: element._id,
-        project: projectId,
+        project: finalProjectId,
         jobTitle: customJobForm.jobTitle.trim(),
         jobDescription: customJobForm.jobDescription.trim() || customJobForm.jobTitle.trim(),
         insertAfterJobId: insertAfterJobId || undefined
