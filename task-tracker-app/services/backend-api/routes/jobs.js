@@ -13,6 +13,78 @@ router.use((req, res, next) => {
   next();
 });
 
+/**
+ * Helper function to determine structural element status based on its jobs
+ * Rules:
+ * 1. If element has no fireProofingWorkflow -> 'no_job'
+ * 2. If any job is 'not_applicable' (non-clearance) -> 'non clearance'
+ * 3. If all jobs are 'completed' -> 'complete'
+ * 4. Otherwise -> 'active'
+ */
+async function updateStructuralElementStatus(elementId) {
+  try {
+    const element = await StructuralElement.findById(elementId);
+    if (!element) {
+      console.log(`Element ${elementId} not found`);
+      return;
+    }
+
+    // Rule 1: No fireProofingWorkflow -> 'no_job'
+    if (!element.fireProofingWorkflow) {
+      if (element.status !== 'no_job') {
+        element.status = 'no_job';
+        await element.save();
+        console.log(`✅ Element ${elementId} -> no_job (no fireProofingWorkflow)`);
+      }
+      return;
+    }
+
+    // Get all jobs for this element
+    const jobs = await Job.find({ structuralElement: elementId });
+    
+    if (jobs.length === 0) {
+      // Has workflow but no jobs created yet -> keep active or set no_job
+      if (element.status !== 'no_job') {
+        element.status = 'no_job';
+        await element.save();
+        console.log(`✅ Element ${elementId} -> no_job (no jobs)`);
+      }
+      return;
+    }
+
+    // Rule 2: If any job is 'not_applicable' -> 'non clearance'
+    const hasNonClearance = jobs.some(job => job.status === 'not_applicable');
+    if (hasNonClearance) {
+      if (element.status !== 'non clearance') {
+        element.status = 'non clearance';
+        await element.save();
+        console.log(`✅ Element ${elementId} -> non clearance (has not_applicable jobs)`);
+      }
+      return;
+    }
+
+    // Rule 3: If all jobs are 'completed' -> 'complete'
+    const allCompleted = jobs.every(job => job.status === 'completed');
+    if (allCompleted) {
+      if (element.status !== 'complete') {
+        element.status = 'complete';
+        await element.save();
+        console.log(`✅ Element ${elementId} -> complete (all jobs completed)`);
+      }
+      return;
+    }
+
+    // Otherwise -> 'active'
+    if (element.status !== 'active') {
+      element.status = 'active';
+      await element.save();
+      console.log(`✅ Element ${elementId} -> active (default)`);
+    }
+  } catch (error) {
+    console.error(`Error updating structural element ${elementId} status:`, error);
+  }
+}
+
 // Cleanup endpoint - delete all jobs (for development/testing)
 router.delete('/cleanup', async (req, res) => {
   try {
@@ -774,6 +846,12 @@ router.put('/:id', auth, async (req, res) => {
     if (updatedJob.structuralElement) {
       await invalidateCache(`cache:structural:jobs:${updatedJob.structuralElement._id || updatedJob.structuralElement}`);
       await invalidateCache(`cache:structural:summary:${updatedJob.project}:*`);
+    }
+
+    // Update structural element status based on job statuses
+    if (updatedJob.structuralElement) {
+      const elementId = updatedJob.structuralElement._id || updatedJob.structuralElement;
+      await updateStructuralElementStatus(elementId);
     }
 
     // Trigger progress calculation if job was just completed
