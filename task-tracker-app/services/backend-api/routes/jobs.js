@@ -1400,8 +1400,12 @@ router.post('/refresh-element-status/:elementId', auth, async (req, res) => {
       return res.status(404).json({ message: 'Element not found' });
     }
     
-    // Invalidate cache
+    // Invalidate ALL related caches to ensure UI refreshes
     await invalidateCache(`cache:structural:summary:${element.project}:*`);
+    await invalidateCache(`cache:grouping:*`); // Invalidate all grouping cache
+    await invalidateCache(`cache:structural:elements:*`); // Invalidate element lists
+    
+    console.log(`✅ Element ${elementId} status updated to: ${element.status}, caches invalidated`);
     
     res.json({ 
       message: 'Element status refreshed successfully',
