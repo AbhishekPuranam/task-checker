@@ -22,7 +22,7 @@ import {
   TextField,
   Collapse
 } from '@mui/material';
-import { Close, CheckCircle, Cancel, HourglassEmpty, Add, ExpandMore, ExpandLess } from '@mui/icons-material';
+import { Close, CheckCircle, Cancel, HourglassEmpty, Add, ExpandMore, ExpandLess, Edit, Delete } from '@mui/icons-material';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -45,6 +45,10 @@ export default function JobManagementDialog({ open, onClose, element, projectId,
     jobTitle: '',
     jobDescription: ''
   });
+  const [editingJob, setEditingJob] = useState(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [jobToDelete, setJobToDelete] = useState(null);
 
   useEffect(() => {
     if (open && element) {
@@ -181,6 +185,89 @@ export default function JobManagementDialog({ open, onClose, element, projectId,
   const handleInsertCustomJobAfter = (jobId) => {
     setInsertAfterJobId(jobId);
     setShowCustomJobForm(true);
+  };
+
+  const handleEditJob = (job) => {
+    setEditingJob({
+      _id: job._id,
+      jobTitle: job.jobTitle,
+      jobDescription: job.jobDescription || ''
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateJob = async () => {
+    if (!editingJob?.jobTitle?.trim()) {
+      setError('Job title is required');
+      return;
+    }
+
+    try {
+      setError(null);
+      const token = localStorage.getItem('token');
+      
+      await axios.put(
+        `${API_URL}/jobs/${editingJob._id}`,
+        {
+          jobTitle: editingJob.jobTitle.trim(),
+          jobDescription: editingJob.jobDescription.trim() || editingJob.jobTitle.trim()
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      toast.success('Job updated successfully');
+      setShowEditDialog(false);
+      setEditingJob(null);
+      
+      // Refresh jobs list
+      await fetchJobs();
+      
+      // Notify parent component
+      if (onJobsUpdated) {
+        onJobsUpdated();
+      }
+    } catch (err) {
+      console.error('Error updating job:', err);
+      const errorMsg = err.response?.data?.message || 'Failed to update job';
+      setError(errorMsg);
+      toast.error(errorMsg);
+    }
+  };
+
+  const handleDeleteClick = (job) => {
+    setJobToDelete(job);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteJob = async () => {
+    if (!jobToDelete) return;
+
+    try {
+      setError(null);
+      const token = localStorage.getItem('token');
+      
+      await axios.delete(
+        `${API_URL}/jobs/${jobToDelete._id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      toast.success('Job deleted successfully');
+      setShowDeleteDialog(false);
+      setJobToDelete(null);
+      
+      // Refresh jobs list
+      await fetchJobs();
+      
+      // Notify parent component
+      if (onJobsUpdated) {
+        onJobsUpdated();
+      }
+    } catch (err) {
+      console.error('Error deleting job:', err);
+      const errorMsg = err.response?.data?.message || 'Failed to delete job';
+      setError(errorMsg);
+      toast.error(errorMsg);
+    }
   };
 
   const getStatusInfo = (status) => {
@@ -349,26 +436,56 @@ export default function JobManagementDialog({ open, onClose, element, projectId,
                       }
                     />
                     <ListItemSecondaryAction>
-                      <FormControl size="small" sx={{ minWidth: 180 }}>
-                        <InputLabel>Status</InputLabel>
-                        <Select
-                          value={job.status || 'pending'}
-                          label="Status"
-                          onChange={(e) => handleStatusChange(job._id, e.target.value)}
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                        <FormControl size="small" sx={{ minWidth: 180 }}>
+                          <InputLabel>Status</InputLabel>
+                          <Select
+                            value={job.status || 'pending'}
+                            label="Status"
+                            onChange={(e) => handleStatusChange(job._id, e.target.value)}
+                          >
+                            {JOB_STATUS_OPTIONS.map((option) => (
+                              <MenuItem key={option.value} value={option.value}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <Chip 
+                                    label={option.label} 
+                                    color={option.color}
+                                    size="small"
+                                  />
+                                </Box>
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        
+                        {/* Edit Button */}
+                        <IconButton
+                          size="small"
+                          onClick={() => handleEditJob(job)}
+                          sx={{ 
+                            color: 'primary.main',
+                            '&:hover': { bgcolor: 'primary.50' }
+                          }}
+                          title="Edit job"
                         >
-                          {JOB_STATUS_OPTIONS.map((option) => (
-                            <MenuItem key={option.value} value={option.value}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Chip 
-                                  label={option.label} 
-                                  color={option.color}
-                                  size="small"
-                                />
-                              </Box>
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
+                          <Edit fontSize="small" />
+                        </IconButton>
+                        
+                        {/* Delete Button - only for custom jobs */}
+                        {job.jobType === 'custom' && (
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeleteClick(job)}
+                            sx={{ 
+                              color: 'error.main',
+                              '&:hover': { bgcolor: 'error.50' }
+                            }}
+                            title="Delete job"
+                          >
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        )}
+                      </Box>
                     </ListItemSecondaryAction>
                   </ListItem>
                 </Box>
@@ -507,6 +624,142 @@ export default function JobManagementDialog({ open, onClose, element, projectId,
           startIcon={<Add />}
         >
           Create Job
+        </Button>
+      </DialogActions>
+    </Dialog>
+    
+    {/* Edit Job Dialog */}
+    <Dialog 
+      open={showEditDialog} 
+      onClose={() => {
+        setShowEditDialog(false);
+        setEditingJob(null);
+        setError(null);
+      }}
+      maxWidth="sm"
+      fullWidth
+    >
+      <DialogTitle>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6">Edit Job</Typography>
+          <IconButton 
+            onClick={() => {
+              setShowEditDialog(false);
+              setEditingJob(null);
+              setError(null);
+            }} 
+            size="small"
+          >
+            <Close />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+      
+      <DialogContent dividers>
+        <TextField
+          fullWidth
+          required
+          label="Job Name"
+          value={editingJob?.jobTitle || ''}
+          onChange={(e) => setEditingJob({ ...editingJob, jobTitle: e.target.value })}
+          sx={{ mb: 3 }}
+          autoFocus
+        />
+        
+        <TextField
+          fullWidth
+          label="Job Description"
+          placeholder="Enter detailed description (optional)..."
+          multiline
+          rows={4}
+          value={editingJob?.jobDescription || ''}
+          onChange={(e) => setEditingJob({ ...editingJob, jobDescription: e.target.value })}
+        />
+      </DialogContent>
+      
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button
+          onClick={() => {
+            setShowEditDialog(false);
+            setEditingJob(null);
+            setError(null);
+          }}
+          variant="outlined"
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleUpdateJob}
+          disabled={!editingJob?.jobTitle?.trim()}
+          variant="contained"
+          startIcon={<Edit />}
+        >
+          Update Job
+        </Button>
+      </DialogActions>
+    </Dialog>
+    
+    {/* Delete Confirmation Dialog */}
+    <Dialog 
+      open={showDeleteDialog} 
+      onClose={() => {
+        setShowDeleteDialog(false);
+        setJobToDelete(null);
+      }}
+      maxWidth="xs"
+      fullWidth
+    >
+      <DialogTitle>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6">Delete Job</Typography>
+          <IconButton 
+            onClick={() => {
+              setShowDeleteDialog(false);
+              setJobToDelete(null);
+            }} 
+            size="small"
+          >
+            <Close />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+      
+      <DialogContent>
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          This action cannot be undone!
+        </Alert>
+        <Typography>
+          Are you sure you want to delete this job?
+        </Typography>
+        <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+          <Typography variant="subtitle2" fontWeight={600}>
+            {jobToDelete?.jobTitle}
+          </Typography>
+          {jobToDelete?.jobDescription && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              {jobToDelete.jobDescription}
+            </Typography>
+          )}
+        </Box>
+      </DialogContent>
+      
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button
+          onClick={() => {
+            setShowDeleteDialog(false);
+            setJobToDelete(null);
+          }}
+          variant="outlined"
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleDeleteJob}
+          variant="contained"
+          color="error"
+          startIcon={<Delete />}
+        >
+          Delete Job
         </Button>
       </DialogActions>
     </Dialog>
