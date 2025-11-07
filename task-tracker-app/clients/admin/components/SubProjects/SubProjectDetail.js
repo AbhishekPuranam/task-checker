@@ -28,6 +28,7 @@ import {
   Tooltip
 } from '@mui/material';
 import { ArrowBack, Download, ViewModule as ViewModuleIcon, Settings as SettingsIcon } from '@mui/icons-material';
+import JobManagementDialog from '../Jobs/JobManagementDialog';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -87,6 +88,10 @@ export default function SubProjectDetail() {
     jobProgress: true
   });
   const [showColumnSettings, setShowColumnSettings] = useState(false);
+  
+  // Job management dialog state
+  const [selectedElement, setSelectedElement] = useState(null);
+  const [showJobDialog, setShowJobDialog] = useState(false);
   
   // Define available columns
   const availableColumns = [
@@ -270,6 +275,17 @@ export default function SubProjectDetail() {
   
   const getVisibleColumns = () => {
     return availableColumns.filter(col => visibleColumns[col.key]);
+  };
+  
+  // Handle row click to open job management
+  const handleRowClick = (element) => {
+    setSelectedElement(element);
+    setShowJobDialog(true);
+  };
+  
+  const handleJobsUpdated = () => {
+    // Refresh the grouped data
+    fetchGroupedData();
   };
   
   // Get cell value helper
@@ -679,7 +695,17 @@ export default function SubProjectDetail() {
                               getGroupPage(index) * getGroupRowsPerPage(index) + getGroupRowsPerPage(index)
                             )
                             .map((element) => (
-                              <tr key={element._id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                              <tr 
+                                key={element._id} 
+                                style={{ 
+                                  borderBottom: '1px solid #f0f0f0',
+                                  cursor: 'pointer',
+                                  transition: 'background-color 0.2s'
+                                }}
+                                onClick={() => handleRowClick(element)}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                              >
                                 {getVisibleColumns().map((column) => (
                                   <td key={column.key} style={{ padding: '8px 12px' }}>
                                     {getCellValue(element, column.key)}
@@ -792,6 +818,17 @@ export default function SubProjectDetail() {
           </Button>
         </DialogActions>
       </Dialog>
+      
+      {/* Job Management Dialog */}
+      <JobManagementDialog
+        open={showJobDialog}
+        onClose={() => {
+          setShowJobDialog(false);
+          setSelectedElement(null);
+        }}
+        element={selectedElement}
+        onJobsUpdated={handleJobsUpdated}
+      />
     </Box>
   );
 }
