@@ -595,6 +595,19 @@ export default function SubProjectDetail() {
               const count = subProject.statistics?.sections?.[section.id === 'non_clearance' ? 'nonClearance' : section.id === 'no_job' ? 'noJob' : section.id]?.count || 0;
               const sqm = subProject.statistics?.sections?.[section.id === 'non_clearance' ? 'nonClearance' : section.id === 'no_job' ? 'noJob' : section.id]?.sqm || 0;
               
+              // Get color based on section
+              const getColorHex = (color) => {
+                switch (color) {
+                  case 'blue': return '#2196f3';
+                  case 'red': return '#f44336';
+                  case 'purple': return '#9c27b0';
+                  case 'green': return '#4caf50';
+                  default: return '#757575';
+                }
+              };
+              
+              const colorHex = getColorHex(section.color);
+              
               return (
                 <Tab
                   key={section.id}
@@ -609,6 +622,16 @@ export default function SubProjectDetail() {
                       </Typography>
                     </Box>
                   }
+                  sx={{
+                    '&.Mui-selected': {
+                      color: colorHex,
+                      backgroundColor: `${colorHex}15`,
+                      borderBottom: `3px solid ${colorHex}`
+                    },
+                    '&:hover': {
+                      backgroundColor: `${colorHex}08`
+                    }
+                  }}
                 />
               );
             })}
