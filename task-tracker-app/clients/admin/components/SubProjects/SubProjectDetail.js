@@ -293,7 +293,13 @@ export default function SubProjectDetail() {
         element.memberType?.toLowerCase().includes(query) ||
         element.level?.toLowerCase().includes(query) ||
         element.gridNo?.toLowerCase().includes(query) ||
-        element.sectionSizes?.toLowerCase().includes(query)
+        element.partMarkNo?.toLowerCase().includes(query) ||
+        element.sectionSizes?.toLowerCase().includes(query) ||
+        element.fireProofingWorkflow?.toLowerCase().includes(query) ||
+        element.status?.toLowerCase().includes(query) ||
+        element.qty?.toString().includes(query) ||
+        element.lengthMm?.toString().includes(query) ||
+        element.surfaceAreaSqm?.toString().includes(query)
       );
     });
   };
@@ -597,7 +603,7 @@ export default function SubProjectDetail() {
           <TextField
             fullWidth
             variant="outlined"
-            placeholder="Search by Serial No, Structure No, Drawing No, Member Type..."
+            placeholder="Search elements by any field (Serial No, Structure No, Drawing No, Level, Member Type, Grid No, Part Mark, Section Size, Status, Qty, Length, SQM, etc.)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             InputProps={{
