@@ -310,14 +310,16 @@ export default function SubProjectDetail() {
     setShowJobDialog(true);
   };
   
-  const handleJobsUpdated = () => {
-    // Refresh the grouped data and subproject statistics
-    fetchGroupedData();
+  const handleJobsUpdated = async () => {
+    // Wait a moment for backend to finish updating element status and cache invalidation
+    await new Promise(resolve => setTimeout(resolve, 500));
     
-    // Also refresh the subproject to get updated statistics
+    // Refresh both grouped data and subproject statistics in parallel
+    const promises = [fetchGroupedData()];
+    
     if (subProject?._id) {
       const token = localStorage.getItem('token');
-      axios.get(`${API_URL}/subprojects/${subProject._id}`, {
+      const subProjectPromise = axios.get(`${API_URL}/subprojects/${subProject._id}`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       .then(res => {
@@ -327,7 +329,12 @@ export default function SubProjectDetail() {
       .catch(err => {
         console.error('Error refreshing subproject:', err);
       });
+      
+      promises.push(subProjectPromise);
     }
+    
+    // Wait for all refreshes to complete
+    await Promise.all(promises);
   };
   
   // Get cell value helper
