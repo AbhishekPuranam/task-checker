@@ -207,10 +207,24 @@ class CacheTransaction {
   }
 }
 
+/**
+ * Middleware to add no-cache headers to mutation requests (POST, PUT, DELETE)
+ * Prevents browsers from caching mutation responses
+ */
+const noCacheMiddleware = (req, res, next) => {
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+  }
+  next();
+};
+
 module.exports = {
   cacheMiddleware,
   invalidateCache,
   jobsCacheKeyGenerator,
   statsCacheKeyGenerator,
-  CacheTransaction
+  CacheTransaction,
+  noCacheMiddleware
 };

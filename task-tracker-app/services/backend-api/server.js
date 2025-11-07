@@ -248,6 +248,10 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customfavIcon: '/favicon.ico'
 }));
 
+// Add no-cache middleware for all API mutation requests
+const { noCacheMiddleware } = require('./middleware/cache');
+app.use('/api', noCacheMiddleware);
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);

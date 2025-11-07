@@ -38,6 +38,10 @@ router.post('/', adminAuth, async (req, res) => {
     // Invalidate project cache
     await cache.invalidateProject(projectId);
     
+    // Prevent browser caching
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.status(201).json(subProject);
   } catch (error) {
     console.error('Error creating SubProject:', error);
@@ -226,6 +230,10 @@ router.put('/:id', adminAuth, async (req, res) => {
       cache.invalidateProject(subProject.project)
     ]);
     
+    // Prevent browser caching
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.json(subProject);
   } catch (error) {
     console.error('Error updating SubProject:', error);
@@ -272,6 +280,10 @@ router.delete('/:id', adminAuth, async (req, res) => {
       cache.invalidateProject(subProject.project)
     ]);
     
+    // Prevent browser caching
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.json({ message: 'SubProject deleted successfully', subProject });
   } catch (error) {
     console.error('Error deleting SubProject:', error);
@@ -316,6 +328,10 @@ router.post('/:id/recalculate', adminAuth, async (req, res) => {
   try {
     const stats = await SubProject.recalculateStatistics(req.params.id);
     
+    // Prevent browser caching
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.json({
       message: 'Statistics recalculated successfully',
       statistics: stats

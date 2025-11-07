@@ -102,6 +102,10 @@ router.post('/', adminAuth, async (req, res) => {
     const userResponse = user.toObject();
     delete userResponse.password;
 
+    // Prevent browser caching
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.status(201).json({ 
       message: 'User created successfully',
       user: userResponse
@@ -177,6 +181,10 @@ router.put('/:id', adminAuth, async (req, res) => {
     const userResponse = user.toObject();
     delete userResponse.password;
 
+    // Prevent browser caching
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.json({ 
       message: 'User updated successfully',
       user: userResponse
@@ -209,6 +217,10 @@ router.delete('/:id', adminAuth, async (req, res) => {
     await invalidateCache('cache:users:*');
     await invalidateCache(`cache:user:${userId}`);
 
+    // Prevent browser caching
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.json({ 
       message: 'User deleted successfully',
       deletedUser: {
@@ -238,6 +250,10 @@ router.put('/:id/status', adminAuth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
+    // Prevent browser caching
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.json(user);
   } catch (error) {
     console.error(error);

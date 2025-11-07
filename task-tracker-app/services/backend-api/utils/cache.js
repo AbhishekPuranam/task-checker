@@ -237,6 +237,17 @@ async function flushAll() {
   }
 }
 
+/**
+ * Set no-cache headers on response to prevent browser caching
+ * Use this for mutation endpoints (POST, PUT, DELETE)
+ * @param {Object} res - Express response object
+ */
+function setNoCacheHeaders(res) {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+}
+
 module.exports = {
   client: redisClient,
   CACHE_TTL,
@@ -249,5 +260,6 @@ module.exports = {
   invalidateProject,
   cacheWrapper,
   getStats,
-  flushAll
+  flushAll,
+  setNoCacheHeaders
 };
