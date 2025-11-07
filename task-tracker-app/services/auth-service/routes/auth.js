@@ -199,6 +199,62 @@ router.get('/verify', async (req, res) => {
   }
 });
 
+// Update user profile endpoint
+router.put('/profile', async (req, res) => {
+  try {
+    // Get token from Authorization header or cookie
+    let token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token && req.headers.cookie) {
+      const cookies = req.headers.cookie.split(';').reduce((acc, cookie) => {
+        const [key, value] = cookie.trim().split('=');
+        acc[key] = value;
+        return acc;
+      }, {});
+      token = cookies.token;
+    }
+
+    if (!token) {
+      return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // Verify token
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await User.findById(decoded.userId);
+
+    if (!user) {
+      return res.status(401).json({ message: 'User not found' });
+    }
+
+    // Update allowed fields
+    const { name, email, department } = req.body;
+    
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (department) user.department = department;
+
+    await user.save();
+
+    console.log('✅ Profile updated for user:', user.username);
+
+    res.json({
+      message: 'Profile updated successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department
+      }
+    });
+
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({ message: 'Server error during profile update' });
+  }
+});
+
 // Traefik ForwardAuth endpoint - checks token from cookie or Authorization header
 router.get('/forward-auth', async (req, res) => {
   try {
