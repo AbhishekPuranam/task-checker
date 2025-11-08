@@ -1,0 +1,36 @@
+[sources.docker_logs]
+type = "docker_logs"
+
+[transforms.enrich]
+type = "remap"
+inputs = ["docker_logs"]
+source = """
+  .timestamp = now()
+  .environment = "production"
+  .level = "info"
+  
+  if exists(.container_name) {
+    .service = replace!(.container_name, r'^/', "")
+  }
+  
+  # Remove problematic label field
+  del(.label)
+"""
+
+[sinks.opensearch]
+type = "elasticsearch"
+inputs = ["enrich"]
+endpoints = ["http://opensearch:9200"]
+mode = "bulk"
+api_version = "v8"
+suppress_type_name = true
+
+[sinks.opensearch.bulk]
+index = "logs-docker-%Y.%m.%d"
+
+[sinks.console]
+type = "console"
+inputs = ["enrich"]
+
+[sinks.console.encoding]
+codec = "json"

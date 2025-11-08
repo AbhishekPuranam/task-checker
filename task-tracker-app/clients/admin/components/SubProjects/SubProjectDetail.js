@@ -29,7 +29,7 @@ import {
   TextField,
   InputAdornment
 } from '@mui/material';
-import { ArrowBack, Download, ViewModule as ViewModuleIcon, Settings as SettingsIcon, Search as SearchIcon, Work as WorkIcon, ExpandMore as ExpandMoreIcon, ExpandLess as ExpandLessIcon, Close as CloseIcon, Info as InfoIcon, Add as AddIcon } from '@mui/icons-material';
+import { ArrowBack, Download, ViewModule as ViewModuleIcon, Settings as SettingsIcon, Search as SearchIcon, Work as WorkIcon, ExpandMore as ExpandMoreIcon, ExpandLess as ExpandLessIcon, Close as CloseIcon, Info as InfoIcon } from '@mui/icons-material';
 import JobManagementDialog from '../Jobs/JobManagementDialog';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -127,29 +127,6 @@ export default function SubProjectDetail() {
   // Job management dialog state
   const [selectedElement, setSelectedElement] = useState(null);
   const [showJobDialog, setShowJobDialog] = useState(false);
-  
-  // Manual element creation
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [newElement, setNewElement] = useState({
-    serialNo: '',
-    structureNumber: '',
-    drawingNo: '',
-    level: '',
-    memberType: '',
-    gridNo: '',
-    partMarkNo: '',
-    sectionSizes: '',
-    lengthMm: '',
-    qty: '1',
-    surfaceAreaSqm: '',
-    fireproofingThickness: '',
-    sectionDepthMm: '',
-    flangeWidthMm: '',
-    webThicknessMm: '',
-    flangeThicknessMm: '',
-    fireProofingWorkflow: ''
-  });
-  const [creatingElement, setCreatingElement] = useState(false);
   
   // Define available columns
   const availableColumns = [
@@ -398,75 +375,22 @@ export default function SubProjectDetail() {
     
     if (subProject?._id) {
       const token = localStorage.getItem('token');
-      promises.push(
-        axios.get(`${API_URL}/subprojects/${subProject._id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }).then(res => setSubProject(res.data))
-      );
+      const subProjectPromise = axios.get(`${API_URL}/subprojects/${subProject._id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      .then(res => {
+        setSubProject(res.data);
+        console.log('✅ SubProject statistics refreshed');
+      })
+      .catch(err => {
+        console.error('Error refreshing subproject:', err);
+      });
+      
+      promises.push(subProjectPromise);
     }
     
+    // Wait for all refreshes to complete
     await Promise.all(promises);
-  };
-  
-  // Handle creating manual element
-  const handleCreateElement = async () => {
-    try {
-      setCreatingElement(true);
-      const token = localStorage.getItem('token');
-      
-      // Prepare element data
-      const elementData = {
-        ...newElement,
-        subProject: subProjectId,
-        project: projectId,
-        // Convert numeric fields
-        lengthMm: newElement.lengthMm ? parseFloat(newElement.lengthMm) : undefined,
-        qty: newElement.qty ? parseInt(newElement.qty) : 1,
-        surfaceAreaSqm: newElement.surfaceAreaSqm ? parseFloat(newElement.surfaceAreaSqm) : undefined,
-        sectionDepthMm: newElement.sectionDepthMm ? parseFloat(newElement.sectionDepthMm) : undefined,
-        flangeWidthMm: newElement.flangeWidthMm ? parseFloat(newElement.flangeWidthMm) : undefined,
-        webThicknessMm: newElement.webThicknessMm ? parseFloat(newElement.webThicknessMm) : undefined,
-        flangeThicknessMm: newElement.flangeThicknessMm ? parseFloat(newElement.flangeThicknessMm) : undefined,
-        // Set initial status
-        status: 'no_job'
-      };
-      
-      await axios.post(`${API_URL}/structural-elements`, elementData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      // Reset form
-      setNewElement({
-        serialNo: '',
-        structureNumber: '',
-        drawingNo: '',
-        level: '',
-        memberType: '',
-        gridNo: '',
-        partMarkNo: '',
-        sectionSizes: '',
-        lengthMm: '',
-        qty: '1',
-        surfaceAreaSqm: '',
-        fireproofingThickness: '',
-        sectionDepthMm: '',
-        flangeWidthMm: '',
-        webThicknessMm: '',
-        flangeThicknessMm: '',
-        fireProofingWorkflow: ''
-      });
-      
-      setShowCreateDialog(false);
-      
-      // Refresh data
-      await handleJobsUpdated();
-      
-    } catch (error) {
-      console.error('Error creating element:', error);
-      alert('Failed to create element: ' + (error.response?.data?.error || error.message));
-    } finally {
-      setCreatingElement(false);
-    }
   };
   
   // Get status color helper
@@ -699,26 +623,8 @@ export default function SubProjectDetail() {
             </Grid>
           </Grid>
 
-          {/* Action Buttons */}
+          {/* Export Buttons */}
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setShowCreateDialog(true)}
-              sx={{ 
-                background: 'linear-gradient(135deg, #673ab7 0%, #512da8 100%)',
-                '&:hover': { 
-                  background: 'linear-gradient(135deg, #512da8 0%, #4527a0 100%)',
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 8px 16px rgba(103, 58, 183, 0.3)'
-                },
-                textTransform: 'none',
-                fontWeight: 600,
-                transition: 'all 0.3s ease'
-              }}
-            >
-              Add Element
-            </Button>
             <Button
               variant="contained"
               startIcon={<Download />}
@@ -1263,6 +1169,21 @@ export default function SubProjectDetail() {
                                   }}
                                 />
                                 
+                                {/* Member Type & Section */}
+                                <Box sx={{ flex: '1 1 auto', minWidth: '180px' }}>
+                                  <Typography variant="body1" sx={{ 
+                                    fontWeight: 'bold', 
+                                    color: '#333',
+                                    fontSize: '1rem',
+                                    mb: 0.5
+                                  }}>
+                                    {element.memberType}
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ color: '#666', fontSize: '0.9rem' }}>
+                                    {element.sectionSizes}
+                                  </Typography>
+                                </Box>
+                                
                                 {/* Level */}
                                 <Box sx={{ minWidth: '70px' }}>
                                   <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
@@ -1274,7 +1195,7 @@ export default function SubProjectDetail() {
                                 </Box>
                                 
                                 {/* Grid No */}
-                                <Box sx={{ minWidth: '90px' }}>
+                                <Box sx={{ minWidth: '70px' }}>
                                   <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
                                     Grid
                                   </Typography>
@@ -1282,52 +1203,6 @@ export default function SubProjectDetail() {
                                     {element.gridNo}
                                   </Typography>
                                 </Box>
-                                
-                                {/* Part Mark No */}
-                                {element.partMarkNo && (
-                                  <Box sx={{ minWidth: '100px' }}>
-                                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
-                                      Part Mark
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
-                                      {element.partMarkNo}
-                                    </Typography>
-                                  </Box>
-                                )}
-                                
-                                {/* Section Size */}
-                                <Box sx={{ minWidth: '120px' }}>
-                                  <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
-                                    Section
-                                  </Typography>
-                                  <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
-                                    {element.sectionSizes}
-                                  </Typography>
-                                </Box>
-                                
-                                {/* Length */}
-                                {element.lengthMm && (
-                                  <Box sx={{ minWidth: '90px' }}>
-                                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
-                                      Length
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
-                                      {element.lengthMm}mm
-                                    </Typography>
-                                  </Box>
-                                )}
-                                
-                                {/* FP Thickness */}
-                                {element.fireproofingThickness && (
-                                  <Box sx={{ minWidth: '90px' }}>
-                                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
-                                      FP Thick
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
-                                      {element.fireproofingThickness}
-                                    </Typography>
-                                  </Box>
-                                )}
                                 
                                 {/* SQM */}
                                 <Box sx={{ minWidth: '80px' }}>
@@ -1338,26 +1213,6 @@ export default function SubProjectDetail() {
                                     {element.surfaceAreaSqm?.toFixed(2)}
                                   </Typography>
                                 </Box>
-                                
-                                {/* FP Workflow */}
-                                {element.fireProofingWorkflow && (
-                                  <Box sx={{ minWidth: '100px' }}>
-                                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
-                                      FP Type
-                                    </Typography>
-                                    <Chip 
-                                      label={element.fireProofingWorkflow.replace(/_/g, ' ')}
-                                      size="small"
-                                      sx={{
-                                        fontSize: '0.7rem',
-                                        fontWeight: '600',
-                                        textTransform: 'capitalize',
-                                        height: '22px',
-                                        mt: 0.3
-                                      }}
-                                    />
-                                  </Box>
-                                )}
                                 
                                 {/* Current Job - Highlighted Inline */}
                                 {element.currentJob && (
@@ -1969,257 +1824,6 @@ export default function SubProjectDetail() {
         <DialogActions>
           <Button onClick={closeDetailsDialog} variant="contained" color="primary">
             Close
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
-      {/* Create Element Dialog */}
-      <Dialog 
-        open={showCreateDialog} 
-        onClose={() => !creatingElement && setShowCreateDialog(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle sx={{ 
-          borderBottom: '2px solid #673ab7',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1,
-          fontWeight: 'bold'
-        }}>
-          <AddIcon sx={{ color: '#673ab7' }} />
-          Add New Element
-        </DialogTitle>
-        <DialogContent sx={{ mt: 2 }}>
-          <Grid container spacing={2}>
-            {/* Serial No */}
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Serial No *"
-                value={newElement.serialNo}
-                onChange={(e) => setNewElement({ ...newElement, serialNo: e.target.value })}
-                disabled={creatingElement}
-                required
-              />
-            </Grid>
-            
-            {/* Structure Number */}
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Structure Number"
-                value={newElement.structureNumber}
-                onChange={(e) => setNewElement({ ...newElement, structureNumber: e.target.value })}
-                disabled={creatingElement}
-              />
-            </Grid>
-            
-            {/* Drawing No */}
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Drawing No"
-                value={newElement.drawingNo}
-                onChange={(e) => setNewElement({ ...newElement, drawingNo: e.target.value })}
-                disabled={creatingElement}
-              />
-            </Grid>
-            
-            {/* Level */}
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Level *"
-                value={newElement.level}
-                onChange={(e) => setNewElement({ ...newElement, level: e.target.value })}
-                disabled={creatingElement}
-                required
-              />
-            </Grid>
-            
-            {/* Member Type */}
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Member Type *"
-                value={newElement.memberType}
-                onChange={(e) => setNewElement({ ...newElement, memberType: e.target.value })}
-                disabled={creatingElement}
-                required
-              />
-            </Grid>
-            
-            {/* Grid No */}
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Grid No *"
-                value={newElement.gridNo}
-                onChange={(e) => setNewElement({ ...newElement, gridNo: e.target.value })}
-                disabled={creatingElement}
-                required
-              />
-            </Grid>
-            
-            {/* Part Mark No */}
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Part Mark No"
-                value={newElement.partMarkNo}
-                onChange={(e) => setNewElement({ ...newElement, partMarkNo: e.target.value })}
-                disabled={creatingElement}
-              />
-            </Grid>
-            
-            {/* Section Sizes */}
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Section Sizes *"
-                value={newElement.sectionSizes}
-                onChange={(e) => setNewElement({ ...newElement, sectionSizes: e.target.value })}
-                disabled={creatingElement}
-                required
-              />
-            </Grid>
-            
-            {/* Length */}
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                label="Length (mm)"
-                type="number"
-                value={newElement.lengthMm}
-                onChange={(e) => setNewElement({ ...newElement, lengthMm: e.target.value })}
-                disabled={creatingElement}
-              />
-            </Grid>
-            
-            {/* Qty */}
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                label="Quantity *"
-                type="number"
-                value={newElement.qty}
-                onChange={(e) => setNewElement({ ...newElement, qty: e.target.value })}
-                disabled={creatingElement}
-                required
-              />
-            </Grid>
-            
-            {/* SQM */}
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                label="Surface Area (SQM)"
-                type="number"
-                value={newElement.surfaceAreaSqm}
-                onChange={(e) => setNewElement({ ...newElement, surfaceAreaSqm: e.target.value })}
-                disabled={creatingElement}
-              />
-            </Grid>
-            
-            {/* FP Thickness */}
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Fireproofing Thickness"
-                value={newElement.fireproofingThickness}
-                onChange={(e) => setNewElement({ ...newElement, fireproofingThickness: e.target.value })}
-                disabled={creatingElement}
-              />
-            </Grid>
-            
-            {/* FP Workflow */}
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Fireproofing Workflow</InputLabel>
-                <Select
-                  value={newElement.fireProofingWorkflow}
-                  onChange={(e) => setNewElement({ ...newElement, fireProofingWorkflow: e.target.value })}
-                  disabled={creatingElement}
-                  label="Fireproofing Workflow"
-                >
-                  <MenuItem value="">None</MenuItem>
-                  <MenuItem value="cement_fire_proofing">Cement Fire Proofing</MenuItem>
-                  <MenuItem value="gypsum_fire_proofing">Gypsum Fire Proofing</MenuItem>
-                  <MenuItem value="intumescent_coatings">Intumescent Coatings</MenuItem>
-                  <MenuItem value="refinery_fire_proofing">Refinery Fire Proofing</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            
-            {/* Section Depth */}
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Section Depth (mm)"
-                type="number"
-                value={newElement.sectionDepthMm}
-                onChange={(e) => setNewElement({ ...newElement, sectionDepthMm: e.target.value })}
-                disabled={creatingElement}
-              />
-            </Grid>
-            
-            {/* Flange Width */}
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Flange Width (mm)"
-                type="number"
-                value={newElement.flangeWidthMm}
-                onChange={(e) => setNewElement({ ...newElement, flangeWidthMm: e.target.value })}
-                disabled={creatingElement}
-              />
-            </Grid>
-            
-            {/* Web Thickness */}
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Web Thickness (mm)"
-                type="number"
-                value={newElement.webThicknessMm}
-                onChange={(e) => setNewElement({ ...newElement, webThicknessMm: e.target.value })}
-                disabled={creatingElement}
-              />
-            </Grid>
-            
-            {/* Flange Thickness */}
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Flange Thickness (mm)"
-                type="number"
-                value={newElement.flangeThicknessMm}
-                onChange={(e) => setNewElement({ ...newElement, flangeThicknessMm: e.target.value })}
-                disabled={creatingElement}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button 
-            onClick={() => setShowCreateDialog(false)} 
-            disabled={creatingElement}
-          >
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleCreateElement} 
-            variant="contained"
-            disabled={creatingElement || !newElement.serialNo || !newElement.level || !newElement.memberType || !newElement.gridNo || !newElement.sectionSizes}
-            sx={{
-              background: 'linear-gradient(135deg, #673ab7 0%, #512da8 100%)',
-              '&:hover': { 
-                background: 'linear-gradient(135deg, #512da8 0%, #4527a0 100%)'
-              }
-            }}
-          >
-            {creatingElement ? <CircularProgress size={24} /> : 'Create Element'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -247,8 +247,11 @@ async function processBatch(uploadSession, batchNumber, excelData, project, user
     await session.abortTransaction();
     console.error(`❌ [BATCH ${batchNumber}] Transaction rolled back:`, error.message);
 
-    // Update batch status to failed
+    // Update batch status to failed and CLEAR any partial data since transaction was rolled back
     uploadSession.updateBatchStatus(batchNumber, 'failed', {
+      elementsCreated: [],  // Clear since rollback removed these
+      jobsCreated: [],      // Clear since rollback removed these
+      duplicatesSkipped: 0, // Reset since batch failed
       errorMessage: error.message,
       errorDetails: { stack: error.stack }
     });
@@ -375,6 +378,12 @@ function createBatchExcelWorker() {
           uploadId
         });
 
+        // Update upload session status to completed/partial_success/failed
+        uploadSession.updateSummary();  // Recalculate status based on batch results
+        await uploadSession.save();     // Save the final status
+        
+        console.log(`📊 [WORKER] Upload session final status: ${uploadSession.status}`);
+
         // Update project count
         if (summary.totalElementsCreated > 0) {
           await Task.findByIdAndUpdate(
@@ -447,6 +456,22 @@ function createBatchExcelWorker() {
 
       } catch (error) {
         console.error(`❌ [WORKER] Job ${job.id} failed:`, error);
+
+        // Try to mark upload session as failed if it exists
+        if (job.data.uploadId) {
+          try {
+            const failedSession = await UploadSession.findOne({ uploadId: job.data.uploadId });
+            if (failedSession && failedSession.status === 'in_progress') {
+              failedSession.status = 'failed';
+              failedSession.completedAt = new Date();
+              failedSession.updateSummary();  // Update summary to reflect failure
+              await failedSession.save();
+              console.log(`📊 [WORKER] Marked upload session ${job.data.uploadId} as failed`);
+            }
+          } catch (sessionError) {
+            console.error(`❌ [WORKER] Failed to update session status:`, sessionError);
+          }
+        }
 
         // Clean up file on error
         if (filePath) {

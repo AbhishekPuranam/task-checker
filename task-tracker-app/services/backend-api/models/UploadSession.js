@@ -151,12 +151,16 @@ UploadSessionSchema.methods.updateBatchStatus = function(batchNumber, status, da
   batch.status = status;
   batch.processedAt = new Date();
   
-  if (data.elementsCreated) {
+  // Handle elementsCreated - explicitly set to empty array if provided empty, otherwise update
+  if (data.hasOwnProperty('elementsCreated')) {
     batch.elementsCreated = data.elementsCreated;
   }
-  if (data.jobsCreated) {
+  
+  // Handle jobsCreated - explicitly set to empty array if provided empty, otherwise update
+  if (data.hasOwnProperty('jobsCreated')) {
     batch.jobsCreated = data.jobsCreated;
   }
+  
   if (data.duplicatesSkipped !== undefined) {
     batch.duplicatesSkipped = data.duplicatesSkipped;
   }
