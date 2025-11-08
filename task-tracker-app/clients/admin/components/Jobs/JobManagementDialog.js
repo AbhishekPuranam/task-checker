@@ -14,24 +14,29 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  Alert
+  Alert,
+  TextField
 } from '@mui/material';
-import { Close, CheckCircle, Cancel, HourglassEmpty, Edit as EditIcon } from '@mui/icons-material';
+import { Close, CheckCircle, Cancel, HourglassEmpty, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 const JOB_STATUS_OPTIONS = [
-  { value: 'pending', label: 'Pending', color: 'warning', icon: HourglassEmpty, bgColor: '#fff3cd', textColor: '#856404' },
-  { value: 'completed', label: 'Completed', color: 'success', icon: CheckCircle, bgColor: '#d4edda', textColor: '#155724' },
-  { value: 'not_applicable', label: 'Non-Clearance', color: 'error', icon: Cancel, bgColor: '#f8d7da', textColor: '#721c24' }
+  { value: 'pending', label: 'Pending', color: 'warning', icon: HourglassEmpty, bgColor: '#fff3cd', textColor: '#856404', chipBg: '#ffc107', chipText: 'white' },
+  { value: 'completed', label: 'Completed', color: 'success', icon: CheckCircle, bgColor: '#d4edda', textColor: '#155724', chipBg: '#28a745', chipText: 'white' },
+  { value: 'not_applicable', label: 'Non-Clearance', color: 'error', icon: Cancel, bgColor: '#f8d7da', textColor: '#721c24', chipBg: '#dc3545', chipText: 'white' }
 ];
 
-export default function JobManagementDialog({ open, onClose, element, onJobsUpdated }) {
+export default function JobManagementDialog({ open, onClose, element, projectId, onJobsUpdated }) {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [editingJob, setEditingJob] = useState(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [jobToDelete, setJobToDelete] = useState(null);
 
   useEffect(() => {
     if (open && element) {
@@ -103,6 +108,91 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
     return JOB_STATUS_OPTIONS.find(opt => opt.value === status) || JOB_STATUS_OPTIONS[0];
   };
 
+  const handleEditJob = (job) => {
+    setEditingJob({
+      _id: job._id,
+      jobTitle: job.jobTitle,
+      jobDescription: job.jobDescription || ''
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateJob = async () => {
+    if (!editingJob?.jobTitle?.trim()) {
+      setError('Job title is required');
+      return;
+    }
+
+    try {
+      setError(null);
+      const token = localStorage.getItem('token');
+      
+      await axios.put(
+        `${API_URL}/jobs/${editingJob._id}`,
+        {
+          jobTitle: editingJob.jobTitle.trim(),
+          jobDescription: editingJob.jobDescription?.trim() || editingJob.jobTitle.trim()
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setSuccess('Job updated successfully');
+      setShowEditDialog(false);
+      setEditingJob(null);
+      
+      // Refresh jobs list
+      await fetchJobs();
+      
+      // Notify parent component
+      if (onJobsUpdated) {
+        onJobsUpdated();
+      }
+      
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      console.error('Error updating job:', err);
+      setError(err.response?.data?.message || 'Failed to update job');
+    }
+  };
+
+  const handleDeleteClick = (job) => {
+    setJobToDelete(job);
+    setShowDeleteDialog(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!jobToDelete) return;
+
+    try {
+      setError(null);
+      const token = localStorage.getItem('token');
+      
+      await axios.delete(
+        `${API_URL}/jobs/${jobToDelete._id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setSuccess('Job deleted successfully');
+      setShowDeleteDialog(false);
+      setJobToDelete(null);
+      
+      // Refresh jobs list
+      await fetchJobs();
+      
+      // Notify parent component
+      if (onJobsUpdated) {
+        onJobsUpdated();
+      }
+      
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      console.error('Error deleting job:', err);
+      setError(err.response?.data?.message || 'Failed to delete job');
+      setShowDeleteDialog(false);
+      setJobToDelete(null);
+    }
+  };
+
   const handleClose = async () => {
     // Refresh element status before closing
     if (element?._id) {
@@ -132,6 +222,7 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
   };
 
   return (
+    <>
     <Dialog 
       open={open} 
       onClose={handleClose}
@@ -244,19 +335,6 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
                     gap: 2,
                     flexWrap: 'wrap'
                   }}>
-                    {/* Order Badge */}
-                    <Chip 
-                      label={`#${job.orderIndex || index + 1}`} 
-                      size="small"
-                      sx={{ 
-                        fontWeight: 'bold',
-                        fontSize: '0.9rem',
-                        bgcolor: borderColor,
-                        color: 'white',
-                        minWidth: '50px'
-                      }}
-                    />
-                    
                     {/* Job Title & Type */}
                     <Box sx={{ flex: '1 1 250px', minWidth: '250px' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
@@ -282,32 +360,22 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
                       )}
                     </Box>
                     
-                    {/* Current Status Badge */}
-                    <Box sx={{ 
-                      minWidth: '120px',
-                      p: 1,
-                      bgcolor: statusInfo.bgColor,
-                      borderRadius: 1,
-                      border: `1px solid ${borderColor}`,
-                      textAlign: 'center'
-                    }}>
-                      <Typography variant="caption" sx={{ 
-                        color: statusInfo.textColor, 
-                        fontSize: '0.7rem', 
-                        display: 'block',
-                        fontWeight: 'bold'
-                      }}>
-                        STATUS
-                      </Typography>
-                      <Typography variant="body2" sx={{ 
-                        color: statusInfo.textColor,
+                    {/* Current Status Chip with Color */}
+                    <Chip 
+                      label={statusInfo.label}
+                      icon={<StatusIcon />}
+                      size="medium"
+                      sx={{ 
+                        bgcolor: statusInfo.chipBg,
+                        color: statusInfo.chipText,
                         fontWeight: 'bold',
-                        fontSize: '0.9rem'
-                      }}>
-                        {statusInfo.label}
-                      </Typography>
-                    </Box>
-                    
+                        fontSize: '0.9rem',
+                        minWidth: '130px',
+                        '& .MuiChip-icon': {
+                          color: statusInfo.chipText
+                        }
+                      }}
+                    />
                     {/* Status Change Button */}
                     <FormControl size="small" sx={{ minWidth: 160 }}>
                       <InputLabel>Change Status</InputLabel>
@@ -315,7 +383,6 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
                         value={job.status || 'pending'}
                         label="Change Status"
                         onChange={(e) => handleStatusChange(job._id, e.target.value)}
-                        IconComponent={EditIcon}
                         sx={{
                           '& .MuiSelect-select': {
                             display: 'flex',
@@ -337,6 +404,40 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
                         })}
                       </Select>
                     </FormControl>
+
+                    {/* Edit Button */}
+                    <IconButton
+                      onClick={() => handleEditJob(job)}
+                      size="small"
+                      sx={{
+                        bgcolor: '#2196f3',
+                        color: 'white',
+                        '&:hover': {
+                          bgcolor: '#1976d2',
+                          transform: 'scale(1.1)'
+                        },
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+
+                    {/* Delete Button */}
+                    <IconButton
+                      onClick={() => handleDeleteClick(job)}
+                      size="small"
+                      sx={{
+                        bgcolor: '#f44336',
+                        color: 'white',
+                        '&:hover': {
+                          bgcolor: '#d32f2f',
+                          transform: 'scale(1.1)'
+                        },
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
                   </Box>
                 </Paper>
               );
@@ -410,5 +511,55 @@ export default function JobManagementDialog({ open, onClose, element, onJobsUpda
         </Button>
       </DialogActions>
     </Dialog>
+
+    {/* Edit Job Dialog */}
+    <Dialog open={showEditDialog} onClose={() => setShowEditDialog(false)} maxWidth="sm" fullWidth>
+      <DialogTitle>Edit Job</DialogTitle>
+      <DialogContent>
+        <TextField
+          label="Job Title"
+          fullWidth
+          value={editingJob?.jobTitle || ''}
+          onChange={(e) => setEditingJob({ ...editingJob, jobTitle: e.target.value })}
+          margin="normal"
+          required
+        />
+        <TextField
+          label="Job Description"
+          fullWidth
+          multiline
+          rows={3}
+          value={editingJob?.jobDescription || ''}
+          onChange={(e) => setEditingJob({ ...editingJob, jobDescription: e.target.value })}
+          margin="normal"
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setShowEditDialog(false)}>Cancel</Button>
+        <Button onClick={handleUpdateJob} variant="contained" color="primary">
+          Update
+        </Button>
+      </DialogActions>
+    </Dialog>
+
+    {/* Delete Confirmation Dialog */}
+    <Dialog open={showDeleteDialog} onClose={() => setShowDeleteDialog(false)} maxWidth="sm">
+      <DialogTitle>Confirm Delete</DialogTitle>
+      <DialogContent>
+        <Typography>
+          Are you sure you want to delete the job "{jobToDelete?.jobTitle}"?
+        </Typography>
+        <Alert severity="warning" sx={{ mt: 2 }}>
+          <strong>Warning:</strong> This action cannot be undone.
+        </Alert>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
+        <Button onClick={handleConfirmDelete} variant="contained" color="error">
+          Delete
+        </Button>
+      </DialogActions>
+    </Dialog>
+    </>
   );
 }
