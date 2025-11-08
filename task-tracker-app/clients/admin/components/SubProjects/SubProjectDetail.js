@@ -1263,21 +1263,6 @@ export default function SubProjectDetail() {
                                   }}
                                 />
                                 
-                                {/* Member Type & Section */}
-                                <Box sx={{ flex: '1 1 auto', minWidth: '180px' }}>
-                                  <Typography variant="body1" sx={{ 
-                                    fontWeight: 'bold', 
-                                    color: '#333',
-                                    fontSize: '1rem',
-                                    mb: 0.5
-                                  }}>
-                                    {element.memberType}
-                                  </Typography>
-                                  <Typography variant="body2" sx={{ color: '#666', fontSize: '0.9rem' }}>
-                                    {element.sectionSizes}
-                                  </Typography>
-                                </Box>
-                                
                                 {/* Level */}
                                 <Box sx={{ minWidth: '70px' }}>
                                   <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
@@ -1300,7 +1285,7 @@ export default function SubProjectDetail() {
                                 
                                 {/* Part Mark No */}
                                 {element.partMarkNo && (
-                                  <Box sx={{ minWidth: '80px' }}>
+                                  <Box sx={{ minWidth: '100px' }}>
                                     <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
                                       Part Mark
                                     </Typography>
@@ -1310,9 +1295,19 @@ export default function SubProjectDetail() {
                                   </Box>
                                 )}
                                 
+                                {/* Section Size */}
+                                <Box sx={{ minWidth: '120px' }}>
+                                  <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
+                                    Section
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
+                                    {element.sectionSizes}
+                                  </Typography>
+                                </Box>
+                                
                                 {/* Length */}
                                 {element.lengthMm && (
-                                  <Box sx={{ minWidth: '70px' }}>
+                                  <Box sx={{ minWidth: '90px' }}>
                                     <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
                                       Length
                                     </Typography>
@@ -1324,7 +1319,7 @@ export default function SubProjectDetail() {
                                 
                                 {/* FP Thickness */}
                                 {element.fireproofingThickness && (
-                                  <Box sx={{ minWidth: '80px' }}>
+                                  <Box sx={{ minWidth: '90px' }}>
                                     <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
                                       FP Thick
                                     </Typography>
@@ -1344,17 +1339,24 @@ export default function SubProjectDetail() {
                                   </Typography>
                                 </Box>
                                 
-                                {/* FP Type */}
+                                {/* FP Workflow */}
                                 {element.fireProofingWorkflow && (
-                                  <Chip 
-                                    label={element.fireProofingWorkflow.replace(/_/g, ' ')}
-                                    size="small"
-                                    sx={{
-                                      fontSize: '0.75rem',
-                                      fontWeight: '600',
-                                      textTransform: 'capitalize'
-                                    }}
-                                  />
+                                  <Box sx={{ minWidth: '100px' }}>
+                                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
+                                      FP Type
+                                    </Typography>
+                                    <Chip 
+                                      label={element.fireProofingWorkflow.replace(/_/g, ' ')}
+                                      size="small"
+                                      sx={{
+                                        fontSize: '0.7rem',
+                                        fontWeight: '600',
+                                        textTransform: 'capitalize',
+                                        height: '22px',
+                                        mt: 0.3
+                                      }}
+                                    />
+                                  </Box>
                                 )}
                                 
                                 {/* Current Job - Highlighted Inline */}
