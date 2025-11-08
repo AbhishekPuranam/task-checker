@@ -29,7 +29,7 @@ import {
   TextField,
   InputAdornment
 } from '@mui/material';
-import { ArrowBack, Download, ViewModule as ViewModuleIcon, Settings as SettingsIcon, Search as SearchIcon } from '@mui/icons-material';
+import { ArrowBack, Download, ViewModule as ViewModuleIcon, Settings as SettingsIcon, Search as SearchIcon, Work as WorkIcon } from '@mui/icons-material';
 import JobManagementDialog from '../Jobs/JobManagementDialog';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -210,10 +210,10 @@ export default function SubProjectDetail() {
       
       console.log('✅ [fetchAvailableFields] Loaded', fields.length, 'fields');
       
-      // Set default groupBy to 'level' after fields are loaded
+      // Set default groupBy to 'currentJob' after fields are loaded
       if (fields.length > 0 && !groupBy) {
-        console.log('📊 [fetchAvailableFields] Setting groupBy to level');
-        setGroupBy('level');
+        console.log('📊 [fetchAvailableFields] Setting groupBy to currentJob');
+        setGroupBy('currentJob');
       }
     } catch (err) {
       console.error('Error fetching fields:', err);
@@ -857,10 +857,8 @@ export default function SubProjectDetail() {
                           return (
                             <Paper
                               key={element._id}
-                              onClick={() => handleRowClick(element)}
                               sx={{
                                 p: 2,
-                                cursor: 'pointer',
                                 background: 'linear-gradient(to right, rgba(255,255,255,0.95) 0%, rgba(255,255,255,1) 100%)',
                                 borderLeft: `5px solid ${statusColors.border}`,
                                 borderRadius: 2,
@@ -999,39 +997,52 @@ export default function SubProjectDetail() {
                                   />
                                 )}
                                 
-                                {/* Current Job - Orange Pulse */}
+                                {/* Current Job - Gradient Shimmer Animation */}
                                 {visibleColumns.currentJob && element.currentJob && (
                                   <Box sx={{ 
-                                    flex: '1 1 150px',
-                                    minWidth: '150px',
-                                    p: 1,
-                                    bgcolor: 'rgba(255, 102, 0, 0.08)',
-                                    borderRadius: 1,
-                                    border: '1px solid rgba(255, 102, 0, 0.2)'
+                                    flex: '1 1 180px',
+                                    minWidth: '180px',
+                                    p: 1.5,
+                                    background: 'linear-gradient(90deg, rgba(255,102,0,0.12) 0%, rgba(255,152,0,0.15) 50%, rgba(255,102,0,0.12) 100%)',
+                                    backgroundSize: '200% 100%',
+                                    borderRadius: 2,
+                                    border: '2px solid rgba(255, 102, 0, 0.3)',
+                                    animation: 'shimmer 3s ease-in-out infinite',
+                                    '@keyframes shimmer': {
+                                      '0%': { 
+                                        backgroundPosition: '200% 0',
+                                        boxShadow: '0 0 10px rgba(255, 102, 0, 0.2)'
+                                      },
+                                      '50%': { 
+                                        backgroundPosition: '0% 0',
+                                        boxShadow: '0 0 20px rgba(255, 102, 0, 0.4)'
+                                      },
+                                      '100%': { 
+                                        backgroundPosition: '-200% 0',
+                                        boxShadow: '0 0 10px rgba(255, 102, 0, 0.2)'
+                                      }
+                                    }
                                   }}>
-                                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
-                                      Current Job
+                                    <Typography variant="caption" sx={{ 
+                                      color: '#d84315', 
+                                      fontSize: '0.7rem', 
+                                      display: 'block', 
+                                      mb: 0.5,
+                                      fontWeight: 'bold',
+                                      letterSpacing: '0.5px'
+                                    }}>
+                                      ⚡ CURRENT JOB
                                     </Typography>
-                                    <Box
+                                    <Typography
                                       sx={{
                                         color: '#ff6600',
                                         fontWeight: 'bold',
-                                        fontSize: '0.95rem',
-                                        animation: 'pulse 2s ease-in-out infinite',
-                                        '@keyframes pulse': {
-                                          '0%, 100%': { 
-                                            opacity: 1,
-                                            transform: 'scale(1)'
-                                          },
-                                          '50%': { 
-                                            opacity: 0.7,
-                                            transform: 'scale(1.05)'
-                                          }
-                                        }
+                                        fontSize: '1rem',
+                                        textShadow: '0 1px 2px rgba(255, 102, 0, 0.3)'
                                       }}
                                     >
                                       {element.currentJob.jobTitle}
-                                    </Box>
+                                    </Typography>
                                     {visibleColumns.jobProgress && (
                                       <Chip 
                                         label={element.currentJob.status}
@@ -1042,7 +1053,8 @@ export default function SubProjectDetail() {
                                           height: '18px',
                                           bgcolor: element.currentJob.status === 'complete' ? '#28a745' : '#ffc107',
                                           color: 'white',
-                                          textTransform: 'capitalize'
+                                          textTransform: 'capitalize',
+                                          fontWeight: 'bold'
                                         }}
                                       />
                                     )}
@@ -1064,6 +1076,34 @@ export default function SubProjectDetail() {
                                     }}
                                   />
                                 )}
+                                
+                                {/* Job Management Button */}
+                                <Button
+                                  variant="contained"
+                                  size="small"
+                                  startIcon={<WorkIcon />}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRowClick(element);
+                                  }}
+                                  sx={{
+                                    ml: 'auto',
+                                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                    color: 'white',
+                                    fontWeight: 'bold',
+                                    fontSize: '0.85rem',
+                                    textTransform: 'none',
+                                    px: 2,
+                                    '&:hover': {
+                                      background: 'linear-gradient(135deg, #5568d3 0%, #63408b 100%)',
+                                      transform: 'scale(1.05)',
+                                      boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)'
+                                    },
+                                    transition: 'all 0.2s ease'
+                                  }}
+                                >
+                                  Manage Jobs
+                                </Button>
                               </Box>
                             </Paper>
                           );
