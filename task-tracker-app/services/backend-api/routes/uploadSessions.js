@@ -9,6 +9,7 @@ const {
   retryFailedBatches,
   retryBatch
 } = require('../utils/uploadSessionCleanup');
+const { cleanupStalledUploads } = require('../workers/uploadCleanup');
 
 /**
  * GET /api/upload-sessions
@@ -247,6 +248,29 @@ router.get('/:uploadId/summary', auth, async (req, res) => {
   } catch (error) {
     console.error('Error fetching upload session summary:', error);
     res.status(500).json({ message: 'Error fetching summary', error: error.message });
+  }
+});
+
+/**
+ * POST /api/upload-sessions/cleanup/stalled
+ * Manually trigger cleanup of stalled upload sessions (admin only)
+ */
+router.post('/cleanup/stalled', auth, async (req, res) => {
+  try {
+    // Only admins can trigger manual cleanup
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    const result = await cleanupStalledUploads();
+    
+    res.json({
+      message: 'Stalled upload cleanup completed',
+      ...result
+    });
+  } catch (error) {
+    console.error('Error during stalled upload cleanup:', error);
+    res.status(500).json({ message: 'Error cleaning up stalled uploads', error: error.message });
   }
 });
 
