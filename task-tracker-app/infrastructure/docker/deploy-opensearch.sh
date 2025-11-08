@@ -85,13 +85,13 @@ log_info "Directories created"
 # Stop existing services if running
 echo ""
 echo "🛑 Stopping existing observability services..."
-docker-compose -f "$COMPOSE_FILE" down 2>/dev/null || true
+docker compose -f "$COMPOSE_FILE" down 2>/dev/null || true
 log_info "Existing services stopped"
 
 # Start OpenSearch first
 echo ""
 echo "🚀 Starting OpenSearch..."
-docker-compose -f "$COMPOSE_FILE" up -d opensearch
+docker compose -f "$COMPOSE_FILE" up -d opensearch
 
 # Wait for OpenSearch to be healthy
 echo "⏳ Waiting for OpenSearch to be ready..."
@@ -143,7 +143,7 @@ log_info "Index templates created"
 # Start remaining services
 echo ""
 echo "🚀 Starting remaining services..."
-docker-compose -f "$COMPOSE_FILE" up -d
+docker compose -f "$COMPOSE_FILE" up -d
 
 # Wait for all services to be healthy
 echo ""
