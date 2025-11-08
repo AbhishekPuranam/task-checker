@@ -2144,9 +2144,10 @@ export default function SubProjectDetail() {
                   label="Fireproofing Workflow"
                 >
                   <MenuItem value="">None</MenuItem>
-                  <MenuItem value="spray_applied">Spray Applied</MenuItem>
-                  <MenuItem value="intumescent_coating">Intumescent Coating</MenuItem>
-                  <MenuItem value="board_protection">Board Protection</MenuItem>
+                  <MenuItem value="cement_fire_proofing">Cement Fire Proofing</MenuItem>
+                  <MenuItem value="gypsum_fire_proofing">Gypsum Fire Proofing</MenuItem>
+                  <MenuItem value="intumescent_coatings">Intumescent Coatings</MenuItem>
+                  <MenuItem value="refinery_fire_proofing">Refinery Fire Proofing</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
