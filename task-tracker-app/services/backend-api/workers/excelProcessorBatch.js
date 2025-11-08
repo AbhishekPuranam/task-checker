@@ -1,5 +1,6 @@
 const { Worker } = require('bullmq');
 const fs = require('fs');
+const path = require('path');
 const StructuralElement = require('../models/StructuralElement');
 const Task = require('../models/Task');
 const Job = require('../models/Job');
@@ -9,6 +10,164 @@ const { addProgressJob } = require('../utils/queue');
 const XLSX = require('xlsx');
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
+
+/**
+ * Delete Excel file safely
+ */
+function deleteExcelFile(filePath) {
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log(`🗑️ [CLEANUP] Deleted Excel file: ${path.basename(filePath)}`);
+      return true;
+    }
+  } catch (error) {
+    console.error(`❌ [CLEANUP] Failed to delete Excel file: ${error.message}`);
+    return false;
+  }
+  return false;
+}
+
+/**
+ * Complete rollback - delete all created elements, jobs, and clean Redis
+ */
+async function completeRollback(uploadSession, projectId, subProjectId = null) {
+  console.log(`🔄 [ROLLBACK] Starting complete rollback for upload: ${uploadSession.uploadId}`);
+  
+  const deletionStats = {
+    elementsDeleted: 0,
+    jobsDeleted: 0,
+    errors: []
+  };
+
+  try {
+    // Collect all element IDs from successful batches
+    const elementIds = [];
+    for (const batch of uploadSession.batches) {
+      if (batch.elementsCreated && batch.elementsCreated.length > 0) {
+        elementIds.push(...batch.elementsCreated);
+      }
+    }
+
+    if (elementIds.length > 0) {
+      // Delete all jobs associated with these elements
+      const jobsResult = await Job.deleteMany({
+        structuralElement: { $in: elementIds }
+      });
+      deletionStats.jobsDeleted = jobsResult.deletedCount;
+      console.log(`🗑️ [ROLLBACK] Deleted ${jobsResult.deletedCount} jobs`);
+
+      // Delete all elements
+      const elementsResult = await StructuralElement.deleteMany({
+        _id: { $in: elementIds }
+      });
+      deletionStats.elementsDeleted = elementsResult.deletedCount;
+      console.log(`🗑️ [ROLLBACK] Deleted ${elementsResult.deletedCount} elements`);
+
+      // Update project count (decrement)
+      if (deletionStats.elementsDeleted > 0) {
+        await Task.findByIdAndUpdate(
+          projectId,
+          { $inc: { structuralElementsCount: -deletionStats.elementsDeleted } }
+        );
+        console.log(`📊 [ROLLBACK] Decremented project count by ${deletionStats.elementsDeleted}`);
+
+        // Update subproject count if applicable
+        if (subProjectId) {
+          const SubProject = require('../models/SubProject');
+          await SubProject.findByIdAndUpdate(
+            subProjectId,
+            { $inc: { structuralElementsCount: -deletionStats.elementsDeleted } }
+          );
+          console.log(`📊 [ROLLBACK] Decremented subproject count by ${deletionStats.elementsDeleted}`);
+        }
+      }
+
+      // Invalidate caches
+      await invalidateCache(`/api/structural-elements?project=${projectId}`);
+      await invalidateCache(`/api/projects/${projectId}/stats`);
+      
+      if (subProjectId) {
+        await invalidateCache(`/api/structural-elements?subProject=${subProjectId}`);
+        await invalidateCache(`/api/subprojects/${subProjectId}/stats`);
+      }
+    }
+
+    // Mark upload session as failed with rollback info
+    uploadSession.status = 'failed';
+    uploadSession.completedAt = new Date();
+    uploadSession.updateSummary();
+    await uploadSession.save();
+
+    console.log(`✅ [ROLLBACK] Complete! Deleted ${deletionStats.elementsDeleted} elements and ${deletionStats.jobsDeleted} jobs`);
+    
+  } catch (error) {
+    console.error(`❌ [ROLLBACK] Error during rollback:`, error);
+    deletionStats.errors.push(error.message);
+  }
+
+  return deletionStats;
+}
+
+/**
+ * Verify data integrity in database
+ */
+async function verifyUploadIntegrity(uploadSession, projectId, subProjectId = null) {
+  console.log(`🔍 [VERIFY] Checking data integrity for upload: ${uploadSession.uploadId}`);
+  
+  try {
+    const summary = uploadSession.summary;
+    
+    // Count actual elements in database
+    const query = { project: projectId };
+    if (subProjectId) {
+      query.subProject = subProjectId;
+    }
+    
+    // Get element IDs from successful batches
+    const elementIds = [];
+    for (const batch of uploadSession.batches) {
+      if (batch.status === 'success' && batch.elementsCreated) {
+        elementIds.push(...batch.elementsCreated);
+      }
+    }
+    
+    const actualElements = await StructuralElement.countDocuments({
+      _id: { $in: elementIds }
+    });
+    
+    const actualJobs = await Job.countDocuments({
+      structuralElement: { $in: elementIds }
+    });
+    
+    const isValid = (actualElements === summary.totalElementsCreated) &&
+                    (actualJobs === summary.totalJobsCreated);
+    
+    console.log(`📊 [VERIFY] Expected: ${summary.totalElementsCreated} elements, ${summary.totalJobsCreated} jobs`);
+    console.log(`📊 [VERIFY] Actual: ${actualElements} elements, ${actualJobs} jobs`);
+    console.log(`✅ [VERIFY] Data integrity: ${isValid ? 'VALID' : 'INVALID'}`);
+    
+    return {
+      isValid,
+      expected: {
+        elements: summary.totalElementsCreated,
+        jobs: summary.totalJobsCreated
+      },
+      actual: {
+        elements: actualElements,
+        jobs: actualJobs
+      }
+    };
+    
+  } catch (error) {
+    console.error(`❌ [VERIFY] Error verifying data:`, error);
+    return {
+      isValid: false,
+      error: error.message
+    };
+  }
+}
+
 
 /**
  * Parse Excel file
@@ -374,7 +533,7 @@ function createBatchExcelWorker() {
         await job.updateProgress({
           stage: 'finalizing',
           percent: 90,
-          message: 'Finalizing upload...',
+          message: 'Finalizing and verifying upload...',
           uploadId
         });
 
@@ -384,7 +543,57 @@ function createBatchExcelWorker() {
         
         console.log(`📊 [WORKER] Upload session final status: ${uploadSession.status}`);
 
-        // Update project count
+        // DECISION POINT: Check if upload was successful enough to keep
+        const shouldKeepUpload = summary.successfulBatches > 0 && summary.totalElementsCreated > 0;
+        const hasFailures = summary.failedBatches > 0;
+
+        if (!shouldKeepUpload) {
+          // Complete failure - rollback everything
+          console.log(`❌ [WORKER] Upload completely failed - initiating full rollback`);
+          
+          await completeRollback(uploadSession, projectId, subProjectId);
+          
+          // Delete Excel file
+          deleteExcelFile(filePath);
+          
+          throw new Error(`Upload failed: No elements were created successfully. All ${summary.failedBatches} batches failed.`);
+        }
+
+        if (hasFailures) {
+          // Partial success - user must decide whether to keep or rollback
+          console.log(`⚠️ [WORKER] Partial success detected - ${summary.failedBatches} batches failed`);
+          
+          // Keep the data but mark status appropriately
+          uploadSession.status = 'partial_success';
+          await uploadSession.save();
+          
+          // Don't delete file yet - user might want to retry failed batches
+          console.log(`📄 [WORKER] Keeping Excel file for potential retry: ${path.basename(filePath)}`);
+        } else {
+          // Complete success - verify and cleanup
+          console.log(`✅ [WORKER] Upload completely successful - verifying data integrity`);
+          
+          // Verify data integrity
+          const verification = await verifyUploadIntegrity(uploadSession, projectId, subProjectId);
+          
+          if (!verification.isValid) {
+            console.error(`❌ [VERIFY] Data integrity check failed - initiating rollback`);
+            console.error(`Expected: ${verification.expected.elements} elements, ${verification.expected.jobs} jobs`);
+            console.error(`Actual: ${verification.actual.elements} elements, ${verification.actual.jobs} jobs`);
+            
+            await completeRollback(uploadSession, projectId, subProjectId);
+            deleteExcelFile(filePath);
+            
+            throw new Error(`Data integrity verification failed. Rolled back all changes.`);
+          }
+          
+          console.log(`✅ [VERIFY] Data integrity confirmed - safe to cleanup Excel file`);
+          
+          // Delete Excel file since data is verified in database
+          deleteExcelFile(filePath);
+        }
+
+        // Update project count (only if elements were created)
         if (summary.totalElementsCreated > 0) {
           await Task.findByIdAndUpdate(
             projectId,
@@ -423,13 +632,8 @@ function createBatchExcelWorker() {
           );
         }
 
-        // Clean up file
-        try {
-          fs.unlinkSync(filePath);
-        } catch (error) {
-          console.error('Error deleting file:', error);
-        }
-
+        // Excel file already deleted above based on success/failure status
+        
         const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
         const statusMessage = summary.failedBatches === 0
           ? `✅ Complete! ${summary.totalElementsCreated} elements, ${summary.totalJobsCreated} jobs created in ${processingTime}s`
@@ -457,29 +661,33 @@ function createBatchExcelWorker() {
       } catch (error) {
         console.error(`❌ [WORKER] Job ${job.id} failed:`, error);
 
-        // Try to mark upload session as failed if it exists
+        // Try to rollback and cleanup if upload session exists
         if (job.data.uploadId) {
           try {
             const failedSession = await UploadSession.findOne({ uploadId: job.data.uploadId });
-            if (failedSession && failedSession.status === 'in_progress') {
-              failedSession.status = 'failed';
-              failedSession.completedAt = new Date();
-              failedSession.updateSummary();  // Update summary to reflect failure
-              await failedSession.save();
-              console.log(`📊 [WORKER] Marked upload session ${job.data.uploadId} as failed`);
+            if (failedSession) {
+              // Perform complete rollback if any elements were created
+              const summary = failedSession.summary;
+              if (summary && summary.totalElementsCreated > 0) {
+                console.log(`🔄 [WORKER] Initiating rollback for failed upload: ${job.data.uploadId}`);
+                await completeRollback(failedSession, projectId, subProjectId);
+              } else {
+                // Just mark as failed if nothing was created
+                failedSession.status = 'failed';
+                failedSession.completedAt = new Date();
+                failedSession.updateSummary();
+                await failedSession.save();
+                console.log(`📊 [WORKER] Marked upload session ${job.data.uploadId} as failed (no rollback needed)`);
+              }
             }
           } catch (sessionError) {
-            console.error(`❌ [WORKER] Failed to update session status:`, sessionError);
+            console.error(`❌ [WORKER] Failed to handle upload session cleanup:`, sessionError);
           }
         }
 
-        // Clean up file on error
+        // Clean up Excel file on error
         if (filePath) {
-          try {
-            fs.unlinkSync(filePath);
-          } catch (e) {
-            console.error('Error deleting file:', e);
-          }
+          deleteExcelFile(filePath);
         }
 
         throw error;
