@@ -168,11 +168,19 @@ router.get('/mongodb', async (req, res) => {
 router.get('/redis', async (req, res) => {
   try {
     const start = Date.now();
-    await redis.ping();
+    const pong = await redis.ping();
     const latency = Date.now() - start;
 
+    if (pong !== 'PONG') {
+      return res.status(503).json({
+        status: 'unhealthy',
+        error: 'Redis ping failed',
+        timestamp: new Date().toISOString()
+      });
+    }
+
     // Get Redis info
-    const info = await redis.info();
+    const info = await redis.info('memory');
     const lines = info.split('\r\n');
     const memoryLine = lines.find(l => l.startsWith('used_memory_human:'));
     const memory = memoryLine ? memoryLine.split(':')[1] : 'unknown';
