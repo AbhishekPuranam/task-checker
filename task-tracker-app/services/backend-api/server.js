@@ -272,7 +272,6 @@ app.use('/api/jobs', jobRoutes);
 app.use('/api/excel', excelRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/upload-sessions', require('./routes/uploadSessions'));
 app.use('/api/subprojects', require('./routes/subprojects'));
 app.use('/api/grouping', require('./routes/grouping'));
 

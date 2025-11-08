@@ -32,7 +32,6 @@ import { useRouter } from 'next/router';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import BatchProgressCard from './BatchProgressCard';
-import UploadSessionHistory from './UploadSessionHistory';
 
 const ExcelUpload = ({ open, onClose, projectId, subProjectId, onUploadSuccess }) => {
   const navigate = useRouter();
@@ -672,16 +671,6 @@ const ExcelUpload = ({ open, onClose, projectId, subProjectId, onUploadSuccess }
                 toast.success('Upload session deleted');
               }}
             />
-          </Box>
-        )}
-
-        {/* Upload History (only show when not actively uploading) */}
-        {!uploading && !uploadSession && projectId && (
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>
-              Recent Uploads
-            </Typography>
-            <UploadSessionHistory projectId={projectId} />
           </Box>
         )}
       </DialogContent>
