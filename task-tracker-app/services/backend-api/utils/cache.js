@@ -167,13 +167,11 @@ async function invalidateProject(projectId) {
   const patterns = [
     `grouping:*projectId:${projectId}*`,
     `statistics:project:${projectId}`,
-    `subprojects:*projectId:${projectId}*`,  // Matches keys like "subprojects:limit:50|page:1|projectId:xxx|status:all"
+    `subprojects:project:${projectId}*`,
     `elements:*projectId:${projectId}*`
   ];
 
-  console.log(`🗑️  Invalidating project cache for project: ${projectId}`);
   for (const pattern of patterns) {
-    console.log(`   Deleting pattern: ${pattern}`);
     await delPattern(pattern);
   }
 }

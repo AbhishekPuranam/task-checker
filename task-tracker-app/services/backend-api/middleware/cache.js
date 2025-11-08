@@ -25,11 +25,6 @@ const cacheMiddleware = (ttl = 300, keyGenerator = null) => {
       
       if (cachedData) {
         console.log(`[CACHE] ✅ HIT - Returning cached data for ${cacheKey}`);
-        // Always set no-cache headers for browser to prevent browser-level caching
-        // (Redis cache is for server-side optimization only)
-        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-        res.set('Pragma', 'no-cache');
-        res.set('Expires', '0');
         return res.json(cachedData);
       }
 
@@ -40,11 +35,6 @@ const cacheMiddleware = (ttl = 300, keyGenerator = null) => {
 
       // Override res.json to cache the response
       res.json = (data) => {
-        // Always set no-cache headers for browser
-        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-        res.set('Pragma', 'no-cache');
-        res.set('Expires', '0');
-        
         // Cache the response
         cache.set(cacheKey, data, ttl).then(() => {
           console.log(`[CACHE] 💾 Cached data for ${cacheKey} (TTL: ${ttl}s)`);

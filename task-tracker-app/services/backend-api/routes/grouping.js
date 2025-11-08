@@ -77,48 +77,6 @@ router.post('/elements', auth, async (req, res) => {
           { $match: matchStage }
         ];
         
-        // If grouping by currentJob, we need to lookup jobs first
-        if (groupBy === 'currentJob' || subGroupBy === 'currentJob') {
-          // Add lookup stage to join with jobs
-          pipeline.push({
-            $lookup: {
-              from: 'jobs',
-              localField: '_id',
-              foreignField: 'structuralElement',
-              as: 'jobs'
-            }
-          });
-          
-          // Add field to compute current job title
-          pipeline.push({
-            $addFields: {
-              currentJob: {
-                $let: {
-                  vars: {
-                    currentJobObj: {
-                      $arrayElemAt: [
-                        {
-                          $filter: {
-                            input: '$jobs',
-                            as: 'job',
-                            cond: {
-                              $in: ['$$job.status', ['pending', 'in_progress']]
-                            }
-                          }
-                        },
-                        0
-                      ]
-                    }
-                  },
-                  in: {
-                    $ifNull: ['$$currentJobObj.jobTitle', 'No Active Job']
-                  }
-                }
-              }
-            }
-          });
-        }
-        
         // Build group stage
         const groupId = {};
         const groupStage = {
@@ -360,24 +318,31 @@ router.post('/elements/group-details', auth, async (req, res) => {
  */
 router.get('/available-fields', auth, async (req, res) => {
   try {
-    // Don't cache this anymore to ensure changes are immediately visible
-    const fields = [
-      { value: 'currentJob', label: 'Current Job' },
-      { value: 'drawingNo', label: 'Drawing No' },
-      { value: 'fireProofingWorkflow', label: 'Fire Proofing Workflow' },
-      { value: 'fireproofingThickness', label: 'Fireproofing Thickness' },
-      { value: 'flangeThicknessMm', label: 'Flange Thickness (mm)' },
-      { value: 'flangeWidthMm', label: 'Flange Width (mm)' },
-      { value: 'gridNo', label: 'Grid No' },
-      { value: 'level', label: 'Level' },
-      { value: 'memberType', label: 'Member Type' },
-      { value: 'partMarkNo', label: 'Part Mark No' },
-      { value: 'sectionDepthMm', label: 'Section Depth (mm)' },
-      { value: 'sectionSizes', label: 'Section Sizes' },
-      { value: 'status', label: 'Status' },
-      { value: 'structureNumber', label: 'Structure Number' },
-      { value: 'webThicknessMm', label: 'Web Thickness (mm)' }
-    ];
+    // Cache this as it rarely changes
+    const cacheKey = 'grouping:available-fields';
+    
+    const fields = await cache.cacheWrapper(
+      cacheKey,
+      cache.CACHE_TTL.AVAILABLE_FIELDS,
+      async () => {
+        return [
+          { value: 'status', label: 'Status' },
+          { value: 'level', label: 'Level' },
+          { value: 'memberType', label: 'Member Type' },
+          { value: 'gridNo', label: 'Grid No' },
+          { value: 'drawingNo', label: 'Drawing No' },
+          { value: 'structureNumber', label: 'Structure Number' },
+          { value: 'sectionSizes', label: 'Section Sizes' },
+          { value: 'fireProofingWorkflow', label: 'Fire Proofing Workflow' },
+          { value: 'partMarkNo', label: 'Part Mark No' },
+          { value: 'sectionDepthMm', label: 'Section Depth (mm)' },
+          { value: 'flangeWidthMm', label: 'Flange Width (mm)' },
+          { value: 'webThicknessMm', label: 'Web Thickness (mm)' },
+          { value: 'flangeThicknessMm', label: 'Flange Thickness (mm)' },
+          { value: 'fireproofingThickness', label: 'Fireproofing Thickness' }
+        ];
+      }
+    );
     
     res.json({ fields });
   } catch (error) {
