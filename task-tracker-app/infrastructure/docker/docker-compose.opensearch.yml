@@ -12,8 +12,8 @@ services:
       - bootstrap.memory_lock=true
       - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_PASSWORD:-Admin@123456}
-      - plugins.security.ssl.http.enabled=false
-      - plugins.security.ssl.transport.enabled=false
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - DISABLE_SECURITY_PLUGIN=true
     ulimits:
       memlock:
         soft: -1
