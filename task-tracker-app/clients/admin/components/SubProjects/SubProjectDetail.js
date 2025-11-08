@@ -29,7 +29,7 @@ import {
   TextField,
   InputAdornment
 } from '@mui/material';
-import { ArrowBack, Download, ViewModule as ViewModuleIcon, Settings as SettingsIcon, Search as SearchIcon, Work as WorkIcon, ExpandMore as ExpandMoreIcon, ExpandLess as ExpandLessIcon } from '@mui/icons-material';
+import { ArrowBack, Download, ViewModule as ViewModuleIcon, Settings as SettingsIcon, Search as SearchIcon, Work as WorkIcon, ExpandMore as ExpandMoreIcon, ExpandLess as ExpandLessIcon, Close as CloseIcon, Info as InfoIcon } from '@mui/icons-material';
 import JobManagementDialog from '../Jobs/JobManagementDialog';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -104,12 +104,24 @@ export default function SubProjectDetail() {
   
   // Expanded rows state for showing more details
   const [expandedRows, setExpandedRows] = useState({});
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedElementDetails, setSelectedElementDetails] = useState(null);
   
   const toggleRowExpanded = (elementId) => {
     setExpandedRows(prev => ({
       ...prev,
       [elementId]: !prev[elementId]
     }));
+  };
+  
+  const openDetailsDialog = (element) => {
+    setSelectedElementDetails(element);
+    setDetailsDialogOpen(true);
+  };
+  
+  const closeDetailsDialog = () => {
+    setDetailsDialogOpen(false);
+    setSelectedElementDetails(null);
   };
   
   // Job management dialog state
@@ -1178,11 +1190,12 @@ export default function SubProjectDetail() {
                                 }
                               }}
                             >
-                              {/* Main Row - Core Essential Info */}
+                              {/* Main Row - Horizontal Layout */}
                               <Box sx={{ 
                                 display: 'flex', 
                                 alignItems: 'center', 
-                                gap: 2
+                                gap: 2,
+                                flexWrap: 'wrap'
                               }}>
                                 {/* Serial No Badge */}
                                 <Chip 
@@ -1197,7 +1210,7 @@ export default function SubProjectDetail() {
                                   }}
                                 />
                                 
-                                {/* Member Type & Section - Primary Info */}
+                                {/* Member Type & Section */}
                                 <Box sx={{ flex: '1 1 auto', minWidth: '180px' }}>
                                   <Typography variant="body1" sx={{ 
                                     fontWeight: 'bold', 
@@ -1232,7 +1245,7 @@ export default function SubProjectDetail() {
                                   </Typography>
                                 </Box>
                                 
-                                {/* SQM - Important metric */}
+                                {/* SQM */}
                                 <Box sx={{ minWidth: '80px' }}>
                                   <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
                                     SQM
@@ -1241,6 +1254,68 @@ export default function SubProjectDetail() {
                                     {element.surfaceAreaSqm?.toFixed(2)}
                                   </Typography>
                                 </Box>
+                                
+                                {/* Current Job - Highlighted Inline */}
+                                {element.currentJob && (
+                                  <Box sx={{ 
+                                    flex: '1 1 200px',
+                                    minWidth: '200px',
+                                    p: 1.5,
+                                    background: 'linear-gradient(90deg, rgba(255,102,0,0.12) 0%, rgba(255,152,0,0.15) 50%, rgba(255,102,0,0.12) 100%)',
+                                    backgroundSize: '200% 100%',
+                                    borderRadius: 2,
+                                    border: '2px solid rgba(255, 102, 0, 0.3)',
+                                    animation: 'shimmer 3s ease-in-out infinite',
+                                    '@keyframes shimmer': {
+                                      '0%': { 
+                                        backgroundPosition: '200% 0',
+                                        boxShadow: '0 0 10px rgba(255, 102, 0, 0.2)'
+                                      },
+                                      '50%': { 
+                                        backgroundPosition: '0% 0',
+                                        boxShadow: '0 0 20px rgba(255, 102, 0, 0.4)'
+                                      },
+                                      '100%': { 
+                                        backgroundPosition: '-200% 0',
+                                        boxShadow: '0 0 10px rgba(255, 102, 0, 0.2)'
+                                      }
+                                    }
+                                  }}>
+                                    <Typography variant="caption" sx={{ 
+                                      color: '#d84315', 
+                                      fontSize: '0.7rem', 
+                                      display: 'block', 
+                                      mb: 0.5,
+                                      fontWeight: 'bold',
+                                      letterSpacing: '0.5px'
+                                    }}>
+                                      ⚡ CURRENT JOB
+                                    </Typography>
+                                    <Typography
+                                      sx={{
+                                        color: '#ff6600',
+                                        fontWeight: 'bold',
+                                        fontSize: '1rem',
+                                        textShadow: '0 1px 2px rgba(255, 102, 0, 0.3)'
+                                      }}
+                                    >
+                                      {element.currentJob.jobTitle}
+                                    </Typography>
+                                    <Chip 
+                                      label={element.currentJob.status}
+                                      size="small"
+                                      sx={{
+                                        mt: 0.5,
+                                        fontSize: '0.7rem',
+                                        height: '18px',
+                                        bgcolor: element.currentJob.status === 'complete' ? '#28a745' : '#ffc107',
+                                        color: 'white',
+                                        textTransform: 'capitalize',
+                                        fontWeight: 'bold'
+                                      }}
+                                    />
+                                  </Box>
+                                )}
                                 
                                 {/* Status Chip */}
                                 <Chip 
@@ -1259,23 +1334,25 @@ export default function SubProjectDetail() {
                                 {/* More Details Button */}
                                 <Button
                                   size="small"
+                                  startIcon={<InfoIcon />}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    toggleRowExpanded(element._id);
+                                    openDetailsDialog(element);
                                   }}
-                                  endIcon={expandedRows[element._id] ? <ExpandLessIcon /> : <ExpandMoreIcon />}
                                   sx={{
                                     minWidth: '120px',
                                     color: '#667eea',
                                     fontWeight: '600',
                                     fontSize: '0.8rem',
                                     textTransform: 'none',
+                                    border: '1px solid rgba(102, 126, 234, 0.3)',
                                     '&:hover': {
-                                      bgcolor: 'rgba(102, 126, 234, 0.08)'
+                                      bgcolor: 'rgba(102, 126, 234, 0.08)',
+                                      borderColor: '#667eea'
                                     }
                                   }}
                                 >
-                                  {expandedRows[element._id] ? 'Less' : 'More Details'}
+                                  More Details
                                 </Button>
                                 
                                 {/* Job Management Button */}
@@ -1305,304 +1382,6 @@ export default function SubProjectDetail() {
                                   Manage Jobs
                                 </Button>
                               </Box>
-                              
-                              {/* Expanded Details Section */}
-                              {expandedRows[element._id] && (
-                                <Box sx={{ 
-                                  mt: 2, 
-                                  pt: 2, 
-                                  borderTop: '2px dashed rgba(102, 126, 234, 0.2)',
-                                  background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.03) 0%, rgba(118, 75, 162, 0.03) 100%)',
-                                  borderRadius: 1,
-                                  p: 2
-                                }}>
-                                  <Grid container spacing={2}>
-                                    {/* Structure Number */}
-                                    {visibleColumns.structureNumber && (
-                                      <Grid item xs={6} sm={4} md={3}>
-                                        <Box sx={{ 
-                                          p: 1.5, 
-                                          bgcolor: 'white', 
-                                          borderRadius: 1,
-                                          border: '1px solid #e0e0e0'
-                                        }}>
-                                          <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block', mb: 0.5 }}>
-                                            Structure No
-                                          </Typography>
-                                          <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
-                                            {element.structureNumber || '-'}
-                                          </Typography>
-                                        </Box>
-                                      </Grid>
-                                    )}
-                                    
-                                    {/* Drawing No */}
-                                    {visibleColumns.drawingNo && (
-                                      <Grid item xs={6} sm={4} md={3}>
-                                        <Box sx={{ 
-                                          p: 1.5, 
-                                          bgcolor: 'white', 
-                                          borderRadius: 1,
-                                          border: '1px solid #e0e0e0'
-                                        }}>
-                                          <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block', mb: 0.5 }}>
-                                            Drawing No
-                                          </Typography>
-                                          <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
-                                            {element.drawingNo || '-'}
-                                          </Typography>
-                                        </Box>
-                                      </Grid>
-                                    )}
-                                    
-                                    {/* Part Mark No */}
-                                    {visibleColumns.partMarkNo && element.partMarkNo && (
-                                      <Grid item xs={6} sm={4} md={3}>
-                                        <Box sx={{ 
-                                          p: 1.5, 
-                                          bgcolor: 'white', 
-                                          borderRadius: 1,
-                                          border: '1px solid #e0e0e0'
-                                        }}>
-                                          <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block', mb: 0.5 }}>
-                                            Part Mark No
-                                          </Typography>
-                                          <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
-                                            {element.partMarkNo}
-                                          </Typography>
-                                        </Box>
-                                      </Grid>
-                                    )}
-                                    
-                                    {/* Qty */}
-                                    {visibleColumns.qty && (
-                                      <Grid item xs={6} sm={4} md={3}>
-                                        <Box sx={{ 
-                                          p: 1.5, 
-                                          bgcolor: 'white', 
-                                          borderRadius: 1,
-                                          border: '1px solid #e0e0e0'
-                                        }}>
-                                          <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block', mb: 0.5 }}>
-                                            Quantity
-                                          </Typography>
-                                          <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
-                                            {element.qty || '-'}
-                                          </Typography>
-                                        </Box>
-                                      </Grid>
-                                    )}
-                                    
-                                    {/* Length */}
-                                    {visibleColumns.lengthMm && element.lengthMm && (
-                                      <Grid item xs={6} sm={4} md={3}>
-                                        <Box sx={{ 
-                                          p: 1.5, 
-                                          bgcolor: 'white', 
-                                          borderRadius: 1,
-                                          border: '1px solid #e0e0e0'
-                                        }}>
-                                          <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block', mb: 0.5 }}>
-                                            Length (mm)
-                                          </Typography>
-                                          <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
-                                            {element.lengthMm}
-                                          </Typography>
-                                        </Box>
-                                      </Grid>
-                                    )}
-                                    
-                                    {/* Fireproofing Thickness */}
-                                    {visibleColumns.fireproofingThickness && element.fireproofingThickness && (
-                                      <Grid item xs={6} sm={4} md={3}>
-                                        <Box sx={{ 
-                                          p: 1.5, 
-                                          bgcolor: 'white', 
-                                          borderRadius: 1,
-                                          border: '1px solid #e0e0e0'
-                                        }}>
-                                          <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block', mb: 0.5 }}>
-                                            FP Thickness
-                                          </Typography>
-                                          <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
-                                            {element.fireproofingThickness}
-                                          </Typography>
-                                        </Box>
-                                      </Grid>
-                                    )}
-                                    
-                                    {/* Section Depth */}
-                                    {visibleColumns.sectionDepthMm && element.sectionDepthMm && (
-                                      <Grid item xs={6} sm={4} md={3}>
-                                        <Box sx={{ 
-                                          p: 1.5, 
-                                          bgcolor: 'white', 
-                                          borderRadius: 1,
-                                          border: '1px solid #e0e0e0'
-                                        }}>
-                                          <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block', mb: 0.5 }}>
-                                            Depth (mm)
-                                          </Typography>
-                                          <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
-                                            {element.sectionDepthMm}
-                                          </Typography>
-                                        </Box>
-                                      </Grid>
-                                    )}
-                                    
-                                    {/* Flange Width */}
-                                    {visibleColumns.flangeWidthMm && element.flangeWidthMm && (
-                                      <Grid item xs={6} sm={4} md={3}>
-                                        <Box sx={{ 
-                                          p: 1.5, 
-                                          bgcolor: 'white', 
-                                          borderRadius: 1,
-                                          border: '1px solid #e0e0e0'
-                                        }}>
-                                          <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block', mb: 0.5 }}>
-                                            Flange Width (mm)
-                                          </Typography>
-                                          <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
-                                            {element.flangeWidthMm}
-                                          </Typography>
-                                        </Box>
-                                      </Grid>
-                                    )}
-                                    
-                                    {/* Web Thickness */}
-                                    {visibleColumns.webThicknessMm && element.webThicknessMm && (
-                                      <Grid item xs={6} sm={4} md={3}>
-                                        <Box sx={{ 
-                                          p: 1.5, 
-                                          bgcolor: 'white', 
-                                          borderRadius: 1,
-                                          border: '1px solid #e0e0e0'
-                                        }}>
-                                          <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block', mb: 0.5 }}>
-                                            Web Thickness (mm)
-                                          </Typography>
-                                          <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
-                                            {element.webThicknessMm}
-                                          </Typography>
-                                        </Box>
-                                      </Grid>
-                                    )}
-                                    
-                                    {/* Flange Thickness */}
-                                    {visibleColumns.flangeThicknessMm && element.flangeThicknessMm && (
-                                      <Grid item xs={6} sm={4} md={3}>
-                                        <Box sx={{ 
-                                          p: 1.5, 
-                                          bgcolor: 'white', 
-                                          borderRadius: 1,
-                                          border: '1px solid #e0e0e0'
-                                        }}>
-                                          <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block', mb: 0.5 }}>
-                                            Flange Thickness (mm)
-                                          </Typography>
-                                          <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
-                                            {element.flangeThicknessMm}
-                                          </Typography>
-                                        </Box>
-                                      </Grid>
-                                    )}
-                                    
-                                    {/* Fireproofing Workflow */}
-                                    {visibleColumns.fireProofingWorkflow && element.fireProofingWorkflow && (
-                                      <Grid item xs={6} sm={4} md={3}>
-                                        <Box sx={{ 
-                                          p: 1.5, 
-                                          bgcolor: 'white', 
-                                          borderRadius: 1,
-                                          border: '1px solid #e0e0e0'
-                                        }}>
-                                          <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block', mb: 0.5 }}>
-                                            FP Workflow
-                                          </Typography>
-                                          <Chip 
-                                            label={element.fireProofingWorkflow.replace(/_/g, ' ')}
-                                            size="small"
-                                            sx={{
-                                              bgcolor: workflowColors.bg,
-                                              color: workflowColors.text,
-                                              fontWeight: '600',
-                                              fontSize: '0.75rem',
-                                              textTransform: 'capitalize',
-                                              height: '24px'
-                                            }}
-                                          />
-                                        </Box>
-                                      </Grid>
-                                    )}
-                                    
-                                    {/* Current Job - Full Width */}
-                                    {visibleColumns.currentJob && element.currentJob && (
-                                      <Grid item xs={12}>
-                                        <Box sx={{ 
-                                          p: 2,
-                                          background: 'linear-gradient(90deg, rgba(255,102,0,0.12) 0%, rgba(255,152,0,0.15) 50%, rgba(255,102,0,0.12) 100%)',
-                                          backgroundSize: '200% 100%',
-                                          borderRadius: 2,
-                                          border: '2px solid rgba(255, 102, 0, 0.3)',
-                                          animation: 'shimmer 3s ease-in-out infinite',
-                                          '@keyframes shimmer': {
-                                            '0%': { 
-                                              backgroundPosition: '200% 0',
-                                              boxShadow: '0 0 10px rgba(255, 102, 0, 0.2)'
-                                            },
-                                            '50%': { 
-                                              backgroundPosition: '0% 0',
-                                              boxShadow: '0 0 20px rgba(255, 102, 0, 0.4)'
-                                            },
-                                            '100%': { 
-                                              backgroundPosition: '-200% 0',
-                                              boxShadow: '0 0 10px rgba(255, 102, 0, 0.2)'
-                                            }
-                                          }
-                                        }}>
-                                          <Typography variant="caption" sx={{ 
-                                            color: '#d84315', 
-                                            fontSize: '0.7rem', 
-                                            display: 'block', 
-                                            mb: 0.5,
-                                            fontWeight: 'bold',
-                                            letterSpacing: '0.5px'
-                                          }}>
-                                            ⚡ CURRENT JOB
-                                          </Typography>
-                                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                            <Typography
-                                              sx={{
-                                                color: '#ff6600',
-                                                fontWeight: 'bold',
-                                                fontSize: '1rem',
-                                                textShadow: '0 1px 2px rgba(255, 102, 0, 0.3)',
-                                                flex: 1
-                                              }}
-                                            >
-                                              {element.currentJob.jobTitle}
-                                            </Typography>
-                                            {visibleColumns.jobProgress && (
-                                              <Chip 
-                                                label={element.currentJob.status}
-                                                size="small"
-                                                sx={{
-                                                  fontSize: '0.75rem',
-                                                  height: '24px',
-                                                  bgcolor: element.currentJob.status === 'complete' ? '#28a745' : '#ffc107',
-                                                  color: 'white',
-                                                  textTransform: 'capitalize',
-                                                  fontWeight: 'bold'
-                                                }}
-                                              />
-                                            )}
-                                          </Box>
-                                        </Box>
-                                      </Grid>
-                                    )}
-                                  </Grid>
-                                </Box>
-                              )}
                             </Paper>
                           );
                         })}
@@ -1707,6 +1486,384 @@ export default function SubProjectDetail() {
             variant="contained"
           >
             Done
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Element Details Dialog */}
+      <Dialog 
+        open={detailsDialogOpen} 
+        onClose={closeDetailsDialog}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <InfoIcon sx={{ color: '#667eea' }} />
+              <Typography variant="h6">Element Details</Typography>
+            </Box>
+            <IconButton onClick={closeDetailsDialog} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedElementDetails && (
+            <Grid container spacing={2}>
+              {/* Serial Number */}
+              <Grid item xs={12} sm={6}>
+                <Box sx={{ 
+                  p: 2, 
+                  bgcolor: '#f5f5f5', 
+                  borderRadius: 2,
+                  border: '1px solid #e0e0e0'
+                }}>
+                  <Typography variant="caption" sx={{ color: '#888', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+                    Serial Number
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: '600', fontSize: '1rem' }}>
+                    #{selectedElementDetails.serialNo}
+                  </Typography>
+                </Box>
+              </Grid>
+
+              {/* Member Type */}
+              <Grid item xs={12} sm={6}>
+                <Box sx={{ 
+                  p: 2, 
+                  bgcolor: '#f5f5f5', 
+                  borderRadius: 2,
+                  border: '1px solid #e0e0e0'
+                }}>
+                  <Typography variant="caption" sx={{ color: '#888', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+                    Member Type
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: '600', fontSize: '1rem' }}>
+                    {selectedElementDetails.memberType}
+                  </Typography>
+                </Box>
+              </Grid>
+
+              {/* Section Sizes */}
+              <Grid item xs={12} sm={6}>
+                <Box sx={{ 
+                  p: 2, 
+                  bgcolor: '#f5f5f5', 
+                  borderRadius: 2,
+                  border: '1px solid #e0e0e0'
+                }}>
+                  <Typography variant="caption" sx={{ color: '#888', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+                    Section Sizes
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: '600', fontSize: '1rem' }}>
+                    {selectedElementDetails.sectionSizes || '-'}
+                  </Typography>
+                </Box>
+              </Grid>
+
+              {/* Level */}
+              <Grid item xs={12} sm={6}>
+                <Box sx={{ 
+                  p: 2, 
+                  bgcolor: '#f5f5f5', 
+                  borderRadius: 2,
+                  border: '1px solid #e0e0e0'
+                }}>
+                  <Typography variant="caption" sx={{ color: '#888', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+                    Level
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: '600', fontSize: '1rem' }}>
+                    {selectedElementDetails.level}
+                  </Typography>
+                </Box>
+              </Grid>
+
+              {/* Grid Number */}
+              {visibleColumns.gridNo && (
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ 
+                    p: 2, 
+                    bgcolor: '#f5f5f5', 
+                    borderRadius: 2,
+                    border: '1px solid #e0e0e0'
+                  }}>
+                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+                      Grid Number
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: '600', fontSize: '1rem' }}>
+                      {selectedElementDetails.gridNo}
+                    </Typography>
+                  </Box>
+                </Grid>
+              )}
+
+              {/* Structure Number */}
+              {visibleColumns.structureNumber && selectedElementDetails.structureNumber && (
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ 
+                    p: 2, 
+                    bgcolor: '#f5f5f5', 
+                    borderRadius: 2,
+                    border: '1px solid #e0e0e0'
+                  }}>
+                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+                      Structure Number
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: '600', fontSize: '1rem' }}>
+                      {selectedElementDetails.structureNumber}
+                    </Typography>
+                  </Box>
+                </Grid>
+              )}
+
+              {/* Drawing Number */}
+              {visibleColumns.drawingNo && selectedElementDetails.drawingNo && (
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ 
+                    p: 2, 
+                    bgcolor: '#f5f5f5', 
+                    borderRadius: 2,
+                    border: '1px solid #e0e0e0'
+                  }}>
+                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+                      Drawing Number
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: '600', fontSize: '1rem' }}>
+                      {selectedElementDetails.drawingNo}
+                    </Typography>
+                  </Box>
+                </Grid>
+              )}
+
+              {/* Part Mark Number */}
+              {visibleColumns.partMarkNo && selectedElementDetails.partMarkNo && (
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ 
+                    p: 2, 
+                    bgcolor: '#f5f5f5', 
+                    borderRadius: 2,
+                    border: '1px solid #e0e0e0'
+                  }}>
+                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+                      Part Mark Number
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: '600', fontSize: '1rem' }}>
+                      {selectedElementDetails.partMarkNo}
+                    </Typography>
+                  </Box>
+                </Grid>
+              )}
+
+              {/* Quantity */}
+              {visibleColumns.qty && selectedElementDetails.qty && (
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ 
+                    p: 2, 
+                    bgcolor: '#f5f5f5', 
+                    borderRadius: 2,
+                    border: '1px solid #e0e0e0'
+                  }}>
+                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+                      Quantity
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: '600', fontSize: '1rem' }}>
+                      {selectedElementDetails.qty}
+                    </Typography>
+                  </Box>
+                </Grid>
+              )}
+
+              {/* Surface Area SQM */}
+              <Grid item xs={12} sm={6}>
+                <Box sx={{ 
+                  p: 2, 
+                  bgcolor: '#e3f2fd', 
+                  borderRadius: 2,
+                  border: '2px solid #2196f3'
+                }}>
+                  <Typography variant="caption" sx={{ color: '#1976d2', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+                    Surface Area (SQM)
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#1565c0' }}>
+                    {selectedElementDetails.surfaceAreaSqm?.toFixed(2)}
+                  </Typography>
+                </Box>
+              </Grid>
+
+              {/* Length */}
+              {visibleColumns.lengthMm && selectedElementDetails.lengthMm && (
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ 
+                    p: 2, 
+                    bgcolor: '#f5f5f5', 
+                    borderRadius: 2,
+                    border: '1px solid #e0e0e0'
+                  }}>
+                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+                      Length (mm)
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: '600', fontSize: '1rem' }}>
+                      {selectedElementDetails.lengthMm}
+                    </Typography>
+                  </Box>
+                </Grid>
+              )}
+
+              {/* Fireproofing Thickness */}
+              {visibleColumns.fireproofingThickness && selectedElementDetails.fireproofingThickness && (
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ 
+                    p: 2, 
+                    bgcolor: '#f5f5f5', 
+                    borderRadius: 2,
+                    border: '1px solid #e0e0e0'
+                  }}>
+                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+                      Fireproofing Thickness
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: '600', fontSize: '1rem' }}>
+                      {selectedElementDetails.fireproofingThickness}
+                    </Typography>
+                  </Box>
+                </Grid>
+              )}
+
+              {/* Section Depth */}
+              {visibleColumns.sectionDepthMm && selectedElementDetails.sectionDepthMm && (
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ 
+                    p: 2, 
+                    bgcolor: '#f5f5f5', 
+                    borderRadius: 2,
+                    border: '1px solid #e0e0e0'
+                  }}>
+                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+                      Section Depth (mm)
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: '600', fontSize: '1rem' }}>
+                      {selectedElementDetails.sectionDepthMm}
+                    </Typography>
+                  </Box>
+                </Grid>
+              )}
+
+              {/* Flange Width */}
+              {visibleColumns.flangeWidthMm && selectedElementDetails.flangeWidthMm && (
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ 
+                    p: 2, 
+                    bgcolor: '#f5f5f5', 
+                    borderRadius: 2,
+                    border: '1px solid #e0e0e0'
+                  }}>
+                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+                      Flange Width (mm)
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: '600', fontSize: '1rem' }}>
+                      {selectedElementDetails.flangeWidthMm}
+                    </Typography>
+                  </Box>
+                </Grid>
+              )}
+
+              {/* Web Thickness */}
+              {visibleColumns.webThicknessMm && selectedElementDetails.webThicknessMm && (
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ 
+                    p: 2, 
+                    bgcolor: '#f5f5f5', 
+                    borderRadius: 2,
+                    border: '1px solid #e0e0e0'
+                  }}>
+                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+                      Web Thickness (mm)
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: '600', fontSize: '1rem' }}>
+                      {selectedElementDetails.webThicknessMm}
+                    </Typography>
+                  </Box>
+                </Grid>
+              )}
+
+              {/* Flange Thickness */}
+              {visibleColumns.flangeThicknessMm && selectedElementDetails.flangeThicknessMm && (
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ 
+                    p: 2, 
+                    bgcolor: '#f5f5f5', 
+                    borderRadius: 2,
+                    border: '1px solid #e0e0e0'
+                  }}>
+                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+                      Flange Thickness (mm)
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: '600', fontSize: '1rem' }}>
+                      {selectedElementDetails.flangeThicknessMm}
+                    </Typography>
+                  </Box>
+                </Grid>
+              )}
+
+              {/* Fireproofing Workflow */}
+              {visibleColumns.fireProofingWorkflow && selectedElementDetails.fireProofingWorkflow && (
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ 
+                    p: 2, 
+                    bgcolor: '#f5f5f5', 
+                    borderRadius: 2,
+                    border: '1px solid #e0e0e0'
+                  }}>
+                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+                      Fireproofing Workflow
+                    </Typography>
+                    <Chip 
+                      label={selectedElementDetails.fireProofingWorkflow.replace(/_/g, ' ')}
+                      sx={{
+                        bgcolor: getWorkflowColor(selectedElementDetails.fireProofingWorkflow).bg,
+                        color: getWorkflowColor(selectedElementDetails.fireProofingWorkflow).text,
+                        fontWeight: '600',
+                        fontSize: '0.85rem',
+                        textTransform: 'capitalize',
+                        height: '28px',
+                        mt: 0.5
+                      }}
+                    />
+                  </Box>
+                </Grid>
+              )}
+
+              {/* Status */}
+              <Grid item xs={12} sm={6}>
+                <Box sx={{ 
+                  p: 2, 
+                  bgcolor: '#f5f5f5', 
+                  borderRadius: 2,
+                  border: '1px solid #e0e0e0'
+                }}>
+                  <Typography variant="caption" sx={{ color: '#888', fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+                    Status
+                  </Typography>
+                  <Chip 
+                    label={selectedElementDetails.status}
+                    sx={{
+                      bgcolor: getStatusColor(selectedElementDetails.status).text,
+                      color: 'white',
+                      fontWeight: 'bold',
+                      fontSize: '0.85rem',
+                      textTransform: 'capitalize',
+                      height: '28px',
+                      mt: 0.5
+                    }}
+                  />
+                </Box>
+              </Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeDetailsDialog} variant="contained" color="primary">
+            Close
           </Button>
         </DialogActions>
       </Dialog>
