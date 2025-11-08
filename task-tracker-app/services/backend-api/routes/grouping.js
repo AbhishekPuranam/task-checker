@@ -327,6 +327,7 @@ router.get('/available-fields', auth, async (req, res) => {
       async () => {
         return [
           { value: 'status', label: 'Status' },
+          { value: 'currentJob', label: 'Current Job' },
           { value: 'level', label: 'Level' },
           { value: 'memberType', label: 'Member Type' },
           { value: 'gridNo', label: 'Grid No' },

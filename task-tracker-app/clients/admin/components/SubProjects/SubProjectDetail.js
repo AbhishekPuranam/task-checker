@@ -80,25 +80,26 @@ export default function SubProjectDetail() {
   // Column visibility state - All columns enabled by default
   const [visibleColumns, setVisibleColumns] = useState({
     serialNo: true,
-    structureNumber: true,
-    drawingNo: true,
     level: true,
-    memberType: true,
     gridNo: true,
     partMarkNo: true,
-    sectionSizes: true,
     lengthMm: true,
     surfaceAreaSqm: true,
-    qty: true,
-    status: true,
     fireproofingThickness: true,
-    sectionDepthMm: true,
-    flangeWidthMm: true,
-    webThicknessMm: true,
-    flangeThicknessMm: true,
     fireProofingWorkflow: true,
     currentJob: true,
-    jobProgress: true
+    // Hidden by default
+    structureNumber: false,
+    drawingNo: false,
+    memberType: false,
+    sectionSizes: false,
+    qty: false,
+    status: false,
+    sectionDepthMm: false,
+    flangeWidthMm: false,
+    webThicknessMm: false,
+    flangeThicknessMm: false,
+    jobProgress: false
   });
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   
