@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const redis = require('../utils/redis');
-const Queue = require('bull');
+const { Queue } = require('bullmq');
 
 /**
  * Basic health check - lightweight, fast response
@@ -62,7 +62,7 @@ router.get('/detailed', async (req, res) => {
     // Check BullMQ queues
     try {
       const excelQueue = new Queue('excel-processing', {
-        redis: {
+        connection: {
           host: process.env.REDIS_HOST || 'localhost',
           port: process.env.REDIS_PORT || 6379,
           password: process.env.REDIS_PASSWORD
@@ -70,7 +70,7 @@ router.get('/detailed', async (req, res) => {
       });
 
       const progressQueue = new Queue('progress-calculation', {
-        redis: {
+        connection: {
           host: process.env.REDIS_HOST || 'localhost',
           port: process.env.REDIS_PORT || 6379,
           password: process.env.REDIS_PASSWORD
@@ -198,7 +198,7 @@ router.get('/redis', async (req, res) => {
 router.get('/queues', async (req, res) => {
   try {
     const excelQueue = new Queue('excel-processing', {
-      redis: {
+      connection: {
         host: process.env.REDIS_HOST || 'localhost',
         port: process.env.REDIS_PORT || 6379,
         password: process.env.REDIS_PASSWORD
@@ -206,7 +206,7 @@ router.get('/queues', async (req, res) => {
     });
 
     const progressQueue = new Queue('progress-calculation', {
-      redis: {
+      connection: {
         host: process.env.REDIS_HOST || 'localhost',
         port: process.env.REDIS_PORT || 6379,
         password: process.env.REDIS_PASSWORD
