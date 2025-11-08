@@ -325,7 +325,12 @@ export default function SubProjectDetail() {
   
   // Handle row click to open job management
   const handleRowClick = (element) => {
-    setSelectedElement(element);
+    // Enrich element with project information if not already present
+    const enrichedElement = {
+      ...element,
+      project: element.project || project?._id || project
+    };
+    setSelectedElement(enrichedElement);
     setShowJobDialog(true);
   };
   
@@ -1221,6 +1226,7 @@ export default function SubProjectDetail() {
           setSelectedElement(null);
         }}
         element={selectedElement}
+        projectId={project?._id}
         onJobsUpdated={handleJobsUpdated}
       />
     </Box>
