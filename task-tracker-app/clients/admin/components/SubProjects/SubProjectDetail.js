@@ -48,8 +48,19 @@ export default function SubProjectDetail() {
   const [subProject, setSubProject] = useState(null);
   const [project, setProject] = useState(null);
   const [activeSection, setActiveSection] = useState('active');
-  const [groupBy, setGroupBy] = useState(''); // Start empty, set to 'level' after fields load
-  const [subGroupBy, setSubGroupBy] = useState('');
+  // Initialize groupBy from localStorage or default to empty
+  const [groupBy, setGroupBy] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('subproject_groupBy') || '';
+    }
+    return '';
+  });
+  const [subGroupBy, setSubGroupBy] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('subproject_subGroupBy') || '';
+    }
+    return '';
+  });
   const [groupedData, setGroupedData] = useState(null);
   const [availableFields, setAvailableFields] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -159,6 +170,24 @@ export default function SubProjectDetail() {
     }
   }, [projectId, subProjectId]);
 
+  // Persist groupBy to localStorage whenever it changes
+  useEffect(() => {
+    if (groupBy) {
+      localStorage.setItem('subproject_groupBy', groupBy);
+      console.log('💾 [SubProjectDetail] Saved groupBy to localStorage:', groupBy);
+    }
+  }, [groupBy]);
+
+  // Persist subGroupBy to localStorage whenever it changes
+  useEffect(() => {
+    if (subGroupBy) {
+      localStorage.setItem('subproject_subGroupBy', subGroupBy);
+      console.log('💾 [SubProjectDetail] Saved subGroupBy to localStorage:', subGroupBy);
+    } else {
+      localStorage.removeItem('subproject_subGroupBy');
+    }
+  }, [subGroupBy]);
+
   useEffect(() => {
     console.log('🔍 [SubProjectDetail] useEffect triggered:', { groupBy, subProjectId: subProject?._id, activeSection });
     if (groupBy && subProject?._id) {
@@ -239,10 +268,15 @@ export default function SubProjectDetail() {
       
       console.log('✅ [fetchAvailableFields] Loaded', fields.length, 'fields');
       
-      // Set default groupBy to 'currentJob' after fields are loaded
+      // Only set default groupBy if not already set from localStorage
       if (fields.length > 0 && !groupBy) {
-        console.log('📊 [fetchAvailableFields] Setting groupBy to currentJob');
-        setGroupBy('currentJob');
+        const savedGroupBy = localStorage.getItem('subproject_groupBy');
+        if (!savedGroupBy) {
+          console.log('📊 [fetchAvailableFields] Setting default groupBy to currentJob');
+          setGroupBy('currentJob');
+        } else {
+          console.log('📊 [fetchAvailableFields] Using saved groupBy from localStorage:', savedGroupBy);
+        }
       }
     } catch (err) {
       console.error('Error fetching fields:', err);
