@@ -13,6 +13,7 @@ const swaggerSpec = require('./swagger');
 const { createExcelWorker } = require('./workers/excelProcessor');
 const { createBatchExcelWorker } = require('./workers/excelProcessorBatch');
 const { startProgressWorker } = require('./workers/progressCalculator');
+const { startUploadCleanupJob } = require('./workers/uploadCleanup');
 
 // Load environment variables
 dotenv.config();
@@ -313,6 +314,15 @@ try {
 } catch (error) {
   console.error('❌ Failed to start Progress worker:', error.message);
   console.warn('⚠️  Progress calculation will not work in background mode');
+}
+
+// Start Upload cleanup cron job
+try {
+  startUploadCleanupJob();
+  console.log('✅ Upload cleanup job started successfully');
+} catch (error) {
+  console.error('❌ Failed to start upload cleanup job:', error.message);
+  console.warn('⚠️  Stalled uploads will not be automatically cleaned up');
 }
 
 server.listen(PORT, () => {
