@@ -984,174 +984,129 @@ export default function SubProjectDetail() {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {groupedData.groups?.map((group, index) => (
               <Paper key={index} sx={{ p: 3, border: '1px solid #e0e0e0', borderRadius: 3, overflow: 'hidden' }}>
-                {/* Group Header with Metrics */}
-                <Box sx={{ mb: 3 }}>
-                  <Typography variant="h5" fontWeight="700" sx={{ color: '#333', mb: 2 }}>
+                {/* Compact Group Header with Inline Metrics */}
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 2, 
+                  mb: 2,
+                  pb: 2,
+                  borderBottom: '2px solid #f0f0f0',
+                  flexWrap: 'wrap'
+                }}>
+                  {/* Group Title */}
+                  <Typography variant="h6" fontWeight="700" sx={{ color: '#333', flex: '1 1 auto', minWidth: '200px' }}>
                     {group._id[groupBy] || '(Not Set)'}
                     {subGroupBy && group._id[subGroupBy] && (
-                      <Box component="span" sx={{ color: '#667eea', ml: 1, fontWeight: 600 }}>
+                      <Box component="span" sx={{ color: '#667eea', ml: 1, fontWeight: 600, fontSize: '0.9em' }}>
                         → {group._id[subGroupBy]}
                       </Box>
                     )}
                   </Typography>
                   
-                  {/* Metric Cards Row */}
-                  <Grid container spacing={2}>
-                    {/* Elements Count Card */}
-                    <Grid item xs={12} sm={6} md={4}>
-                      <Paper
-                        elevation={0}
-                        sx={{
-                          p: 2.5,
-                          background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
-                          border: '2px solid #90caf9',
-                          borderRadius: 2,
-                          position: 'relative',
-                          overflow: 'hidden',
-                          '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '4px',
-                            height: '100%',
-                            background: 'linear-gradient(180deg, #2196f3 0%, #1976d2 100%)',
-                          }
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <Box
-                            sx={{
-                              width: 48,
-                              height: 48,
-                              borderRadius: 2,
-                              background: 'linear-gradient(135deg, #2196f3 0%, #1976d2 100%)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              boxShadow: '0 4px 12px rgba(33, 150, 243, 0.3)'
-                            }}
-                          >
-                            <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
-                              📊
-                            </Typography>
-                          </Box>
-                          <Box>
-                            <Typography variant="caption" sx={{ color: '#1976d2', fontWeight: 600, fontSize: '0.7rem', textTransform: 'uppercase' }}>
-                              Elements
-                            </Typography>
-                            <Typography variant="h4" fontWeight="900" sx={{ color: '#1565c0', lineHeight: 1 }}>
-                              {group.count}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </Paper>
-                    </Grid>
+                  {/* Inline Compact Metrics */}
+                  <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* Elements Count */}
+                    <Box sx={{ 
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      px: 2,
+                      py: 1,
+                      background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
+                      borderRadius: 2,
+                      border: '1px solid #90caf9'
+                    }}>
+                      <Box sx={{ 
+                        width: 32, 
+                        height: 32, 
+                        borderRadius: 1,
+                        background: 'linear-gradient(135deg, #2196f3 0%, #1976d2 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '1rem'
+                      }}>
+                        📊
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: '#1976d2', fontWeight: 600, fontSize: '0.65rem', textTransform: 'uppercase', display: 'block', lineHeight: 1 }}>
+                          Elements
+                        </Typography>
+                        <Typography variant="h6" fontWeight="900" sx={{ color: '#1565c0', lineHeight: 1, mt: 0.3 }}>
+                          {group.count}
+                        </Typography>
+                      </Box>
+                    </Box>
 
-                    {/* Total SQM Card */}
-                    <Grid item xs={12} sm={6} md={4}>
-                      <Paper
-                        elevation={0}
-                        sx={{
-                          p: 2.5,
-                          background: 'linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%)',
-                          border: '2px solid #ce93d8',
-                          borderRadius: 2,
-                          position: 'relative',
-                          overflow: 'hidden',
-                          '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '4px',
-                            height: '100%',
-                            background: 'linear-gradient(180deg, #9c27b0 0%, #7b1fa2 100%)',
-                          }
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <Box
-                            sx={{
-                              width: 48,
-                              height: 48,
-                              borderRadius: 2,
-                              background: 'linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              boxShadow: '0 4px 12px rgba(156, 39, 176, 0.3)'
-                            }}
-                          >
-                            <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
-                              📐
-                            </Typography>
-                          </Box>
-                          <Box>
-                            <Typography variant="caption" sx={{ color: '#7b1fa2', fontWeight: 600, fontSize: '0.7rem', textTransform: 'uppercase' }}>
-                              Total SQM
-                            </Typography>
-                            <Typography variant="h4" fontWeight="900" sx={{ color: '#6a1b9a', lineHeight: 1 }}>
-                              {group.totalSqm?.toFixed(1)}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </Paper>
-                    </Grid>
+                    {/* Total SQM */}
+                    <Box sx={{ 
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      px: 2,
+                      py: 1,
+                      background: 'linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%)',
+                      borderRadius: 2,
+                      border: '1px solid #ce93d8'
+                    }}>
+                      <Box sx={{ 
+                        width: 32, 
+                        height: 32, 
+                        borderRadius: 1,
+                        background: 'linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '1rem'
+                      }}>
+                        📐
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: '#7b1fa2', fontWeight: 600, fontSize: '0.65rem', textTransform: 'uppercase', display: 'block', lineHeight: 1 }}>
+                          Total SQM
+                        </Typography>
+                        <Typography variant="h6" fontWeight="900" sx={{ color: '#6a1b9a', lineHeight: 1, mt: 0.3 }}>
+                          {group.totalSqm?.toFixed(1)}
+                        </Typography>
+                      </Box>
+                    </Box>
 
-                    {/* Total Qty Card (if applicable) */}
+                    {/* Total Qty (if applicable) */}
                     {group.totalQty > 0 && (
-                      <Grid item xs={12} sm={6} md={4}>
-                        <Paper
-                          elevation={0}
-                          sx={{
-                            p: 2.5,
-                            background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
-                            border: '2px solid #ffb74d',
-                            borderRadius: 2,
-                            position: 'relative',
-                            overflow: 'hidden',
-                            '&::before': {
-                              content: '""',
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              width: '4px',
-                              height: '100%',
-                              background: 'linear-gradient(180deg, #ff9800 0%, #f57c00 100%)',
-                            }
-                          }}
-                        >
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <Box
-                              sx={{
-                                width: 48,
-                                height: 48,
-                                borderRadius: 2,
-                                background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: '0 4px 12px rgba(255, 152, 0, 0.3)'
-                              }}
-                            >
-                              <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
-                                🔢
-                              </Typography>
-                            </Box>
-                            <Box>
-                              <Typography variant="caption" sx={{ color: '#f57c00', fontWeight: 600, fontSize: '0.7rem', textTransform: 'uppercase' }}>
-                                Total Qty
-                              </Typography>
-                              <Typography variant="h4" fontWeight="900" sx={{ color: '#e65100', lineHeight: 1 }}>
-                                {group.totalQty}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </Paper>
-                      </Grid>
+                      <Box sx={{ 
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        px: 2,
+                        py: 1,
+                        background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
+                        borderRadius: 2,
+                        border: '1px solid #ffb74d'
+                      }}>
+                        <Box sx={{ 
+                          width: 32, 
+                          height: 32, 
+                          borderRadius: 1,
+                          background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '1rem'
+                        }}>
+                          🔢
+                        </Box>
+                        <Box>
+                          <Typography variant="caption" sx={{ color: '#f57c00', fontWeight: 600, fontSize: '0.65rem', textTransform: 'uppercase', display: 'block', lineHeight: 1 }}>
+                            Total Qty
+                          </Typography>
+                          <Typography variant="h6" fontWeight="900" sx={{ color: '#e65100', lineHeight: 1, mt: 0.3 }}>
+                            {group.totalQty}
+                          </Typography>
+                        </Box>
+                      </Box>
                     )}
-                  </Grid>
+                  </Box>
                 </Box>
 
                 {/* All Elements */}
@@ -1324,8 +1279,9 @@ export default function SubProjectDetail() {
                                   sx={{ 
                                     fontWeight: '600',
                                     fontSize: '0.8rem',
-                                    bgcolor: statusColors.text,
-                                    color: 'white',
+                                    background: statusColors.bg,
+                                    color: statusColors.text,
+                                    border: `2px solid ${statusColors.border}`,
                                     textTransform: 'capitalize',
                                     minWidth: '80px'
                                   }}
