@@ -1170,23 +1170,8 @@ export default function SubProjectDetail() {
                                   }}
                                 />
                                 
-                                {/* Member Type & Section */}
-                                <Box sx={{ flex: '1 1 auto', minWidth: '180px' }}>
-                                  <Typography variant="body1" sx={{ 
-                                    fontWeight: 'bold', 
-                                    color: '#333',
-                                    fontSize: '1rem',
-                                    mb: 0.5
-                                  }}>
-                                    {element.memberType}
-                                  </Typography>
-                                  <Typography variant="body2" sx={{ color: '#666', fontSize: '0.9rem' }}>
-                                    {element.sectionSizes}
-                                  </Typography>
-                                </Box>
-                                
                                 {/* Level */}
-                                <Box sx={{ minWidth: '70px' }}>
+                                <Box sx={{ minWidth: '90px' }}>
                                   <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
                                     Level
                                   </Typography>
@@ -1196,12 +1181,32 @@ export default function SubProjectDetail() {
                                 </Box>
                                 
                                 {/* Grid No */}
-                                <Box sx={{ minWidth: '70px' }}>
+                                <Box sx={{ minWidth: '100px' }}>
                                   <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
                                     Grid
                                   </Typography>
                                   <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
                                     {element.gridNo}
+                                  </Typography>
+                                </Box>
+                                
+                                {/* Part Mark No */}
+                                <Box sx={{ minWidth: '110px' }}>
+                                  <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
+                                    Part Mark
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
+                                    {element.partMarkNo || '-'}
+                                  </Typography>
+                                </Box>
+                                
+                                {/* Length (mm) */}
+                                <Box sx={{ minWidth: '100px' }}>
+                                  <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
+                                    Length (mm)
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
+                                    {element.lengthMm || '-'}
                                   </Typography>
                                 </Box>
                                 
@@ -1213,6 +1218,36 @@ export default function SubProjectDetail() {
                                   <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: '0.95rem', color: '#2196f3' }}>
                                     {element.surfaceAreaSqm?.toFixed(2)}
                                   </Typography>
+                                </Box>
+                                
+                                {/* FP Thickness */}
+                                <Box sx={{ minWidth: '100px' }}>
+                                  <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
+                                    FP Thickness
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
+                                    {element.fireproofingThickness || '-'}
+                                  </Typography>
+                                </Box>
+                                
+                                {/* FP Workflow */}
+                                <Box sx={{ minWidth: '120px' }}>
+                                  <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
+                                    FP Workflow
+                                  </Typography>
+                                  <Chip 
+                                    label={element.fireProofingWorkflow?.replace(/_/g, ' ') || '-'}
+                                    size="small"
+                                    sx={{
+                                      mt: 0.5,
+                                      fontSize: '0.75rem',
+                                      height: '22px',
+                                      bgcolor: getWorkflowColor(element.fireProofingWorkflow).bg,
+                                      color: getWorkflowColor(element.fireProofingWorkflow).text,
+                                      textTransform: 'capitalize',
+                                      fontWeight: '600'
+                                    }}
+                                  />
                                 </Box>
                                 
                                 {/* Current Job - Highlighted Inline */}

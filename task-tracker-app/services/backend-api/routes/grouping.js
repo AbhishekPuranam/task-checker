@@ -77,6 +77,43 @@ router.post('/elements', auth, async (req, res) => {
           { $match: matchStage }
         ];
         
+        // Add lookup for currentJob if grouping by it
+        if (groupBy === 'currentJob' || subGroupBy === 'currentJob') {
+          pipeline.push({
+            $lookup: {
+              from: 'jobs',
+              let: { elementId: '$_id' },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $eq: ['$structuralElement', '$$elementId'] },
+                        { $in: ['$status', ['pending', 'in_progress']] }
+                      ]
+                    }
+                  }
+                },
+                { $sort: { orderIndex: 1 } },
+                { $limit: 1 }
+              ],
+              as: 'currentJobArray'
+            }
+          });
+          
+          // Add computed field for currentJob title
+          pipeline.push({
+            $addFields: {
+              currentJob: {
+                $ifNull: [
+                  { $arrayElemAt: ['$currentJobArray.jobTitle', 0] },
+                  '(Not Set)'
+                ]
+              }
+            }
+          });
+        }
+        
         // Build group stage
         const groupId = {};
         const groupStage = {
