@@ -65,7 +65,7 @@ export default function SubProjectDetail() {
   
   // Get pagination for specific group
   const getGroupPage = (groupIndex) => groupPages[groupIndex] || 0;
-  const getGroupRowsPerPage = (groupIndex) => groupRowsPerPage[groupIndex] || 25;
+  const getGroupRowsPerPage = (groupIndex) => groupRowsPerPage[groupIndex] || 10;
   
   // Pagination handlers for groups
   const handleGroupPageChange = (groupIndex, newPage) => {
@@ -357,6 +357,36 @@ export default function SubProjectDetail() {
     
     // Wait for all refreshes to complete
     await Promise.all(promises);
+  };
+  
+  // Get status color helper
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'complete':
+        return { bg: 'linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)', border: '#28a745', text: '#155724' };
+      case 'active':
+        return { bg: 'linear-gradient(135deg, #cce5ff 0%, #b8daff 100%)', border: '#007bff', text: '#004085' };
+      case 'non_clearance':
+        return { bg: 'linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%)', border: '#dc3545', text: '#721c24' };
+      case 'no_job':
+        return { bg: 'linear-gradient(135deg, #e2d6f3 0%, #d4c4e8 100%)', border: '#9c27b0', text: '#4a148c' };
+      default:
+        return { bg: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)', border: '#6c757d', text: '#495057' };
+    }
+  };
+
+  // Get workflow color helper
+  const getWorkflowColor = (workflow) => {
+    switch (workflow?.toLowerCase()) {
+      case 'cement_fire_proofing':
+        return { bg: '#fff3cd', text: '#856404' };
+      case 'intumescent_coating':
+        return { bg: '#d1ecf1', text: '#0c5460' };
+      case 'board_system':
+        return { bg: '#f8d7da', text: '#721c24' };
+      default:
+        return { bg: '#e7f3ff', text: '#004085' };
+    }
   };
   
   // Get cell value helper
@@ -809,47 +839,225 @@ export default function SubProjectDetail() {
                   const filteredElements = filterElements(group.elements);
                   return (
                   <Box sx={{ mt: 2 }}>
-                    <Typography variant="body2" fontWeight="600" sx={{ color: '#333', mb: 1 }}>
+                    <Typography variant="body1" fontWeight="600" sx={{ color: '#333', mb: 2, fontSize: '1rem' }}>
                       All Elements ({filteredElements.length} {searchQuery ? 'matching' : 'total'}):
                     </Typography>
-                    <Box sx={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
-                        <thead style={{ backgroundColor: '#f5f5f5' }}>
-                          <tr>
-                            {getVisibleColumns().map((column) => (
-                              <th key={column.key} style={{ padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>
-                                {column.label}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredElements
-                            .slice(
-                              getGroupPage(index) * getGroupRowsPerPage(index), 
-                              getGroupPage(index) * getGroupRowsPerPage(index) + getGroupRowsPerPage(index)
-                            )
-                            .map((element) => (
-                              <tr 
-                                key={element._id} 
-                                style={{ 
-                                  borderBottom: '1px solid #f0f0f0',
-                                  cursor: 'pointer',
-                                  transition: 'background-color 0.2s'
-                                }}
-                                onClick={() => handleRowClick(element)}
-                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
-                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                              >
-                                {getVisibleColumns().map((column) => (
-                                  <td key={column.key} style={{ padding: '8px 12px' }}>
-                                    {getCellValue(element, column.key)}
-                                  </td>
-                                ))}
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
+                    
+                    {/* Bento Grid Layout */}
+                    <Box sx={{ 
+                      display: 'grid',
+                      gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: '1fr 1fr 1fr' },
+                      gap: 2,
+                      mb: 3
+                    }}>
+                      {filteredElements
+                        .slice(
+                          getGroupPage(index) * getGroupRowsPerPage(index), 
+                          getGroupPage(index) * getGroupRowsPerPage(index) + getGroupRowsPerPage(index)
+                        )
+                        .map((element) => {
+                          const statusColors = getStatusColor(element.status);
+                          const workflowColors = getWorkflowColor(element.fireProofingWorkflow);
+                          
+                          return (
+                            <Paper
+                              key={element._id}
+                              onClick={() => handleRowClick(element)}
+                              sx={{
+                                p: 2.5,
+                                cursor: 'pointer',
+                                background: statusColors.bg,
+                                border: `2px solid ${statusColors.border}`,
+                                borderRadius: 3,
+                                transition: 'all 0.3s ease',
+                                '&:hover': {
+                                  transform: 'translateY(-4px)',
+                                  boxShadow: `0 8px 24px ${statusColors.border}40`,
+                                }
+                              }}
+                            >
+                              {/* Header Section */}
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
+                                <Chip 
+                                  label={`#${element.serialNo}`} 
+                                  size="small"
+                                  sx={{ 
+                                    fontWeight: 'bold',
+                                    fontSize: '0.95rem',
+                                    bgcolor: statusColors.border,
+                                    color: 'white'
+                                  }}
+                                />
+                                <Chip 
+                                  label={element.status} 
+                                  size="small"
+                                  sx={{ 
+                                    fontWeight: '600',
+                                    fontSize: '0.85rem',
+                                    bgcolor: statusColors.text,
+                                    color: 'white',
+                                    textTransform: 'capitalize'
+                                  }}
+                                />
+                              </Box>
+
+                              {/* Main Content */}
+                              <Box sx={{ mb: 2 }}>
+                                <Typography variant="h6" sx={{ 
+                                  fontWeight: 'bold', 
+                                  color: statusColors.text,
+                                  fontSize: '1.1rem',
+                                  mb: 0.5
+                                }}>
+                                  {element.memberType}
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: '#555', fontSize: '0.95rem', mb: 1 }}>
+                                  {element.sectionSizes}
+                                </Typography>
+                              </Box>
+
+                              {/* Details Grid */}
+                              <Box sx={{ 
+                                display: 'grid', 
+                                gridTemplateColumns: '1fr 1fr',
+                                gap: 1.5,
+                                mb: 2
+                              }}>
+                                {visibleColumns.level && (
+                                  <Box>
+                                    <Typography variant="caption" sx={{ color: '#666', fontSize: '0.8rem' }}>
+                                      Level
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.95rem' }}>
+                                      {element.level}
+                                    </Typography>
+                                  </Box>
+                                )}
+                                {visibleColumns.gridNo && (
+                                  <Box>
+                                    <Typography variant="caption" sx={{ color: '#666', fontSize: '0.8rem' }}>
+                                      Grid
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.95rem' }}>
+                                      {element.gridNo}
+                                    </Typography>
+                                  </Box>
+                                )}
+                                {visibleColumns.qty && (
+                                  <Box>
+                                    <Typography variant="caption" sx={{ color: '#666', fontSize: '0.8rem' }}>
+                                      Quantity
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.95rem' }}>
+                                      {element.qty}
+                                    </Typography>
+                                  </Box>
+                                )}
+                                {visibleColumns.surfaceAreaSqm && (
+                                  <Box>
+                                    <Typography variant="caption" sx={{ color: '#666', fontSize: '0.8rem' }}>
+                                      SQM
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.95rem' }}>
+                                      {element.surfaceAreaSqm?.toFixed(2)}
+                                    </Typography>
+                                  </Box>
+                                )}
+                              </Box>
+
+                              {/* Workflow Badge */}
+                              {visibleColumns.fireProofingWorkflow && element.fireProofingWorkflow && (
+                                <Box sx={{ mb: 2 }}>
+                                  <Chip 
+                                    label={element.fireProofingWorkflow.replace(/_/g, ' ')}
+                                    size="small"
+                                    sx={{
+                                      bgcolor: workflowColors.bg,
+                                      color: workflowColors.text,
+                                      fontWeight: '600',
+                                      fontSize: '0.85rem',
+                                      textTransform: 'capitalize'
+                                    }}
+                                  />
+                                </Box>
+                              )}
+
+                              {/* Current Job Section */}
+                              {visibleColumns.currentJob && element.currentJob && (
+                                <Box sx={{ 
+                                  mt: 2,
+                                  p: 1.5,
+                                  bgcolor: 'rgba(255, 255, 255, 0.8)',
+                                  borderRadius: 2,
+                                  border: '1px solid rgba(0,0,0,0.1)'
+                                }}>
+                                  <Typography variant="caption" sx={{ color: '#666', fontSize: '0.8rem', display: 'block', mb: 0.5 }}>
+                                    Current Job
+                                  </Typography>
+                                  <Box
+                                    sx={{
+                                      color: '#ff6600',
+                                      fontWeight: 'bold',
+                                      fontSize: '1rem',
+                                      animation: 'pulse 2s ease-in-out infinite',
+                                      '@keyframes pulse': {
+                                        '0%, 100%': { 
+                                          opacity: 1,
+                                          transform: 'scale(1)'
+                                        },
+                                        '50%': { 
+                                          opacity: 0.7,
+                                          transform: 'scale(1.05)'
+                                        }
+                                      }
+                                    }}
+                                  >
+                                    {element.currentJob.jobTitle}
+                                  </Box>
+                                  {visibleColumns.jobProgress && (
+                                    <Chip 
+                                      label={element.currentJob.status}
+                                      size="small"
+                                      sx={{
+                                        mt: 1,
+                                        fontSize: '0.75rem',
+                                        height: '20px',
+                                        bgcolor: element.currentJob.status === 'complete' ? '#28a745' : '#ffc107',
+                                        color: 'white',
+                                        textTransform: 'capitalize'
+                                      }}
+                                    />
+                                  )}
+                                </Box>
+                              )}
+
+                              {/* Additional Info */}
+                              {(visibleColumns.structureNumber || visibleColumns.drawingNo) && (
+                                <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid rgba(0,0,0,0.1)' }}>
+                                  {visibleColumns.structureNumber && (
+                                    <Typography variant="caption" sx={{ 
+                                      display: 'block',
+                                      color: '#666',
+                                      fontSize: '0.8rem',
+                                      mb: 0.5
+                                    }}>
+                                      Structure: {element.structureNumber}
+                                    </Typography>
+                                  )}
+                                  {visibleColumns.drawingNo && (
+                                    <Typography variant="caption" sx={{ 
+                                      display: 'block',
+                                      color: '#666',
+                                      fontSize: '0.8rem'
+                                    }}>
+                                      Drawing: {element.drawingNo}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              )}
+                            </Paper>
+                          );
+                        })}
                     </Box>
                     
                     {/* Pagination */}
@@ -861,7 +1069,7 @@ export default function SubProjectDetail() {
                       rowsPerPage={getGroupRowsPerPage(index)}
                       onRowsPerPageChange={(event) => handleGroupRowsPerPageChange(index, event)}
                       rowsPerPageOptions={[5, 10, 25, 50, 100]}
-                      sx={{ borderTop: '1px solid #e0e0e0', mt: 1 }}
+                      sx={{ borderTop: '1px solid #e0e0e0', mt: 2 }}
                     />
                   </Box>
                   );
