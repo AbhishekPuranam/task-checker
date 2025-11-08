@@ -15,9 +15,10 @@ import {
   FormControl,
   InputLabel,
   Alert,
-  TextField
+  TextField,
+  Divider
 } from '@mui/material';
-import { Close, CheckCircle, Cancel, HourglassEmpty, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { Close, CheckCircle, Cancel, HourglassEmpty, Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -37,6 +38,13 @@ export default function JobManagementDialog({ open, onClose, element, projectId,
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [jobToDelete, setJobToDelete] = useState(null);
+  const [showAddJobDialog, setShowAddJobDialog] = useState(false);
+  const [insertAfterJobId, setInsertAfterJobId] = useState(null);
+  const [newJobForm, setNewJobForm] = useState({
+    jobTitle: '',
+    jobDescription: '',
+    status: 'pending'
+  });
 
   useEffect(() => {
     if (open && element) {
@@ -193,6 +201,74 @@ export default function JobManagementDialog({ open, onClose, element, projectId,
     }
   };
 
+  const handleAddJobAfter = (jobId) => {
+    setInsertAfterJobId(jobId);
+    setNewJobForm({
+      jobTitle: '',
+      jobDescription: '',
+      status: 'pending'
+    });
+    setShowAddJobDialog(true);
+  };
+
+  const handleCreateCustomJob = async () => {
+    if (!newJobForm.jobTitle.trim()) {
+      setError('Job title is required');
+      return;
+    }
+
+    if (!element?.project) {
+      setError('Project information is missing. Please close and reopen this dialog.');
+      return;
+    }
+
+    try {
+      setError(null);
+      const token = localStorage.getItem('token');
+      
+      // Get project ID - handle both ObjectId and populated project
+      const projectIdToUse = typeof element.project === 'object' ? element.project._id : element.project;
+      
+      const jobData = {
+        structuralElement: element._id,
+        project: projectIdToUse,
+        jobTitle: newJobForm.jobTitle.trim(),
+        jobDescription: newJobForm.jobDescription.trim() || newJobForm.jobTitle.trim(),
+        status: newJobForm.status,
+        insertAfterJobId: insertAfterJobId || undefined
+      };
+
+      console.log('Creating custom job with data:', jobData);
+
+      await axios.post(
+        `${API_URL}/jobs/custom`,
+        jobData,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setSuccess('Custom job created successfully');
+      
+      // Reset form
+      setNewJobForm({ jobTitle: '', jobDescription: '', status: 'pending' });
+      setShowAddJobDialog(false);
+      setInsertAfterJobId(null);
+      
+      // Refresh jobs list
+      await fetchJobs();
+      
+      // Notify parent component
+      if (onJobsUpdated) {
+        onJobsUpdated();
+      }
+      
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      console.error('Error creating custom job:', err);
+      const errorMsg = err.response?.data?.message || 'Failed to create custom job';
+      setError(errorMsg);
+    }
+  };
+
   const handleClose = async () => {
     // Refresh element status before closing
     if (element?._id) {
@@ -314,22 +390,62 @@ export default function JobManagementDialog({ open, onClose, element, projectId,
               if (job.status === 'not_applicable') borderColor = '#dc3545'; // red
               
               return (
-                <Paper
-                  key={job._id}
-                  sx={{
-                    p: 2,
-                    background: 'linear-gradient(to right, rgba(255,255,255,0.95) 0%, rgba(255,255,255,1) 100%)',
-                    borderLeft: `5px solid ${borderColor}`,
-                    borderRadius: 2,
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      transform: 'translateX(4px)',
-                      boxShadow: `0 4px 12px ${borderColor}30`,
-                      background: `linear-gradient(to right, ${statusInfo.bgColor} 0%, rgba(255,255,255,1) 100%)`
-                    }
-                  }}
-                >
-                  <Box sx={{ 
+                <Box key={job._id}>
+                  {/* Add Job Button Between Jobs */}
+                  {index > 0 && (
+                    <Box sx={{ 
+                      display: 'flex', 
+                      justifyContent: 'center', 
+                      alignItems: 'center',
+                      py: 1,
+                      position: 'relative'
+                    }}>
+                      <Divider sx={{ position: 'absolute', width: '100%' }} />
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<AddIcon />}
+                        onClick={() => handleAddJobAfter(jobs[index - 1]._id)}
+                        sx={{
+                          zIndex: 1,
+                          bgcolor: 'white',
+                          px: 2,
+                          py: 0.5,
+                          borderRadius: 2,
+                          fontSize: '0.8rem',
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          borderColor: '#667eea',
+                          color: '#667eea',
+                          '&:hover': {
+                            bgcolor: '#f0f0ff',
+                            borderColor: '#5568d3',
+                            transform: 'scale(1.05)',
+                            boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)'
+                          },
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        Add Custom Job Here
+                      </Button>
+                    </Box>
+                  )}
+                  
+                  <Paper
+                    sx={{
+                      p: 2,
+                      background: 'linear-gradient(to right, rgba(255,255,255,0.95) 0%, rgba(255,255,255,1) 100%)',
+                      borderLeft: `5px solid ${borderColor}`,
+                      borderRadius: 2,
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        transform: 'translateX(4px)',
+                        boxShadow: `0 4px 12px ${borderColor}30`,
+                        background: `linear-gradient(to right, ${statusInfo.bgColor} 0%, rgba(255,255,255,1) 100%)`
+                      }
+                    }}
+                  >
+                    <Box sx={{ 
                     display: 'flex', 
                     alignItems: 'center', 
                     gap: 2,
@@ -440,6 +556,7 @@ export default function JobManagementDialog({ open, onClose, element, projectId,
                     </IconButton>
                   </Box>
                 </Paper>
+                </Box>
               );
             })}
           </Box>
@@ -557,6 +674,75 @@ export default function JobManagementDialog({ open, onClose, element, projectId,
         <Button onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
         <Button onClick={handleConfirmDelete} variant="contained" color="error">
           Delete
+        </Button>
+      </DialogActions>
+    </Dialog>
+
+    {/* Add Custom Job Dialog */}
+    <Dialog open={showAddJobDialog} onClose={() => setShowAddJobDialog(false)} maxWidth="sm" fullWidth>
+      <DialogTitle>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <AddIcon />
+          <Typography variant="h6">Add Custom Job</Typography>
+        </Box>
+      </DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          Create a custom job that will be inserted after the selected position in the workflow.
+        </Typography>
+        <TextField
+          label="Job Title"
+          fullWidth
+          value={newJobForm.jobTitle}
+          onChange={(e) => setNewJobForm({ ...newJobForm, jobTitle: e.target.value })}
+          margin="normal"
+          required
+          placeholder="e.g., Surface Preparation, Special Coating"
+        />
+        <TextField
+          label="Job Description (Optional)"
+          fullWidth
+          multiline
+          rows={3}
+          value={newJobForm.jobDescription}
+          onChange={(e) => setNewJobForm({ ...newJobForm, jobDescription: e.target.value })}
+          margin="normal"
+          placeholder="Detailed description of the job..."
+        />
+        <FormControl fullWidth margin="normal">
+          <InputLabel>Initial Status</InputLabel>
+          <Select
+            value={newJobForm.status}
+            label="Initial Status"
+            onChange={(e) => setNewJobForm({ ...newJobForm, status: e.target.value })}
+          >
+            {JOB_STATUS_OPTIONS.map((option) => {
+              const OptionIcon = option.icon;
+              return (
+                <MenuItem key={option.value} value={option.value}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <OptionIcon fontSize="small" />
+                    <Typography variant="body2">{option.label}</Typography>
+                  </Box>
+                </MenuItem>
+              );
+            })}
+          </Select>
+        </FormControl>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setShowAddJobDialog(false)}>Cancel</Button>
+        <Button 
+          onClick={handleCreateCustomJob} 
+          variant="contained" 
+          sx={{
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            '&:hover': {
+              background: 'linear-gradient(135deg, #5568d3 0%, #63408b 100%)'
+            }
+          }}
+        >
+          Add Job
         </Button>
       </DialogActions>
     </Dialog>
