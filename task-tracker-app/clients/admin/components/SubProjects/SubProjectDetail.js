@@ -625,75 +625,212 @@ export default function SubProjectDetail() {
           </Box>
         </Paper>
 
-        {/* Sections Tabs */}
-        <Paper 
-          elevation={3} 
-          sx={{ 
-            mb: 3, 
-            borderRadius: 3,
-            boxShadow: '0 8px 32px rgba(106, 17, 203, 0.3)'
-          }}
-        >
-          <Tabs
-            value={activeSection}
-            onChange={(e, newValue) => setActiveSection(newValue)}
-            variant="fullWidth"
-            sx={{
-              borderBottom: 1,
-              borderColor: 'divider',
-              '& .MuiTab-root': {
-                textTransform: 'none',
-                fontWeight: 600,
-                fontSize: '1rem'
+        {/* Section Metrics - Card Style */}
+        <Grid container spacing={3} sx={{ mb: 3 }}>
+          {SECTIONS.map((section) => {
+            const count = subProject.statistics?.sections?.[section.id === 'non_clearance' ? 'nonClearance' : section.id === 'no_job' ? 'noJob' : section.id]?.count || 0;
+            const sqm = subProject.statistics?.sections?.[section.id === 'non_clearance' ? 'nonClearance' : section.id === 'no_job' ? 'noJob' : section.id]?.sqm || 0;
+            
+            // Get color scheme based on section
+            const getColorScheme = (color) => {
+              switch (color) {
+                case 'blue': 
+                  return { 
+                    primary: '#2196f3', 
+                    light: '#e3f2fd', 
+                    lighter: '#bbdefb',
+                    dark: '#1976d2',
+                    gradient: 'linear-gradient(135deg, #2196f3 0%, #1976d2 100%)'
+                  };
+                case 'red': 
+                  return { 
+                    primary: '#f44336', 
+                    light: '#ffebee', 
+                    lighter: '#ffcdd2',
+                    dark: '#d32f2f',
+                    gradient: 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)'
+                  };
+                case 'purple': 
+                  return { 
+                    primary: '#9c27b0', 
+                    light: '#f3e5f5', 
+                    lighter: '#e1bee7',
+                    dark: '#7b1fa2',
+                    gradient: 'linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%)'
+                  };
+                case 'green': 
+                  return { 
+                    primary: '#4caf50', 
+                    light: '#e8f5e9', 
+                    lighter: '#c8e6c9',
+                    dark: '#388e3c',
+                    gradient: 'linear-gradient(135deg, #4caf50 0%, #388e3c 100%)'
+                  };
+                default: 
+                  return { 
+                    primary: '#757575', 
+                    light: '#fafafa', 
+                    lighter: '#e0e0e0',
+                    dark: '#616161',
+                    gradient: 'linear-gradient(135deg, #757575 0%, #616161 100%)'
+                  };
               }
-            }}
-          >
-            {SECTIONS.map((section) => {
-              const count = subProject.statistics?.sections?.[section.id === 'non_clearance' ? 'nonClearance' : section.id === 'no_job' ? 'noJob' : section.id]?.count || 0;
-              const sqm = subProject.statistics?.sections?.[section.id === 'non_clearance' ? 'nonClearance' : section.id === 'no_job' ? 'noJob' : section.id]?.sqm || 0;
-              
-              // Get color based on section
-              const getColorHex = (color) => {
-                switch (color) {
-                  case 'blue': return '#2196f3';
-                  case 'red': return '#f44336';
-                  case 'purple': return '#9c27b0';
-                  case 'green': return '#4caf50';
-                  default: return '#757575';
-                }
-              };
-              
-              const colorHex = getColorHex(section.color);
-              
-              return (
-                <Tab
-                  key={section.id}
-                  value={section.id}
-                  label={
-                    <Box>
-                      <Typography variant="body1" fontWeight="bold">
-                        {section.label}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#666' }}>
-                        {count} items • {sqm.toFixed(1)} SQM
-                      </Typography>
-                    </Box>
-                  }
+            };
+            
+            const colors = getColorScheme(section.color);
+            const isActive = activeSection === section.id;
+            
+            return (
+              <Grid item xs={12} sm={6} md={3} key={section.id}>
+                <Paper
+                  elevation={isActive ? 8 : 2}
+                  onClick={() => setActiveSection(section.id)}
                   sx={{
-                    '&.Mui-selected': {
-                      color: colorHex,
-                      backgroundColor: `${colorHex}15`,
-                      borderBottom: `3px solid ${colorHex}`
-                    },
+                    p: 3,
+                    cursor: 'pointer',
+                    borderRadius: 3,
+                    position: 'relative',
+                    overflow: 'hidden',
+                    background: isActive 
+                      ? `linear-gradient(135deg, ${colors.light} 0%, ${colors.lighter} 100%)`
+                      : 'white',
+                    border: isActive ? `3px solid ${colors.primary}` : '1px solid #e0e0e0',
+                    transform: isActive ? 'scale(1.05)' : 'scale(1)',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     '&:hover': {
-                      backgroundColor: `${colorHex}08`
-                    }
+                      transform: 'scale(1.05)',
+                      boxShadow: `0 8px 24px ${colors.primary}40`,
+                      borderColor: colors.primary
+                    },
+                    '&::before': isActive ? {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '6px',
+                      background: colors.gradient,
+                      animation: 'shimmer 2s ease-in-out infinite',
+                      '@keyframes shimmer': {
+                        '0%, 100%': { opacity: 1 },
+                        '50%': { opacity: 0.6 }
+                      }
+                    } : {}
                   }}
-                />
-              );
-            })}
-          </Tabs>
-        </Paper>
+                >
+                  {/* Section Label */}
+                  <Typography 
+                    variant="h6" 
+                    fontWeight="bold" 
+                    sx={{ 
+                      color: isActive ? colors.dark : colors.primary,
+                      mb: 2,
+                      fontSize: '1.1rem',
+                      letterSpacing: '0.5px',
+                      textTransform: 'uppercase'
+                    }}
+                  >
+                    {section.label}
+                  </Typography>
+                  
+                  {/* Count Metric */}
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 1.5 }}>
+                    <Typography 
+                      variant="h3" 
+                      fontWeight="900"
+                      sx={{ 
+                        color: colors.primary,
+                        lineHeight: 1,
+                        fontSize: '2.5rem',
+                        textShadow: isActive ? `0 2px 8px ${colors.primary}40` : 'none'
+                      }}
+                    >
+                      {count}
+                    </Typography>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        color: '#666',
+                        fontWeight: 600
+                      }}
+                    >
+                      Elements
+                    </Typography>
+                  </Box>
+                  
+                  {/* SQM Metric */}
+                  <Box 
+                    sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 1,
+                      p: 1.5,
+                      background: isActive ? `${colors.primary}15` : `${colors.light}`,
+                      borderRadius: 2,
+                      border: `1px solid ${colors.lighter}`
+                    }}
+                  >
+                    <Box 
+                      sx={{ 
+                        width: 8, 
+                        height: 8, 
+                        borderRadius: '50%',
+                        bgcolor: colors.primary,
+                        boxShadow: `0 0 10px ${colors.primary}60`
+                      }} 
+                    />
+                    <Typography 
+                      variant="h6" 
+                      fontWeight="bold"
+                      sx={{ 
+                        color: colors.dark,
+                        fontSize: '1.2rem'
+                      }}
+                    >
+                      {sqm.toFixed(1)}
+                    </Typography>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        color: '#666',
+                        fontWeight: 600
+                      }}
+                    >
+                      SQM
+                    </Typography>
+                  </Box>
+                  
+                  {/* Active Indicator */}
+                  {isActive && (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: 16,
+                        right: 16,
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        bgcolor: colors.primary,
+                        boxShadow: `0 0 0 4px ${colors.primary}30`,
+                        animation: 'pulse 2s ease-in-out infinite',
+                        '@keyframes pulse': {
+                          '0%, 100%': { 
+                            transform: 'scale(1)',
+                            opacity: 1
+                          },
+                          '50%': { 
+                            transform: 'scale(1.2)',
+                            opacity: 0.8
+                          }
+                        }
+                      }}
+                    />
+                  )}
+                </Paper>
+              </Grid>
+            );
+          })}
+        </Grid>
 
         {/* Grouping Controls */}
         <Paper 
