@@ -36,9 +36,9 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 const SECTIONS = [
   { id: 'active', label: 'Active', color: 'blue' },
+  { id: 'complete', label: 'Complete', color: 'green' },
   { id: 'non_clearance', label: 'Non-Clearance', color: 'red' },
-  { id: 'no_job', label: 'No Job', color: 'purple' },
-  { id: 'complete', label: 'Complete', color: 'green' }
+  { id: 'no_job', label: 'No Job', color: 'purple' }
 ];
 
 export default function SubProjectDetail() {
@@ -713,7 +713,11 @@ export default function SubProjectDetail() {
               <Grid item xs={12} sm={6} md={3} key={section.id}>
                 <Paper
                   elevation={isActive ? 8 : 2}
-                  onClick={() => setActiveSection(section.id)}
+                  onClick={() => {
+                    // Clear cache for fresh data when switching sections
+                    setCachedGroupedData({});
+                    setActiveSection(section.id);
+                  }}
                   sx={{
                     p: 3,
                     cursor: 'pointer',
