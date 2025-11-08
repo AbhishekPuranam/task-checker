@@ -266,10 +266,8 @@ app.use('/api/upload-sessions', require('./routes/uploadSessions'));
 app.use('/api/subprojects', require('./routes/subprojects'));
 app.use('/api/grouping', require('./routes/grouping'));
 
-// Health check endpoint (must be before catch-all route)
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
-});
+// Health check endpoints (must be before catch-all route)
+app.use('/health', require('./routes/health'));
 
 // Serve static assets in production
 if (process.env.NODE_ENV === 'production') {
