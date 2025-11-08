@@ -1108,7 +1108,7 @@ router.get('/excel/subproject/:subProjectId', adminAuth, async (req, res) => {
           surfaceAreaSqm: element.surfaceAreaSqm,
           fireProofingWorkflow: element.fireProofingWorkflow,
           status: element.status,
-          completedDate: element.completedDate ? new Date(element.completedDate).toLocaleDateString() : ''
+          completedDate: element.completedDate ? moment(element.completedDate).format('DD/MM/YYYY') : ''
         }).commit();
       }
       

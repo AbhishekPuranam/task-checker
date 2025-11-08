@@ -202,18 +202,13 @@ export default function SubProjectDetail() {
   const fetchAvailableFields = async () => {
     try {
       const token = localStorage.getItem('token');
-      // Add cache busting timestamp to ensure fresh data
-      const res = await axios.get(`${API_URL}/grouping/available-fields?t=${Date.now()}`, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
+      const res = await axios.get(`${API_URL}/grouping/available-fields`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
       const fields = res.data.fields || [];
       setAvailableFields(fields);
       
-      console.log('✅ [fetchAvailableFields] Loaded', fields.length, 'fields:', fields.map(f => f.label).join(', '));
+      console.log('✅ [fetchAvailableFields] Loaded', fields.length, 'fields');
       
       // Set default groupBy to 'level' after fields are loaded
       if (fields.length > 0 && !groupBy) {
@@ -404,7 +399,29 @@ export default function SubProjectDetail() {
       case 'fireProofingWorkflow':
         return element.fireProofingWorkflow || '-';
       case 'currentJob':
-        return element.currentJob?.jobTitle || '-';
+        const jobTitle = element.currentJob?.jobTitle || '-';
+        return (
+          <Box
+            component="span"
+            sx={{
+              color: '#ff6600',
+              fontWeight: 'bold',
+              animation: 'pulse 2s ease-in-out infinite',
+              '@keyframes pulse': {
+                '0%, 100%': { 
+                  opacity: 1,
+                  transform: 'scale(1)'
+                },
+                '50%': { 
+                  opacity: 0.7,
+                  transform: 'scale(1.05)'
+                }
+              }
+            }}
+          >
+            {jobTitle}
+          </Box>
+        );
       case 'jobProgress':
         return element.currentJob?.status || '-';
       default:
@@ -946,7 +963,6 @@ export default function SubProjectDetail() {
           setSelectedElement(null);
         }}
         element={selectedElement}
-        projectId={subProject?.project?._id || subProject?.project}
         onJobsUpdated={handleJobsUpdated}
       />
     </Box>
