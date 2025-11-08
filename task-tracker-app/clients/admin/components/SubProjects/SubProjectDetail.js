@@ -48,19 +48,8 @@ export default function SubProjectDetail() {
   const [subProject, setSubProject] = useState(null);
   const [project, setProject] = useState(null);
   const [activeSection, setActiveSection] = useState('active');
-  // Initialize groupBy from localStorage or default to empty
-  const [groupBy, setGroupBy] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('subproject_groupBy') || '';
-    }
-    return '';
-  });
-  const [subGroupBy, setSubGroupBy] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('subproject_subGroupBy') || '';
-    }
-    return '';
-  });
+  const [groupBy, setGroupBy] = useState(''); // Start empty, set to 'level' after fields load
+  const [subGroupBy, setSubGroupBy] = useState('');
   const [groupedData, setGroupedData] = useState(null);
   const [availableFields, setAvailableFields] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -91,25 +80,25 @@ export default function SubProjectDetail() {
   // Column visibility state - All columns enabled by default
   const [visibleColumns, setVisibleColumns] = useState({
     serialNo: true,
-    structureNumber: false,
-    drawingNo: false,
+    structureNumber: true,
+    drawingNo: true,
     level: true,
-    memberType: false,
+    memberType: true,
     gridNo: true,
     partMarkNo: true,
-    sectionSizes: false,
+    sectionSizes: true,
     lengthMm: true,
     surfaceAreaSqm: true,
-    qty: false,
-    status: false,
+    qty: true,
+    status: true,
     fireproofingThickness: true,
-    sectionDepthMm: false,
-    flangeWidthMm: false,
-    webThicknessMm: false,
-    flangeThicknessMm: false,
+    sectionDepthMm: true,
+    flangeWidthMm: true,
+    webThicknessMm: true,
+    flangeThicknessMm: true,
     fireProofingWorkflow: true,
     currentJob: true,
-    jobProgress: false
+    jobProgress: true
   });
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   
@@ -169,24 +158,6 @@ export default function SubProjectDetail() {
       fetchAvailableFields();
     }
   }, [projectId, subProjectId]);
-
-  // Persist groupBy to localStorage whenever it changes
-  useEffect(() => {
-    if (groupBy) {
-      localStorage.setItem('subproject_groupBy', groupBy);
-      console.log('💾 [SubProjectDetail] Saved groupBy to localStorage:', groupBy);
-    }
-  }, [groupBy]);
-
-  // Persist subGroupBy to localStorage whenever it changes
-  useEffect(() => {
-    if (subGroupBy) {
-      localStorage.setItem('subproject_subGroupBy', subGroupBy);
-      console.log('💾 [SubProjectDetail] Saved subGroupBy to localStorage:', subGroupBy);
-    } else {
-      localStorage.removeItem('subproject_subGroupBy');
-    }
-  }, [subGroupBy]);
 
   useEffect(() => {
     console.log('🔍 [SubProjectDetail] useEffect triggered:', { groupBy, subProjectId: subProject?._id, activeSection });
@@ -268,15 +239,10 @@ export default function SubProjectDetail() {
       
       console.log('✅ [fetchAvailableFields] Loaded', fields.length, 'fields');
       
-      // Only set default groupBy if not already set from localStorage
+      // Set default groupBy to 'currentJob' after fields are loaded
       if (fields.length > 0 && !groupBy) {
-        const savedGroupBy = localStorage.getItem('subproject_groupBy');
-        if (!savedGroupBy) {
-          console.log('📊 [fetchAvailableFields] Setting default groupBy to currentJob');
-          setGroupBy('currentJob');
-        } else {
-          console.log('📊 [fetchAvailableFields] Using saved groupBy from localStorage:', savedGroupBy);
-        }
+        console.log('📊 [fetchAvailableFields] Setting groupBy to currentJob');
+        setGroupBy('currentJob');
       }
     } catch (err) {
       console.error('Error fetching fields:', err);
