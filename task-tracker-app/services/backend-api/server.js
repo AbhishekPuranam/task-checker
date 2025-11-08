@@ -148,6 +148,15 @@ const connectWithRetry = () => {
   .then(async () => {
     console.log('MongoDB connected successfully');
     
+    // Start Upload cleanup cron job after MongoDB is connected
+    try {
+      startUploadCleanupJob();
+      console.log('✅ Upload cleanup job started successfully');
+    } catch (error) {
+      console.error('❌ Failed to start upload cleanup job:', error.message);
+      console.warn('⚠️  Stalled uploads will not be automatically cleaned up');
+    }
+    
     // Note: Database initialization scripts moved to /scripts folder
     // Run manually with: docker exec tasktracker-app-dev node create-users.js
     // Or use scripts in /scripts folder from the host machine
@@ -314,15 +323,6 @@ try {
 } catch (error) {
   console.error('❌ Failed to start Progress worker:', error.message);
   console.warn('⚠️  Progress calculation will not work in background mode');
-}
-
-// Start Upload cleanup cron job
-try {
-  startUploadCleanupJob();
-  console.log('✅ Upload cleanup job started successfully');
-} catch (error) {
-  console.error('❌ Failed to start upload cleanup job:', error.message);
-  console.warn('⚠️  Stalled uploads will not be automatically cleaned up');
 }
 
 server.listen(PORT, () => {
