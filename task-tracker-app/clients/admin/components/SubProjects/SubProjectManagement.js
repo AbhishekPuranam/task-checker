@@ -11,6 +11,7 @@ import {
   Grid,
   Card,
   CardContent,
+  CardActions,
   Chip,
   CircularProgress,
   Dialog,
@@ -19,6 +20,8 @@ import {
   DialogActions,
   TextField,
   MenuItem,
+  Avatar,
+  Divider,
 } from '@mui/material';
 import { Add, Upload, Download, Folder, ArrowBack, Edit, Delete } from '@mui/icons-material';
 
@@ -504,249 +507,183 @@ export default function SubProjectManagement() {
                     }}
                     onClick={() => navigateToSubProject(subProject)}
                   >
-                    <CardContent sx={{ p: 3 }}>
-                      {/* Header Section */}
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 3 }}>
-                        <Typography variant="h6" fontWeight="bold" sx={{ color: '#333' }}>
-                          {subProject.name}
-                        </Typography>
-                        <Chip 
-                          label={subProject.status.toUpperCase()}
-                          size="small"
-                          sx={{
-                            bgcolor: subProject.status === 'active' ? '#e8f5e9' : 
-                                     subProject.status === 'completed' ? '#f5f5f5' : '#fff3e0',
-                            color: subProject.status === 'active' ? '#2e7d32' : 
-                                   subProject.status === 'completed' ? '#616161' : '#e65100',
-                            border: `1px solid ${subProject.status === 'active' ? '#81c784' : 
-                                    subProject.status === 'completed' ? '#bdbdbd' : '#ffb74d'}`,
-                            fontWeight: 600
+                    <CardContent sx={{ flexGrow: 1, p: 3 }}>
+                      {/* Header with Avatar */}
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 2 }}>
+                        <Avatar 
+                          sx={{ 
+                            bgcolor: 'primary.main',
+                            background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)',
+                            width: 48,
+                            height: 48,
                           }}
-                        />
+                        >
+                          📊
+                        </Avatar>
+                        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                          <Typography 
+                            variant="h6" 
+                            fontWeight="bold" 
+                            sx={{ 
+                              mb: 0.5,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                            }}
+                          >
+                            {subProject.name}
+                          </Typography>
+                          <Chip 
+                            label={subProject.status.toUpperCase()}
+                            size="small"
+                            sx={{
+                              bgcolor: subProject.status === 'active' ? '#e8f5e9' : 
+                                       subProject.status === 'completed' ? '#f5f5f5' : '#fff3e0',
+                              color: subProject.status === 'active' ? '#2e7d32' : 
+                                     subProject.status === 'completed' ? '#616161' : '#e65100',
+                              fontWeight: 600,
+                              height: 24
+                            }}
+                          />
+                        </Box>
                       </Box>
                       
-                      <Typography variant="body2" sx={{ color: '#666', mb: 3 }}>
-                        Code: <Box component="span" sx={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{subProject.code}</Box>
+                      {/* Code */}
+                      <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+                        Code: <Box component="span" sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: 'text.primary' }}>{subProject.code}</Box>
                       </Typography>
 
-                      {/* Bento Grid Layout */}
-                      <Box sx={{ 
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(4, 1fr)',
-                        gridTemplateRows: 'auto auto',
-                        gap: 1.5,
-                        mb: 3
-                      }}>
-                        {/* Large Upload Button - Spans 2 columns and 2 rows */}
-                        <Box sx={{ 
-                          gridColumn: 'span 2',
-                          gridRow: 'span 2',
-                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                          borderRadius: 2,
-                          p: 2.5,
-                          cursor: 'pointer',
-                          transition: 'all 0.3s ease',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          '&:hover': {
-                            transform: 'translateY(-4px)',
-                            boxShadow: '0 12px 24px rgba(102, 126, 234, 0.4)'
-                          },
-                          '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%)',
-                            pointerEvents: 'none'
-                          }
-                        }}
+                      {/* Statistics Grid */}
+                      <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                        <Grid item xs={6}>
+                          <Box sx={{ 
+                            bgcolor: '#e3f2fd', 
+                            p: 1.5, 
+                            borderRadius: 1.5, 
+                            textAlign: 'center',
+                            border: '1px solid #90caf9'
+                          }}>
+                            <Typography variant="h6" fontWeight="bold" sx={{ color: '#1565c0' }}>
+                              {subProject.statistics?.totalElements || 0}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#1976d2' }}>Elements</Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Box sx={{ 
+                            bgcolor: '#e8f5e9', 
+                            p: 1.5, 
+                            borderRadius: 1.5, 
+                            textAlign: 'center',
+                            border: '1px solid #81c784'
+                          }}>
+                            <Typography variant="h6" fontWeight="bold" sx={{ color: '#2e7d32' }}>
+                              {subProject.statistics?.completedElements || 0}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#388e3c' }}>Completed</Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Box sx={{ 
+                            bgcolor: '#f3e5f5', 
+                            p: 1.5, 
+                            borderRadius: 1.5, 
+                            textAlign: 'center',
+                            border: '1px solid #ce93d8'
+                          }}>
+                            <Typography variant="h6" fontWeight="bold" sx={{ color: '#6a1b9a' }}>
+                              {subProject.statistics?.totalSqm?.toFixed(1) || 0}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#7b1fa2' }}>Total SQM</Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Box sx={{ 
+                            bgcolor: '#fff3e0', 
+                            p: 1.5, 
+                            borderRadius: 1.5, 
+                            textAlign: 'center',
+                            border: '1px solid #ffb74d'
+                          }}>
+                            <Typography variant="h6" fontWeight="bold" sx={{ color: '#e65100' }}>
+                              {subProject.statistics?.completedSqm?.toFixed(1) || 0}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#ef6c00' }}>Completed SQM</Typography>
+                          </Box>
+                        </Grid>
+                      </Grid>
+
+                      {/* Section Breakdown */}
+                      <Box sx={{ fontSize: '0.75rem', color: 'text.secondary', mb: 1 }}>
+                        <Typography variant="caption" display="block">
+                          Active: {subProject.statistics?.sections?.active?.count || 0} • 
+                          Non-Clearance: {subProject.statistics?.sections?.nonClearance?.count || 0} • 
+                          No Job: {subProject.statistics?.sections?.noJob?.count || 0} • 
+                          Complete: {subProject.statistics?.sections?.complete?.count || 0}
+                        </Typography>
+                      </Box>
+                    </CardContent>
+
+                    <Divider />
+
+                    {/* Action Buttons */}
+                    <CardActions sx={{ p: 2, pt: 1.5 }}>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        startIcon={<Upload />}
                         onClick={(e) => {
                           e.stopPropagation();
                           navigateToExcelUpload(subProject);
                         }}
-                        >
-                          <Box sx={{ position: 'relative', zIndex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: 1.5 }}>
-                            <Upload sx={{ fontSize: 48, color: 'white', opacity: 0.9 }} />
-                            <Typography variant="h6" sx={{ color: 'white', fontWeight: 700, textAlign: 'center' }}>
-                              Upload Excel
-                            </Typography>
-                            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)', textAlign: 'center', fontSize: '0.7rem' }}>
-                              Import structural elements
-                            </Typography>
-                          </Box>
-                        </Box>
-
-                        {/* Total Elements */}
-                        <Box sx={{ 
-                          bgcolor: '#e3f2fd', 
-                          p: 1.5, 
-                          borderRadius: 2, 
-                          border: '2px solid #90caf9',
-                          textAlign: 'center',
-                          transition: 'transform 0.2s',
-                          '&:hover': { transform: 'scale(1.05)' }
-                        }}>
-                          <Typography variant="h6" fontWeight="900" sx={{ color: '#1565c0', fontSize: '1.5rem' }}>
-                            {subProject.statistics?.totalElements || 0}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#1976d2', fontWeight: 600, fontSize: '0.65rem' }}>
-                            Elements
-                          </Typography>
-                        </Box>
-
-                        {/* Completed Elements */}
-                        <Box sx={{ 
-                          bgcolor: '#e8f5e9', 
-                          p: 1.5, 
-                          borderRadius: 2, 
-                          border: '2px solid #81c784',
-                          textAlign: 'center',
-                          transition: 'transform 0.2s',
-                          '&:hover': { transform: 'scale(1.05)' }
-                        }}>
-                          <Typography variant="h6" fontWeight="900" sx={{ color: '#2e7d32', fontSize: '1.5rem' }}>
-                            {subProject.statistics?.completedElements || 0}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#388e3c', fontWeight: 600, fontSize: '0.65rem' }}>
-                            Completed
-                          </Typography>
-                        </Box>
-
-                        {/* Total SQM */}
-                        <Box sx={{ 
-                          bgcolor: '#f3e5f5', 
-                          p: 1.5, 
-                          borderRadius: 2, 
-                          border: '2px solid #ce93d8',
-                          textAlign: 'center',
-                          transition: 'transform 0.2s',
-                          '&:hover': { transform: 'scale(1.05)' }
-                        }}>
-                          <Typography variant="h6" fontWeight="900" sx={{ color: '#6a1b9a', fontSize: '1.5rem' }}>
-                            {subProject.statistics?.totalSqm?.toFixed(1) || 0}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#7b1fa2', fontWeight: 600, fontSize: '0.65rem' }}>
-                            Total SQM
-                          </Typography>
-                        </Box>
-
-                        {/* Completed SQM */}
-                        <Box sx={{ 
-                          bgcolor: '#fff3e0', 
-                          p: 1.5, 
-                          borderRadius: 2, 
-                          border: '2px solid #ffb74d',
-                          textAlign: 'center',
-                          transition: 'transform 0.2s',
-                          '&:hover': { transform: 'scale(1.05)' }
-                        }}>
-                          <Typography variant="h6" fontWeight="900" sx={{ color: '#e65100', fontSize: '1.5rem' }}>
-                            {subProject.statistics?.completedSqm?.toFixed(1) || 0}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#ef6c00', fontWeight: 600, fontSize: '0.65rem' }}>
-                            Completed SQM
-                          </Typography>
-                        </Box>
-                      </Box>
-
-                      {/* Section Status Breakdown */}
-                      <Box sx={{ 
-                        display: 'flex', 
-                        gap: 1.5, 
-                        mb: 2.5,
-                        flexWrap: 'wrap'
-                      }}>
-                        <Chip 
-                          label={`Active: ${subProject.statistics?.sections?.active?.count || 0}`}
-                          size="small"
-                          sx={{ 
-                            bgcolor: '#e3f2fd', 
-                            color: '#1565c0',
-                            fontWeight: 600,
-                            fontSize: '0.7rem',
-                            border: '1px solid #90caf9'
-                          }}
-                        />
-                        <Chip 
-                          label={`Non-Clearance: ${subProject.statistics?.sections?.nonClearance?.count || 0}`}
-                          size="small"
-                          sx={{ 
-                            bgcolor: '#ffebee', 
-                            color: '#c62828',
-                            fontWeight: 600,
-                            fontSize: '0.7rem',
-                            border: '1px solid #ef5350'
-                          }}
-                        />
-                        <Chip 
-                          label={`No Job: ${subProject.statistics?.sections?.noJob?.count || 0}`}
-                          size="small"
-                          sx={{ 
-                            bgcolor: '#f3e5f5', 
-                            color: '#6a1b9a',
-                            fontWeight: 600,
-                            fontSize: '0.7rem',
-                            border: '1px solid #ce93d8'
-                          }}
-                        />
-                        <Chip 
-                          label={`Complete: ${subProject.statistics?.sections?.complete?.count || 0}`}
-                          size="small"
-                          sx={{ 
-                            bgcolor: '#e8f5e9', 
-                            color: '#2e7d32',
-                            fontWeight: 600,
-                            fontSize: '0.7rem',
-                            border: '1px solid #81c784'
-                          }}
-                        />
-                      </Box>
-
-                      {/* Action Buttons */}
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <Button
-                          variant="outlined"
-                          fullWidth
-                          startIcon={<Edit />}
-                          onClick={(e) => handleEditSubProject(subProject, e)}
-                          sx={{ 
-                            borderColor: '#ff9800',
-                            color: '#ff9800',
-                            '&:hover': { 
-                              borderColor: '#f57c00',
-                              bgcolor: '#fff3e0'
-                            },
-                            textTransform: 'none',
-                            fontSize: '0.75rem',
-                            fontWeight: 600
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          fullWidth
-                          startIcon={<Delete />}
-                          onClick={(e) => handleDeleteSubProject(subProject, e)}
-                          sx={{ 
-                            borderColor: '#f44336',
-                            color: '#f44336',
-                            '&:hover': { 
-                              borderColor: '#d32f2f',
-                              bgcolor: '#ffebee'
-                            },
-                            textTransform: 'none',
-                            fontSize: '0.75rem',
-                            fontWeight: 600
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      </Box>
-                    </CardContent>
+                        sx={{
+                          borderRadius: 1.5,
+                          fontWeight: 'bold',
+                          flex: 1,
+                          mr: 1,
+                          background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)',
+                          '&:hover': {
+                            background: 'linear-gradient(45deg, #1565c0 30%, #1976d2 90%)',
+                          }
+                        }}
+                      >
+                        Upload
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<Edit />}
+                        onClick={(e) => handleEditSubProject(subProject, e)}
+                        sx={{
+                          borderRadius: 1.5,
+                          fontWeight: 'bold',
+                          whiteSpace: 'nowrap',
+                          mr: 1
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="error"
+                        startIcon={<Delete />}
+                        onClick={(e) => handleDeleteSubProject(subProject, e)}
+                        sx={{
+                          borderRadius: 1.5,
+                          fontWeight: 'bold',
+                          whiteSpace: 'nowrap',
+                          '&:hover': {
+                            backgroundColor: 'error.main',
+                            color: 'white',
+                          }
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </CardActions>
                   </Card>
                 </Grid>
               ))}
