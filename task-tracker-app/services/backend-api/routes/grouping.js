@@ -7,6 +7,83 @@ const { auth } = require('../middleware/auth');
 const cache = require('../utils/cache');
 
 /**
+ * Helper function to group elements by their current job
+ */
+async function groupByCurrentJob(matchStage, page, limit, includeElements, subGroupBy) {
+  // Get all elements matching the criteria
+  const elements = await StructuralElement.find(matchStage).lean();
+  const elementIds = elements.map(e => e._id);
+  
+  // Get all jobs for these elements
+  const jobs = await Job.find({
+    structuralElement: { $in: elementIds }
+  }).sort({ orderIndex: 1 }).lean();
+  
+  // Create map of elementId -> currentJob
+  const elementJobMap = {};
+  jobs.forEach(job => {
+    const elemId = job.structuralElement.toString();
+    if (!elementJobMap[elemId]) {
+      const isCurrent = job.status === 'pending' || job.status === 'in_progress';
+      if (isCurrent || !elementJobMap[elemId]) {
+        elementJobMap[elemId] = job;
+      }
+    }
+  });
+  
+  // Group elements by current job title
+  const groups = {};
+  elements.forEach(element => {
+    const elemId = element._id.toString();
+    const currentJob = elementJobMap[elemId];
+    const jobTitle = currentJob ? currentJob.jobTitle : 'No Job';
+    
+    if (!groups[jobTitle]) {
+      groups[jobTitle] = {
+        _id: { currentJob: jobTitle },
+        count: 0,
+        totalSqm: 0,
+        totalQty: 0,
+        totalLengthMm: 0,
+        elements: []
+      };
+    }
+    
+    groups[jobTitle].count++;
+    groups[jobTitle].totalSqm += element.surfaceAreaSqm || 0;
+    groups[jobTitle].totalQty += element.qty || 0;
+    groups[jobTitle].totalLengthMm += element.lengthMm || 0;
+    groups[jobTitle].elements.push({
+      ...element,
+      currentJob: currentJob
+    });
+  });
+  
+  // Convert to array and sort alphabetically
+  const groupResults = Object.values(groups).sort((a, b) => {
+    const titleA = a._id.currentJob || '';
+    const titleB = b._id.currentJob || '';
+    return titleA.localeCompare(titleB);
+  });
+  
+  const total = groupResults.length;
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const paginatedGroups = groupResults.slice(skip, skip + parseInt(limit));
+  
+  return {
+    groups: paginatedGroups,
+    groupBy: 'currentJob',
+    subGroupBy: null,
+    pagination: {
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      pages: Math.ceil(total / parseInt(limit))
+    }
+  };
+}
+
+/**
  * @swagger
  * /api/grouping/elements:
  *   post:
@@ -72,6 +149,11 @@ router.post('/elements', auth, async (req, res) => {
       cacheKey,
       cache.CACHE_TTL.GROUPING,
       async () => {
+        // Special handling for grouping by currentJob
+        if (groupBy === 'currentJob') {
+          return await groupByCurrentJob(matchStage, page, limit, includeElements, subGroupBy);
+        }
+        
         // Build aggregation pipeline
         const pipeline = [
           { $match: matchStage }
@@ -326,6 +408,7 @@ router.get('/available-fields', auth, async (req, res) => {
       cache.CACHE_TTL.AVAILABLE_FIELDS,
       async () => {
         return [
+          { value: 'currentJob', label: 'Current Job' },
           { value: 'status', label: 'Status' },
           { value: 'level', label: 'Level' },
           { value: 'memberType', label: 'Member Type' },
