@@ -45,22 +45,25 @@ source = """
   
   # Extract service name from container name
   if exists(.container_name) {
-    .service_name = replace(.container_name, r'^tasktracker-', "")
-    .service_name = replace(.service_name, r'^/', "")
+    .service_name, err = replace(.container_name, r'^tasktracker-', "")
+    if err == null && exists(.service_name) {
+      .service_name, err2 = replace(.service_name, r'^/', "")
+    }
   } else if exists(.file) {
     # Extract from file path
-    .service_name = replace(.file, r'^.*/([^/]+)\\.log$', "$1")
+    .service_name, err = replace(.file, r'^.*/([^/]+)\\.log$', "$1")
   }
   
   # Parse log level - Supports emoji logging (🚀✅❌⚠️📊💾)
   if exists(.message) {
-    if match(.message, r'(?i)(error|err|fatal|critical)') {
+    msg = string(.message)
+    if match(msg, r'(?i)(error|err|fatal|critical)') ?? false {
       .level = "error"
-    } else if match(.message, r'(?i)(warn|warning)') {
+    } else if match(msg, r'(?i)(warn|warning)') ?? false {
       .level = "warn"
-    } else if match(.message, r'(?i)(info|information)') {
+    } else if match(msg, r'(?i)(info|information)') ?? false {
       .level = "info"
-    } else if match(.message, r'(?i)(debug|trace)') {
+    } else if match(msg, r'(?i)(debug|trace)') ?? false {
       .level = "debug"
     } else {
       .level = "info"
