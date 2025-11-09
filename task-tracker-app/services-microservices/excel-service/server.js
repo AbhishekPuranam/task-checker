@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const fs = require('fs');
+const { createBatchExcelWorker } = require('./workers/excelProcessorBatch');
 
 const app = express();
 const PORT = process.env.PORT || 5002;
@@ -26,6 +27,15 @@ mongoose.connect(mongoUri, {
   useUnifiedTopology: true
 }).then(() => {
   console.log('✅ MongoDB connected to excel-service');
+  
+  // Start the Excel processing worker
+  createBatchExcelWorker()
+    .then(worker => {
+      console.log('✅ Excel batch processing worker started');
+    })
+    .catch(err => {
+      console.error('❌ Failed to start Excel worker:', err);
+    });
 }).catch(err => {
   console.error('❌ MongoDB connection error:', err);
   process.exit(1);
