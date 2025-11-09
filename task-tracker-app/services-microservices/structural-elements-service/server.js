@@ -34,6 +34,7 @@ mongoose.connect(mongoUri, {
 // Routes
 app.use('/health', require('./routes/health'));
 app.use('/api/structural-elements', require('./routes/structuralElements'));
+app.use('/api/grouping', require('./routes/grouping'));
 
 app.use((err, req, res, next) => {
   console.error('Error:', err);
