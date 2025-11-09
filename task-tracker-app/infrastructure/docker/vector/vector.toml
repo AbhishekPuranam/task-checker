@@ -46,8 +46,8 @@ source = """
   # Extract service name from container name
   if exists(.container_name) {
     .service_name, err = replace(.container_name, r'^tasktracker-', "")
-    if err == null && exists(.service_name) {
-      .service_name, err2 = replace(.service_name, r'^/', "")
+    if exists(.service_name) {
+      .service_name = replace(.service_name, r'^/', "")
     }
   } else if exists(.file) {
     # Extract from file path
@@ -58,13 +58,13 @@ source = """
   if exists(.message) {
     msg, err3 = string(.message)
     if err3 == null {
-      if match(msg, r'(?i)(error|err|fatal|critical)') ?? false {
+      if match(msg, r'(?i)(error|err|fatal|critical)') {
         .level = "error"
-      } else if match(msg, r'(?i)(warn|warning)') ?? false {
+      } else if match(msg, r'(?i)(warn|warning)') {
         .level = "warn"
-      } else if match(msg, r'(?i)(info|information)') ?? false {
+      } else if match(msg, r'(?i)(info|information)') {
         .level = "info"
-      } else if match(msg, r'(?i)(debug|trace)') ?? false {
+      } else if match(msg, r'(?i)(debug|trace)') {
         .level = "debug"
       } else {
         .level = "info"
