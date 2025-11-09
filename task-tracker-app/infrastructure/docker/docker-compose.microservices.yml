@@ -122,10 +122,10 @@ services:
       - tasktracker-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.auth.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/auth`)"
+      - "traefik.http.routers.auth.rule=Host(`projects.sapcindia.com`) && (Path(`/`) || Path(`/login`) || PathPrefix(`/api/auth`))"
       - "traefik.http.routers.auth.entrypoints=web"
       - "traefik.http.routers.auth.priority=100"
-      - "traefik.http.routers.auth-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/auth`)"
+      - "traefik.http.routers.auth-secure.rule=Host(`projects.sapcindia.com`) && (Path(`/`) || Path(`/login`) || PathPrefix(`/api/auth`))"
       - "traefik.http.routers.auth-secure.entrypoints=websecure"
       - "traefik.http.routers.auth-secure.tls.certresolver=letsencrypt"
       - "traefik.http.routers.auth-secure.priority=100"
