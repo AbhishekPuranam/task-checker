@@ -365,11 +365,16 @@ function createBatchExcelWorker() {
         // Stage 1: Parse Excel (0-10%)
         await job.updateProgress({ stage: 'parsing', percent: 0, message: 'Parsing Excel file...' });
 
-        if (!fs.existsSync(filePath)) {
-          throw new Error(`File not found: ${filePath}`);
+        // Construct full path if only filename is provided
+        const fullFilePath = filePath.includes('/') ? filePath : path.join('/app/uploads/excel', filePath);
+        
+        console.log(`📂 [WORKER] Resolved file path: ${fullFilePath}`);
+
+        if (!fs.existsSync(fullFilePath)) {
+          throw new Error(`File not found: ${fullFilePath}`);
         }
 
-        const excelData = parseExcelFile(filePath);
+        const excelData = parseExcelFile(fullFilePath);
         if (!excelData || excelData.length === 0) {
           throw new Error('Excel file is empty or invalid');
         }
@@ -392,8 +397,8 @@ function createBatchExcelWorker() {
           uploadId,
           projectId,
           userId,
-          fileName: filePath.split('/').pop(),
-          filePath,
+          fileName: fullFilePath.split('/').pop(),
+          filePath: fullFilePath,
           totalRows: excelData.length,
           batchSize: BATCH_SIZE
         });
@@ -463,7 +468,7 @@ function createBatchExcelWorker() {
           await completeRollback(uploadSession, projectId, subProjectId);
           
           // Delete Excel file
-          deleteExcelFile(filePath);
+          deleteExcelFile(fullFilePath);
           
           throw new Error(`Upload failed: No elements were created successfully. All ${summary.failedBatches} batches failed.`);
         }
@@ -477,7 +482,7 @@ function createBatchExcelWorker() {
           await uploadSession.save();
           
           // Don't delete file yet - user might want to retry failed batches
-          console.log(`📄 [WORKER] Keeping Excel file for potential retry: ${path.basename(filePath)}`);
+          console.log(`📄 [WORKER] Keeping Excel file for potential retry: ${path.basename(fullFilePath)}`);
         } else {
           // Complete success - verify and cleanup
           console.log(`✅ [WORKER] Upload completely successful - verifying data integrity`);
@@ -491,7 +496,7 @@ function createBatchExcelWorker() {
             console.error(`Actual: ${verification.actual.elements} elements, ${verification.actual.jobs} jobs`);
             
             await completeRollback(uploadSession, projectId, subProjectId);
-            deleteExcelFile(filePath);
+            deleteExcelFile(fullFilePath);
             
             throw new Error(`Data integrity verification failed. Rolled back all changes.`);
           }
@@ -499,7 +504,7 @@ function createBatchExcelWorker() {
           console.log(`✅ [VERIFY] Data integrity confirmed - safe to cleanup Excel file`);
           
           // Delete Excel file since data is verified in database
-          deleteExcelFile(filePath);
+          deleteExcelFile(fullFilePath);
         }
 
         // Update project count (only if elements were created)
@@ -620,10 +625,16 @@ function createBatchExcelWorker() {
           }
         }
 
-        // Clean up Excel file on error
-        if (filePath) {
-          console.log(`🗑️ [WORKER] Cleaning up Excel file: ${path.basename(filePath)}`);
-          deleteExcelFile(filePath);
+        // Clean up Excel file on error - BUT only if this is the last retry attempt
+        // BullMQ will handle retries, so we shouldn't delete the file until all retries are exhausted
+        // Check if this is the last attempt before deleting
+        if (filePath && job.attemptsMade >= (job.opts?.attempts || 3)) {
+          // Construct full path if only filename is provided
+          const cleanupFilePath = filePath.includes('/') ? filePath : path.join('/app/uploads/excel', filePath);
+          console.log(`🗑️ [WORKER] Final attempt failed - cleaning up Excel file: ${path.basename(cleanupFilePath)}`);
+          deleteExcelFile(cleanupFilePath);
+        } else if (filePath) {
+          console.log(`⏳ [WORKER] Keeping file for retry (attempt ${job.attemptsMade}/${job.opts?.attempts || 3})`);
         }
 
         throw error;
