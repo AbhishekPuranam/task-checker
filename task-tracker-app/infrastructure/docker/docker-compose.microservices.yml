@@ -1,0 +1,610 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # INFRASTRUCTURE SERVICES
+  # ============================================
+  
+  # HashiCorp Vault for Secret Management
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: tasktracker-vault
+    restart: unless-stopped
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_ADDR: 'http://0.0.0.0:8200'
+      VAULT_DEV_ROOT_TOKEN_ID: 'dev-only-token'
+      VAULT_DEV_LISTEN_ADDRESS: '0.0.0.0:8200'
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - vault_data:/vault/file
+      - vault_logs:/vault/logs
+      - ./vault-config.hcl:/vault/config/vault.hcl:ro
+    command: server
+    networks:
+      - tasktracker-network
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # MongoDB Database (Replica Set for Transactions)
+  mongodb:
+    image: mongo:7.0
+    container_name: tasktracker-mongodb
+    restart: unless-stopped
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017", "--keyFile", "/data/mongodb-keyfile"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/mongodb_password
+      MONGO_INITDB_DATABASE: tasktracker
+    volumes:
+      - mongodb_data:/data/db
+      - ../../scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - ./mongodb-keyfile:/data/mongodb-keyfile:ro
+    secrets:
+      - mongodb_password
+    networks:
+      - tasktracker-network
+    healthcheck:
+      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongodb:27017'}]}) }" | mongosh -u admin -p $$(cat /run/secrets/mongodb_password) --authenticationDatabase admin --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # Redis for Caching and BullMQ
+  redis:
+    image: redis:7-alpine
+    container_name: tasktracker-redis
+    restart: unless-stopped
+    command: /bin/sh -c "redis-server --requirepass $$(cat /run/secrets/redis_password) --maxmemory 4gb --maxmemory-policy noeviction --save 60 1000 --appendonly yes --appendfsync everysec"
+    volumes:
+      - redis_data:/data
+    secrets:
+      - redis_password
+    networks:
+      - tasktracker-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================
+  # MICROSERVICES - BACKEND
+  # ============================================
+
+  # 1. Auth Service - Authentication & Authorization
+  auth-service:
+    build:
+      context: ../../services-microservices/auth-service
+      dockerfile: Dockerfile
+    container_name: tasktracker-auth-service
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    environment:
+      NODE_ENV: production
+      PORT: 6000
+      SERVICE_NAME: auth-service
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      MONGO_DB: tasktracker
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN_FILE: /run/secrets/vault_token
+    volumes:
+      - ../../uploads:/app/uploads
+      - ../../logs:/app/logs
+      - ../../shared:/app/shared:ro
+    secrets:
+      - vault_token
+      - mongodb_password
+      - jwt_secret
+      - session_secret
+      - redis_password
+    depends_on:
+      - mongodb
+      - redis
+      - vault
+    networks:
+      - tasktracker-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.auth.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/auth`)"
+      - "traefik.http.routers.auth.entrypoints=web"
+      - "traefik.http.routers.auth.priority=100"
+      - "traefik.http.routers.auth-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/auth`)"
+      - "traefik.http.routers.auth-secure.entrypoints=websecure"
+      - "traefik.http.routers.auth-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.auth-secure.priority=100"
+      - "traefik.http.services.auth.loadbalancer.server.port=6000"
+      - "traefik.http.services.auth.loadbalancer.healthcheck.path=/health"
+
+  # 2. Excel Service - Excel Upload & Batch Processing
+  excel-service:
+    build:
+      context: ../../services-microservices/excel-service
+      dockerfile: Dockerfile
+    container_name: tasktracker-excel-service
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 2048M
+        reservations:
+          cpus: '1.0'
+          memory: 1024M
+    environment:
+      NODE_ENV: production
+      PORT: 6001
+      SERVICE_NAME: excel-service
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      MONGO_DB: tasktracker
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      EXCEL_BATCH_MODE: 'true'
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN_FILE: /run/secrets/vault_token
+    volumes:
+      - ../../uploads:/app/uploads
+      - ../../logs:/app/logs
+      - ../../shared:/app/shared:ro
+    secrets:
+      - vault_token
+      - mongodb_password
+      - redis_password
+    depends_on:
+      - mongodb
+      - redis
+      - vault
+    networks:
+      - tasktracker-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.excel.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/excel`)"
+      - "traefik.http.routers.excel.entrypoints=web"
+      - "traefik.http.routers.excel.priority=90"
+      - "traefik.http.routers.excel-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/excel`)"
+      - "traefik.http.routers.excel-secure.entrypoints=websecure"
+      - "traefik.http.routers.excel-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.excel-secure.priority=90"
+      - "traefik.http.services.excel.loadbalancer.server.port=6001"
+      - "traefik.http.services.excel.loadbalancer.healthcheck.path=/health"
+
+  # 3. Project Service - Project Management & Aggregation
+  project-service:
+    build:
+      context: ../../services-microservices/project-service
+      dockerfile: Dockerfile
+    container_name: tasktracker-project-service
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    environment:
+      NODE_ENV: production
+      PORT: 6002
+      SERVICE_NAME: project-service
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      MONGO_DB: tasktracker
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN_FILE: /run/secrets/vault_token
+    volumes:
+      - ../../logs:/app/logs
+      - ../../shared:/app/shared:ro
+    secrets:
+      - vault_token
+      - mongodb_password
+      - redis_password
+    depends_on:
+      - mongodb
+      - redis
+      - vault
+    networks:
+      - tasktracker-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.project.rule=Host(`projects.sapcindia.com`) && (PathPrefix(`/api/projects`) && !PathPrefix(`/api/projects/{id}/subprojects`))"
+      - "traefik.http.routers.project.entrypoints=web"
+      - "traefik.http.routers.project.priority=70"
+      - "traefik.http.routers.project-secure.rule=Host(`projects.sapcindia.com`) && (PathPrefix(`/api/projects`) && !PathPrefix(`/api/projects/{id}/subprojects`))"
+      - "traefik.http.routers.project-secure.entrypoints=websecure"
+      - "traefik.http.routers.project-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.project-secure.priority=70"
+      - "traefik.http.services.project.loadbalancer.server.port=6002"
+      - "traefik.http.services.project.loadbalancer.healthcheck.path=/health"
+
+  # 4. SubProject Service - SubProject Management & Grouping
+  subproject-service:
+    build:
+      context: ../../services-microservices/subproject-service
+      dockerfile: Dockerfile
+    container_name: tasktracker-subproject-service
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    environment:
+      NODE_ENV: production
+      PORT: 6003
+      SERVICE_NAME: subproject-service
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      MONGO_DB: tasktracker
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN_FILE: /run/secrets/vault_token
+    volumes:
+      - ../../logs:/app/logs
+      - ../../shared:/app/shared:ro
+    secrets:
+      - vault_token
+      - mongodb_password
+      - redis_password
+    depends_on:
+      - mongodb
+      - redis
+      - vault
+    networks:
+      - tasktracker-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.subproject.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/subprojects`)"
+      - "traefik.http.routers.subproject.entrypoints=web"
+      - "traefik.http.routers.subproject.priority=80"
+      - "traefik.http.routers.subproject-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/subprojects`)"
+      - "traefik.http.routers.subproject-secure.entrypoints=websecure"
+      - "traefik.http.routers.subproject-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.subproject-secure.priority=80"
+      - "traefik.http.services.subproject.loadbalancer.server.port=6003"
+      - "traefik.http.services.subproject.loadbalancer.healthcheck.path=/health"
+
+  # 5. Structural Elements Service - 3 Replicas for High Load
+  structural-elements-service:
+    build:
+      context: ../../services-microservices/structural-elements-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 768M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    environment:
+      NODE_ENV: production
+      PORT: 6004
+      SERVICE_NAME: structural-elements-service
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      MONGO_DB: tasktracker
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN_FILE: /run/secrets/vault_token
+    volumes:
+      - ../../logs:/app/logs
+      - ../../shared:/app/shared:ro
+    secrets:
+      - vault_token
+      - mongodb_password
+      - redis_password
+    depends_on:
+      - mongodb
+      - redis
+      - vault
+    networks:
+      - tasktracker-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.structural-elements.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/structural-elements`)"
+      - "traefik.http.routers.structural-elements.entrypoints=web"
+      - "traefik.http.routers.structural-elements.priority=75"
+      - "traefik.http.routers.structural-elements-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/structural-elements`)"
+      - "traefik.http.routers.structural-elements-secure.entrypoints=websecure"
+      - "traefik.http.routers.structural-elements-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.structural-elements-secure.priority=75"
+      - "traefik.http.services.structural-elements.loadbalancer.server.port=6004"
+      - "traefik.http.services.structural-elements.loadbalancer.sticky.cookie=true"
+      - "traefik.http.services.structural-elements.loadbalancer.sticky.cookie.name=elements_sticky"
+      - "traefik.http.services.structural-elements.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.structural-elements.loadbalancer.healthcheck.interval=10s"
+
+  # 6. Jobs Service - 3 Replicas for High Load
+  jobs-service:
+    build:
+      context: ../../services-microservices/jobs-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 768M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    environment:
+      NODE_ENV: production
+      PORT: 6007
+      SERVICE_NAME: jobs-service
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      MONGO_DB: tasktracker
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN_FILE: /run/secrets/vault_token
+    volumes:
+      - ../../logs:/app/logs
+      - ../../shared:/app/shared:ro
+    secrets:
+      - vault_token
+      - mongodb_password
+      - redis_password
+    depends_on:
+      - mongodb
+      - redis
+      - vault
+    networks:
+      - tasktracker-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jobs.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/jobs`)"
+      - "traefik.http.routers.jobs.entrypoints=web"
+      - "traefik.http.routers.jobs.priority=75"
+      - "traefik.http.routers.jobs-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/jobs`)"
+      - "traefik.http.routers.jobs-secure.entrypoints=websecure"
+      - "traefik.http.routers.jobs-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.jobs-secure.priority=75"
+      - "traefik.http.services.jobs.loadbalancer.server.port=6007"
+      - "traefik.http.services.jobs.loadbalancer.sticky.cookie=true"
+      - "traefik.http.services.jobs.loadbalancer.sticky.cookie.name=jobs_sticky"
+      - "traefik.http.services.jobs.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.jobs.loadbalancer.healthcheck.interval=10s"
+
+  # 7. Metrics Service - Reports & Analytics
+  metrics-service:
+    build:
+      context: ../../services-microservices/metrics-service
+      dockerfile: Dockerfile
+    container_name: tasktracker-metrics-service
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 768M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    environment:
+      NODE_ENV: production
+      PORT: 6010
+      SERVICE_NAME: metrics-service
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      MONGO_DB: tasktracker
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN_FILE: /run/secrets/vault_token
+    volumes:
+      - ../../logs:/app/logs
+      - ../../shared:/app/shared:ro
+    secrets:
+      - vault_token
+      - mongodb_password
+      - redis_password
+    depends_on:
+      - mongodb
+      - redis
+      - vault
+    networks:
+      - tasktracker-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.metrics.rule=Host(`projects.sapcindia.com`) && (PathPrefix(`/api/reports`) || PathPrefix(`/api/metrics`))"
+      - "traefik.http.routers.metrics.entrypoints=web"
+      - "traefik.http.routers.metrics.priority=80"
+      - "traefik.http.routers.metrics-secure.rule=Host(`projects.sapcindia.com`) && (PathPrefix(`/api/reports`) || PathPrefix(`/api/metrics`))"
+      - "traefik.http.routers.metrics-secure.entrypoints=websecure"
+      - "traefik.http.routers.metrics-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.metrics-secure.priority=80"
+      - "traefik.http.services.metrics.loadbalancer.server.port=6010"
+      - "traefik.http.services.metrics.loadbalancer.healthcheck.path=/health"
+
+  # ============================================
+  # UI SERVICES - FRONTEND
+  # ============================================
+
+  # Admin UI - 2 Replicas
+  tasktracker-admin:
+    build:
+      context: ../../clients/admin
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: https://projects.sapcindia.com/api
+    depends_on:
+      - auth-service
+      - project-service
+    networks:
+      - tasktracker-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.admin.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/admin`)"
+      - "traefik.http.routers.admin.entrypoints=web"
+      - "traefik.http.routers.admin.priority=50"
+      - "traefik.http.routers.admin-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/admin`)"
+      - "traefik.http.routers.admin-secure.entrypoints=websecure"
+      - "traefik.http.routers.admin-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.admin-secure.priority=50"
+      - "traefik.http.services.admin.loadbalancer.server.port=3002"
+      - "traefik.http.services.admin.loadbalancer.sticky.cookie=true"
+      - "traefik.http.services.admin.loadbalancer.sticky.cookie.name=admin_sticky"
+
+  # Engineer UI - 2 Replicas
+  tasktracker-engineer:
+    build:
+      context: ../../clients/engineer
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: https://projects.sapcindia.com/api
+    depends_on:
+      - auth-service
+      - jobs-service
+    networks:
+      - tasktracker-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.engineer.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/engineer`)"
+      - "traefik.http.routers.engineer.entrypoints=web"
+      - "traefik.http.routers.engineer.priority=50"
+      - "traefik.http.routers.engineer-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/engineer`)"
+      - "traefik.http.routers.engineer-secure.entrypoints=websecure"
+      - "traefik.http.routers.engineer-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.engineer-secure.priority=50"
+      - "traefik.http.services.engineer.loadbalancer.server.port=3001"
+      - "traefik.http.services.engineer.loadbalancer.sticky.cookie=true"
+      - "traefik.http.services.engineer.loadbalancer.sticky.cookie.name=engineer_sticky"
+
+  # ============================================
+  # MONITORING & OBSERVABILITY
+  # ============================================
+
+  # Uptime Kuma - Service Monitoring
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    restart: unless-stopped
+    environment:
+      - UPTIME_KUMA_DISABLE_FRAME_SAMEORIGIN=true
+    ports:
+      - "3001:3001"
+    volumes:
+      - uptime_kuma_data:/app/data
+    networks:
+      - tasktracker-network
+
+  # ============================================
+  # API GATEWAY & LOAD BALANCER
+  # ============================================
+
+  # Traefik Reverse Proxy
+  traefik:
+    image: traefik:v2.10
+    container_name: tasktracker-traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - traefik_letsencrypt:/letsencrypt
+    networks:
+      - tasktracker-network
+    labels:
+      - "traefik.enable=true"
+      # Dashboard
+      - "traefik.http.routers.traefik.rule=Host(`traefik.projects.sapcindia.com`)"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
+
+# ============================================
+# SECRETS MANAGEMENT
+# ============================================
+secrets:
+  vault_token:
+    file: ./secrets/vault_token
+  mongodb_password:
+    file: ./secrets/mongodb_password
+  redis_password:
+    file: ./secrets/redis_password
+  jwt_secret:
+    file: ./secrets/jwt_secret
+  session_secret:
+    file: ./secrets/session_secret
+
+# ============================================
+# PERSISTENT VOLUMES
+# ============================================
+volumes:
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+  traefik_letsencrypt:
+    driver: local
+  vault_data:
+    driver: local
+  vault_logs:
+    driver: local
+  uptime_kuma_data:
+    driver: local
+
+# ============================================
+# NETWORKING
+# ============================================
+networks:
+  tasktracker-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
