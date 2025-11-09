@@ -85,65 +85,50 @@ source = """
 type = "route"
 inputs = ["enrich"]
 
-# Auth Service routes
 [transforms.route_by_service.route.auth_service]
-type = "check_fields"
-"service_name.eq" = "auth-service"
+.service_name == "auth-service"
 
-# Excel Service routes
 [transforms.route_by_service.route.excel_service]
-type = "check_fields"
-"service_name.eq" = "excel-service"
+.service_name == "excel-service"
 
-# Project Service routes
 [transforms.route_by_service.route.project_service]
-type = "check_fields"
-"service_name.eq" = "project-service"
+.service_name == "project-service"
 
-# SubProject Service routes
 [transforms.route_by_service.route.subproject_service]
-type = "check_fields"
-"service_name.eq" = "subproject-service"
+.service_name == "subproject-service"
 
-# Structural Elements Service routes
 [transforms.route_by_service.route.structural_elements_service]
-type = "check_fields"
-"service_name.eq" = "structural-elements-service"
+.service_name == "structural-elements-service"
 
-# Jobs Service routes
 [transforms.route_by_service.route.jobs_service]
-type = "check_fields"
-"service_name.eq" = "jobs-service"
+.service_name == "jobs-service"
 
-# Metrics Service routes
 [transforms.route_by_service.route.metrics_service]
-type = "check_fields"
-"service_name.eq" = "metrics-service"
+.service_name == "metrics-service"
 
-# MongoDB routes
 [transforms.route_by_service.route.mongodb]
-type = "check_fields"
-"service_name.eq" = "mongodb"
+.service_name == "mongodb"
 
-# Redis routes
 [transforms.route_by_service.route.redis]
-type = "check_fields"
-"service_name.eq" = "redis"
+.service_name == "redis"
 
-# Traefik routes
 [transforms.route_by_service.route.traefik]
-type = "check_fields"
-"service_name.eq" = "traefik"
+.service_name == "traefik"
 
-# Vault routes
 [transforms.route_by_service.route.vault]
-type = "check_fields"
-"service_name.eq" = "vault"
+.service_name == "vault"
 
-# Uptime Kuma routes
 [transforms.route_by_service.route.uptime_kuma]
-type = "check_fields"
-"service_name.eq" = "uptime-kuma"
+.service_name == "uptime-kuma"
+
+[transforms.route_by_service.route.admin_ui]
+contains(string!(.container_name), "admin")
+
+[transforms.route_by_service.route.engineer_ui]
+contains(string!(.container_name), "engineer")
+
+[transforms.route_by_service.route.other]
+true
 
 # ============================================
 # SINKS - OpenSearch Outputs (Separate Index per Service)
@@ -328,6 +313,51 @@ auth.password = "Admin@123456"
 
 [sinks.opensearch_uptime.bulk]
 index = "logs-uptime-kuma-%Y.%m.%d"
+
+# Admin UI Sink
+[sinks.opensearch_admin_ui]
+type = "elasticsearch"
+inputs = ["route_by_service.admin_ui"]
+endpoints = ["http://opensearch:9200"]
+mode = "bulk"
+api_version = "v8"
+suppress_type_name = true
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "Admin@123456"
+
+[sinks.opensearch_admin_ui.bulk]
+index = "logs-admin-ui-%Y.%m.%d"
+
+# Engineer UI Sink
+[sinks.opensearch_engineer_ui]
+type = "elasticsearch"
+inputs = ["route_by_service.engineer_ui"]
+endpoints = ["http://opensearch:9200"]
+mode = "bulk"
+api_version = "v8"
+suppress_type_name = true
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "Admin@123456"
+
+[sinks.opensearch_engineer_ui.bulk]
+index = "logs-engineer-ui-%Y.%m.%d"
+
+# Other Services Sink (catch-all)
+[sinks.opensearch_other]
+type = "elasticsearch"
+inputs = ["route_by_service.other"]
+endpoints = ["http://opensearch:9200"]
+mode = "bulk"
+api_version = "v8"
+suppress_type_name = true
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "Admin@123456"
+
+[sinks.opensearch_other.bulk]
+index = "logs-other-%Y.%m.%d"
 
 # ============================================
 # DEBUG SINK (Optional - for troubleshooting)
