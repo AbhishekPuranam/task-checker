@@ -31,11 +31,12 @@ mongoose.connect(mongoUri, {
   process.exit(1);
 });
 
-// Load models to register schemas
-require('./shared/models/Project');
+// Load models to register schemas (Task model is used as Project)
+require('./shared/models/Task');
 require('./shared/models/SubProject');
 require('./shared/models/StructuralElement');
 require('./shared/models/User');
+require('./shared/models/Job');
 
 // Routes
 app.use('/health', require('./routes/health'));

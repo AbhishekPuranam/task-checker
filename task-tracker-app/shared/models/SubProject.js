@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
 
 const subProjectSchema = new mongoose.Schema({
-  // Link to parent project (Project model)
+  // Link to parent project (Task model is used as Project)
   project: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Project',
+    ref: 'Task',
     required: true,
     index: true
   },
