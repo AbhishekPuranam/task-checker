@@ -345,12 +345,12 @@ services:
       - "traefik.http.routers.grouping.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/grouping`)"
       - "traefik.http.routers.grouping.entrypoints=web"
       - "traefik.http.routers.grouping.priority=76"
+      - "traefik.http.routers.grouping.service=structural-elements"
       - "traefik.http.routers.grouping-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/grouping`)"
       - "traefik.http.routers.grouping-secure.entrypoints=websecure"
       - "traefik.http.routers.grouping-secure.tls.certresolver=letsencrypt"
       - "traefik.http.routers.grouping-secure.priority=76"
-      - "traefik.http.services.grouping.loadbalancer.server.port=6004"
-      - "traefik.http.services.grouping.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.routers.grouping-secure.service=structural-elements"
 
   # 6. Jobs Service - 3 Replicas for High Load
   jobs-service:
