@@ -77,7 +77,7 @@ docker-compose up -d
 - [ ] SSH'd into production server
 - [ ] Navigated to correct directory
 - [ ] Pulled latest changes
-- [ ] Built Docker containers
+- [ ] Built Docker containers using docker compose build
 - [ ] Deployed with docker-compose
 - [ ] Verified services are running
 - [ ] Checked logs in OpenSearch

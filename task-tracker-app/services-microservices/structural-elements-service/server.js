@@ -33,7 +33,7 @@ mongoose.connect(mongoUri, {
 
 // Routes
 app.use('/health', require('./routes/health'));
-// TODO: Add your routes here
+app.use('/api/structural-elements', require('./routes/structuralElements'));
 
 app.use((err, req, res, next) => {
   console.error('Error:', err);

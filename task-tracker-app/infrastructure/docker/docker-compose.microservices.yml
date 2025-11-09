@@ -122,6 +122,7 @@ services:
       - tasktracker-network
     labels:
       - "traefik.enable=true"
+      # Route /api/auth to auth service
       - "traefik.http.routers.auth.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/auth`)"
       - "traefik.http.routers.auth.entrypoints=web"
       - "traefik.http.routers.auth.priority=100"
@@ -129,6 +130,14 @@ services:
       - "traefik.http.routers.auth-secure.entrypoints=websecure"
       - "traefik.http.routers.auth-secure.tls.certresolver=letsencrypt"
       - "traefik.http.routers.auth-secure.priority=100"
+      # Route /login and / (root) to auth service for login page
+      - "traefik.http.routers.auth-login.rule=Host(`projects.sapcindia.com`) && (Path(`/`) || Path(`/login`))"
+      - "traefik.http.routers.auth-login.entrypoints=web"
+      - "traefik.http.routers.auth-login.priority=10"
+      - "traefik.http.routers.auth-login-secure.rule=Host(`projects.sapcindia.com`) && (Path(`/`) || Path(`/login`))"
+      - "traefik.http.routers.auth-login-secure.entrypoints=websecure"
+      - "traefik.http.routers.auth-login-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.auth-login-secure.priority=10"
       - "traefik.http.services.auth.loadbalancer.server.port=6000"
       - "traefik.http.services.auth.loadbalancer.healthcheck.path=/health"
 

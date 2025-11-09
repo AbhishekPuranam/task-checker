@@ -33,7 +33,8 @@ mongoose.connect(mongoUri, {
 
 // Routes
 app.use('/health', require('./routes/health'));
-// TODO: Add your routes here
+app.use('/api/reports', require('./routes/reports'));
+app.use('/api/metrics', require('./routes/reports')); // Same reports route for metrics endpoint
 
 app.use((err, req, res, next) => {
   console.error('Error:', err);
