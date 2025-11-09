@@ -178,10 +178,13 @@ services:
       - "traefik.http.routers.excel.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/excel`)"
       - "traefik.http.routers.excel.entrypoints=web"
       - "traefik.http.routers.excel.priority=90"
+      - "traefik.http.routers.excel.middlewares=excel-stripprefix"
       - "traefik.http.routers.excel-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/excel`)"
       - "traefik.http.routers.excel-secure.entrypoints=websecure"
       - "traefik.http.routers.excel-secure.tls.certresolver=letsencrypt"
       - "traefik.http.routers.excel-secure.priority=90"
+      - "traefik.http.routers.excel-secure.middlewares=excel-stripprefix"
+      - "traefik.http.middlewares.excel-stripprefix.stripprefix.prefixes=/api/excel"
       - "traefik.http.services.excel.loadbalancer.server.port=6001"
       - "traefik.http.services.excel.loadbalancer.healthcheck.path=/health"
 
