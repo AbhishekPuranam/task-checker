@@ -1,10 +1,10 @@
 const { Worker } = require('bullmq');
 const fs = require('fs');
 const path = require('path');
-const StructuralElement = require('../models/StructuralElement');
-const Task = require('../models/Task');
-const Job = require('../models/Job');
-const UploadSession = require('../models/UploadSession');
+const StructuralElement = require('../shared/models/StructuralElement');
+const Task = require('../shared/models/Task');
+const Job = require('../shared/models/Job');
+const UploadSession = require('../shared/models/UploadSession');
 const { invalidateCache } = require('../middleware/cache');
 const { addProgressJob } = require('../utils/queue');
 const mongoose = require('mongoose');
@@ -98,7 +98,7 @@ async function completeRollback(uploadSession, projectId, subProjectId = null) {
 
         // Update subproject count if applicable
         if (subProjectId) {
-          const SubProject = require('../models/SubProject');
+          const SubProject = require('../shared/models/SubProject');
           await SubProject.findByIdAndUpdate(
             subProjectId,
             { $inc: { structuralElementsCount: -deletionStats.elementsDeleted } }
@@ -511,7 +511,7 @@ function createBatchExcelWorker() {
           
           // Update subproject count if subProjectId is provided
           if (subProjectId) {
-            const SubProject = require('../models/SubProject');
+            const SubProject = require('../shared/models/SubProject');
             await SubProject.findByIdAndUpdate(
               subProjectId,
               { $inc: { structuralElementsCount: summary.totalElementsCreated } }
