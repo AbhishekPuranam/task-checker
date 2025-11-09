@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const SubProject = require('../shared/models/SubProject');
+const Project = require('../shared/models/Project');
 const StructuralElement = require('../shared/models/StructuralElement');
 const { auth, adminAuth } = require('../shared/middleware/auth');
 const cache = require('../shared/utils/cache');
