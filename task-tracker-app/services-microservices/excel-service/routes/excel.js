@@ -524,6 +524,10 @@ router.post('/upload/:projectId/:subProjectId', auth, upload.single('excelFile')
     
     console.log(`✅ [UPLOAD] All validations passed for SubProject: ${subProject.name}`);
     
+    // Log the actual req.file.path value
+    console.log(`📂 [UPLOAD] req.file.path value: ${req.file.path}`);
+    console.log(`📂 [UPLOAD] req.file object:`, JSON.stringify(req.file, null, 2));
+    
     // Queue the job for async processing with subProjectId
     const job = await addExcelJob({
       filePath: req.file.path,
