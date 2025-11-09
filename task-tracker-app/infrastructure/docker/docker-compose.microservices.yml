@@ -132,14 +132,14 @@ services:
       - "traefik.http.services.auth.loadbalancer.server.port=6000"
       - "traefik.http.services.auth.loadbalancer.healthcheck.path=/health"
       # Login page route
-      - "traefik.http.routers.login.rule=Host(`projects.sapcindia.com`) && (Path(`/login`) || Path(`/`))"
+      - "traefik.http.routers.login.rule=Host(`projects.sapcindia.com`) && (PathPrefix(`/login`) || Path(`/`))"
       - "traefik.http.routers.login.entrypoints=web"
-      - "traefik.http.routers.login.priority=90"
+      - "traefik.http.routers.login.priority=40"
       - "traefik.http.routers.login.service=auth"
-      - "traefik.http.routers.login-secure.rule=Host(`projects.sapcindia.com`) && (Path(`/login`) || Path(`/`))"
+      - "traefik.http.routers.login-secure.rule=Host(`projects.sapcindia.com`) && (PathPrefix(`/login`) || Path(`/`))"
       - "traefik.http.routers.login-secure.entrypoints=websecure"
       - "traefik.http.routers.login-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.login-secure.priority=90"
+      - "traefik.http.routers.login-secure.priority=40"
       - "traefik.http.routers.login-secure.service=auth"
 
   # 2. Excel Service - Excel Upload & Batch Processing
