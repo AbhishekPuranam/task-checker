@@ -1,110 +1,58 @@
 #!/bin/bash
 
-# ============================================
-# OpenSearch Deployment Script
-# Deploys OpenSearch with Vector log collection
-# ============================================
+# Deploy OpenSearch with Vector Log Collection
+# Creates separate indices and dashboards for each service
 
 set -e
 
-cd "$(dirname "$0")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOCKER_DIR="$SCRIPT_DIR"
 
-echo "============================================"
-echo "OpenSearch Deployment"
-echo "============================================"
+echo "🚀 Deploying OpenSearch with Vector Log Collection..."
 echo ""
 
-# Check if network exists
-if ! docker network inspect tasktracker-network >/dev/null 2>&1; then
-    echo "Creating tasktracker-network..."
-    docker network create tasktracker-network
-    echo "✓ Network created"
-else
-    echo "✓ Network already exists"
-fi
-echo ""
-
-# Deploy OpenSearch stack
-echo "Deploying OpenSearch stack..."
+# Step 1: Deploy OpenSearch stack
+echo "📦 Step 1: Deploying OpenSearch and Dashboards..."
+cd "$DOCKER_DIR"
 docker compose -f docker-compose.opensearch.yml up -d
 
 echo ""
-echo "Waiting for services to be healthy..."
+echo "⏳ Waiting for OpenSearch to be healthy..."
 sleep 30
 
-# Check service health
+# Check OpenSearch health
+until curl -s -k -u admin:Admin@123456 http://localhost:9200/_cluster/health > /dev/null 2>&1; do
+    echo "Waiting for OpenSearch..."
+    sleep 10
+done
+
+echo "✅ OpenSearch is healthy!"
+
+# Step 2: Setup index patterns
 echo ""
-echo "Checking service health..."
+echo "📊 Step 2: Creating index patterns and templates..."
+cd "$DOCKER_DIR/scripts"
+chmod +x setup-opensearch-indices.sh
+./setup-opensearch-indices.sh
 
-# Check OpenSearch
-echo -n "OpenSearch: "
-if curl -s -u admin:Admin@123456 http://localhost:9200/_cluster/health > /dev/null 2>&1; then
-    echo "✓ Healthy"
-else
-    echo "✗ Not responding"
-fi
-
-# Check OpenSearch Dashboards
-echo -n "OpenSearch Dashboards: "
-if curl -s http://localhost:5601/api/status > /dev/null 2>&1; then
-    echo "✓ Healthy"
-else
-    echo "✗ Not responding"
-fi
-
-# Check Vector
-echo -n "Vector: "
-if docker ps | grep -q tasktracker-vector; then
-    echo "✓ Running"
-else
-    echo "✗ Not running"
-fi
-
+# Step 3: Create dashboards
 echo ""
-echo "============================================"
-echo "Setting up Index Patterns and Dashboards..."
-echo "============================================"
+echo "🎨 Step 3: Creating service dashboards..."
+chmod +x create-opensearch-dashboards.sh
+./create-opensearch-dashboards.sh
+
+# Step 4: Show status
 echo ""
-
-# Wait a bit more for dashboards to be fully ready
-sleep 10
-
-# Run setup script
-if [ -f "./setup-opensearch-dashboards.sh" ]; then
-    chmod +x ./setup-opensearch-dashboards.sh
-    ./setup-opensearch-dashboards.sh
-else
-    echo "Warning: setup-opensearch-dashboards.sh not found"
-fi
+echo "📊 Step 4: OpenSearch Stack Status..."
+cd "$DOCKER_DIR"
+docker compose -f docker-compose.opensearch.yml ps
 
 echo ""
-echo "============================================"
-echo "Deployment Complete!"
-echo "============================================"
+echo "✅ OpenSearch deployment complete!"
 echo ""
-echo "Services:"
-echo "  OpenSearch:           http://localhost:9200"
-echo "  OpenSearch Dashboards: http://localhost:5601"
+echo "🌐 Access Points:"
+echo "   - OpenSearch: http://localhost:9200"
+echo "   - OpenSearch Dashboards: http://localhost:5601"
+echo "   - Username: admin"
+echo "   - Password: Admin@123456"
 echo ""
-echo "Credentials:"
-echo "  Username: admin"
-echo "  Password: Admin@123456"
-echo ""
-echo "Index Patterns:"
-echo "  - logs-auth-service-*"
-echo "  - logs-excel-service-*"
-echo "  - logs-project-service-*"
-echo "  - logs-subproject-service-*"
-echo "  - logs-structural-elements-service-*"
-echo "  - logs-jobs-service-*"
-echo "  - logs-metrics-service-*"
-echo "  - logs-mongodb-*"
-echo "  - logs-redis-*"
-echo "  - logs-traefik-*"
-echo "  - logs-vault-*"
-echo "  - logs-uptime-kuma-*"
-echo ""
-echo "View logs:"
-echo "  docker compose -f docker-compose.opensearch.yml logs -f"
-echo ""
-echo "============================================"
