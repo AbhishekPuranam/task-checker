@@ -122,7 +122,6 @@ services:
       - tasktracker-network
     labels:
       - "traefik.enable=true"
-      # Route /api/auth to auth service
       - "traefik.http.routers.auth.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/auth`)"
       - "traefik.http.routers.auth.entrypoints=web"
       - "traefik.http.routers.auth.priority=100"
@@ -130,14 +129,6 @@ services:
       - "traefik.http.routers.auth-secure.entrypoints=websecure"
       - "traefik.http.routers.auth-secure.tls.certresolver=letsencrypt"
       - "traefik.http.routers.auth-secure.priority=100"
-      # Route /login and / (root) to auth service for login page
-      - "traefik.http.routers.auth-login.rule=Host(`projects.sapcindia.com`) && (Path(`/`) || Path(`/login`))"
-      - "traefik.http.routers.auth-login.entrypoints=web"
-      - "traefik.http.routers.auth-login.priority=10"
-      - "traefik.http.routers.auth-login-secure.rule=Host(`projects.sapcindia.com`) && (Path(`/`) || Path(`/login`))"
-      - "traefik.http.routers.auth-login-secure.entrypoints=websecure"
-      - "traefik.http.routers.auth-login-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.auth-login-secure.priority=10"
       - "traefik.http.services.auth.loadbalancer.server.port=6000"
       - "traefik.http.services.auth.loadbalancer.healthcheck.path=/health"
 
@@ -227,7 +218,6 @@ services:
       - vault_token
       - mongodb_password
       - redis_password
-      - jwt_secret
     depends_on:
       - mongodb
       - redis
@@ -279,7 +269,6 @@ services:
       - vault_token
       - mongodb_password
       - redis_password
-      - jwt_secret
     depends_on:
       - mongodb
       - redis
@@ -331,7 +320,6 @@ services:
       - vault_token
       - mongodb_password
       - redis_password
-      - jwt_secret
     depends_on:
       - mongodb
       - redis
@@ -352,6 +340,15 @@ services:
       - "traefik.http.services.structural-elements.loadbalancer.sticky.cookie.name=elements_sticky"
       - "traefik.http.services.structural-elements.loadbalancer.healthcheck.path=/health"
       - "traefik.http.services.structural-elements.loadbalancer.healthcheck.interval=10s"
+      - "traefik.http.routers.grouping.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/grouping`)"
+      - "traefik.http.routers.grouping.entrypoints=web"
+      - "traefik.http.routers.grouping.priority=76"
+      - "traefik.http.routers.grouping-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/grouping`)"
+      - "traefik.http.routers.grouping-secure.entrypoints=websecure"
+      - "traefik.http.routers.grouping-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.grouping-secure.priority=76"
+      - "traefik.http.services.grouping.loadbalancer.server.port=6004"
+      - "traefik.http.services.grouping.loadbalancer.healthcheck.path=/health"
 
   # 6. Jobs Service - 3 Replicas for High Load
   jobs-service:
@@ -386,7 +383,6 @@ services:
       - vault_token
       - mongodb_password
       - redis_password
-      - jwt_secret
     depends_on:
       - mongodb
       - redis
@@ -441,7 +437,6 @@ services:
       - vault_token
       - mongodb_password
       - redis_password
-      - jwt_secret
     depends_on:
       - mongodb
       - redis

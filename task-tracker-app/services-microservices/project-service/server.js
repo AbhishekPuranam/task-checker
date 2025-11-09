@@ -12,16 +12,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Add request logging middleware
-app.use((req, res, next) => {
-  console.log(`📝 ${req.method} ${req.path} - Headers:`, {
-    authorization: req.headers.authorization ? 'present' : 'missing',
-    host: req.headers.host,
-    origin: req.headers.origin
-  });
-  next();
-});
-
 // MongoDB connection
 const MONGODB_PASSWORD = fs.existsSync('/run/secrets/mongodb_password') 
   ? fs.readFileSync('/run/secrets/mongodb_password', 'utf8').trim()
@@ -43,11 +33,7 @@ mongoose.connect(mongoUri, {
 
 // Routes
 app.use('/health', require('./routes/health'));
-
-// Handle both /api/projects (from Traefik) and / (if path is stripped)
 app.use('/api/projects', require('./routes/projects'));
-// Also handle if Traefik strips the prefix
-app.use('/', require('./routes/projects'));
 
 app.use((err, req, res, next) => {
   console.error('Error:', err);

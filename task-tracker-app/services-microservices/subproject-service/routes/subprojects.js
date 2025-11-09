@@ -163,10 +163,18 @@ router.get('/:id', auth, async (req, res) => {
 router.get('/by-name/:projectId/:subProjectName', auth, async (req, res) => {
   try {
     const { projectId, subProjectName } = req.params;
-    
+    if (!projectId || !subProjectName) {
+      console.error('❌ Missing projectId or subProjectName', { projectId, subProjectName });
+      return res.status(400).json({ error: 'Missing projectId or subProjectName' });
+    }
+
     // Decode the subproject name from URL
     const decodedName = decodeURIComponent(subProjectName);
-    
+    if (!decodedName || decodedName.length < 2) {
+      console.error('❌ Invalid subProjectName', { subProjectName, decodedName });
+      return res.status(400).json({ error: 'Invalid subProjectName' });
+    }
+
     // Try to find by name or code (case insensitive)
     const subProject = await SubProject.findOne({
       project: projectId,
@@ -178,20 +186,30 @@ router.get('/by-name/:projectId/:subProjectName', auth, async (req, res) => {
       .populate('project', 'title description')
       .populate('createdBy', 'name email')
       .lean();
-    
+
     if (!subProject) {
+      console.error('❌ SubProject not found', { projectId, decodedName });
       return res.status(404).json({ error: 'SubProject not found' });
     }
-    
+
     // Always calculate statistics on-the-fly to ensure fresh data
-    console.log('📊 Calculating statistics for subproject:', subProject._id);
-    const stats = await SubProject.recalculateStatistics(subProject._id);
-    console.log('📊 Calculated statistics:', JSON.stringify(stats, null, 2));
-    subProject.statistics = stats;
-    
+    try {
+      console.log('📊 Calculating statistics for subproject:', subProject._id);
+      const stats = await SubProject.recalculateStatistics(subProject._id);
+      console.log('📊 Calculated statistics:', JSON.stringify(stats, null, 2));
+      subProject.statistics = stats;
+    } catch (statsError) {
+      console.error('❌ Error calculating statistics:', statsError);
+      subProject.statistics = { error: statsError.message };
+    }
+
     res.json(subProject);
   } catch (error) {
-    console.error('Error fetching SubProject by name:', error);
+    console.error('❌ Error fetching SubProject by name:', {
+      error: error.message,
+      stack: error.stack,
+      params: req.params
+    });
     res.status(500).json({ error: error.message });
   }
 });
