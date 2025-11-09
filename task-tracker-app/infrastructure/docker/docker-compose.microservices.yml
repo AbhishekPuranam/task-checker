@@ -378,6 +378,7 @@ services:
       - vault_token
       - mongodb_password
       - redis_password
+      - jwt_secret
     depends_on:
       - mongodb
       - redis
