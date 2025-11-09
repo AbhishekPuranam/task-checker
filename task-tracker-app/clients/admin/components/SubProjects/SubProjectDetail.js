@@ -27,7 +27,11 @@ import {
   IconButton,
   Tooltip,
   TextField,
-  InputAdornment
+  InputAdornment,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Collapse
 } from '@mui/material';
 import { ArrowBack, Download, ViewModule as ViewModuleIcon, Settings as SettingsIcon, Search as SearchIcon, Work as WorkIcon, ExpandMore as ExpandMoreIcon, ExpandLess as ExpandLessIcon, Close as CloseIcon, Info as InfoIcon } from '@mui/icons-material';
 import JobManagementDialog from '../Jobs/JobManagementDialog';
@@ -58,6 +62,10 @@ export default function SubProjectDetail() {
   
   // Client-side cache for grouped data by section
   const [cachedGroupedData, setCachedGroupedData] = useState({});
+  
+  // Track which groups are expanded for lazy loading
+  const [expandedGroups, setExpandedGroups] = useState({});
+  const [groupElementsLoading, setGroupElementsLoading] = useState({});
   
   // Pagination state - per group
   const [groupPages, setGroupPages] = useState({});
@@ -250,10 +258,10 @@ export default function SubProjectDetail() {
     }
   };
 
-  const fetchGroupedData = async (forceRefresh = false) => {
+  const fetchGroupedData = async (forceRefresh = false, includeElements = false) => {
     try {
       // Create cache key based on current parameters
-      const cacheKey = `${activeSection}-${groupBy}-${subGroupBy || 'none'}`;
+      const cacheKey = `${activeSection}-${groupBy}-${subGroupBy || 'none'}-${includeElements ? 'full' : 'metrics'}`;
       
       // Check if we have cached data for this section (unless forcing refresh)
       if (!forceRefresh && cachedGroupedData[cacheKey]) {
@@ -269,7 +277,8 @@ export default function SubProjectDetail() {
         subProjectId: subProject._id,
         status: activeSection,
         groupBy,
-        subGroupBy: subGroupBy || undefined
+        subGroupBy: subGroupBy || undefined,
+        includeElements
       });
       
       const res = await axios.post(
@@ -280,8 +289,8 @@ export default function SubProjectDetail() {
           groupBy,
           subGroupBy: subGroupBy || undefined,
           page: 1,
-          limit: 10000, // Fetch all elements
-          includeElements: true // Request full element details
+          limit: 10000, // Fetch all groups
+          includeElements: includeElements // Only fetch elements if requested
         },
         {
           headers: { Authorization: `Bearer ${token}` }
@@ -302,6 +311,60 @@ export default function SubProjectDetail() {
       alert('Failed to load grouped data');
     } finally {
       setLoadingGroups(false);
+    }
+  };
+
+  // Fetch elements for a specific group when expanded
+  const fetchGroupElements = async (groupIndex) => {
+    if (expandedGroups[groupIndex] || groupElementsLoading[groupIndex]) {
+      return; // Already loaded or loading
+    }
+    
+    try {
+      setGroupElementsLoading(prev => ({ ...prev, [groupIndex]: true }));
+      
+      const token = localStorage.getItem('token');
+      const group = groupedData.groups[groupIndex];
+      
+      // Build filter criteria based on group ID
+      const filterCriteria = {};
+      if (groupBy && group._id[groupBy]) {
+        filterCriteria[groupBy] = group._id[groupBy];
+      }
+      if (subGroupBy && group._id[subGroupBy]) {
+        filterCriteria[subGroupBy] = group._id[subGroupBy];
+      }
+      
+      console.log('📊 [fetchGroupElements] Fetching elements for group:', { groupIndex, filterCriteria });
+      
+      const res = await axios.post(
+        `${API_URL}/grouping/elements`,
+        {
+          subProjectId: subProject._id,
+          status: activeSection,
+          groupBy,
+          subGroupBy: subGroupBy || undefined,
+          page: 1,
+          limit: 10000,
+          includeElements: true
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      
+      // Update the specific group with full elements
+      setGroupedData(prev => {
+        const newData = { ...prev };
+        newData.groups[groupIndex] = res.data.groups[groupIndex];
+        return newData;
+      });
+      
+      setExpandedGroups(prev => ({ ...prev, [groupIndex]: true }));
+    } catch (err) {
+      console.error('❌ [fetchGroupElements] Error:', err);
+    } finally {
+      setGroupElementsLoading(prev => ({ ...prev, [groupIndex]: false }));
     }
   };
 
@@ -1220,13 +1283,13 @@ export default function SubProjectDetail() {
                                   </Typography>
                                 </Box>
                                 
-                                {/* FP Thickness */}
-                                <Box sx={{ minWidth: '100px' }}>
+                                {/* Qty */}
+                                <Box sx={{ minWidth: '90px' }}>
                                   <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
-                                    FP Thickness
+                                    Qty
                                   </Typography>
                                   <Typography variant="body2" sx={{ fontWeight: '600', fontSize: '0.9rem' }}>
-                                    {element.fireproofingThickness || '-'}
+                                    {element.qty || '-'}
                                   </Typography>
                                 </Box>
                                 
