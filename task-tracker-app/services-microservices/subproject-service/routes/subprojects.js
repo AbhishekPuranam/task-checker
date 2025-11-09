@@ -158,25 +158,24 @@ router.get('/:id', auth, async (req, res) => {
  * @swagger
  * /api/subprojects/by-name/:projectId/:subProjectName:
  *   get:
- *     summary: Get a specific SubProject by name or code with statistics
+ *     summary: Get SubProject by project ID and name/code
  *     tags: [SubProjects]
  */
 router.get('/by-name/:projectId/:subProjectName', auth, async (req, res) => {
   try {
+    console.log('🔍 [SUBPROJECT] REQUEST RECEIVED:', {
+      method: req.method,
+      url: req.url,
+      params: req.params,
+      projectId: req.params.projectId,
+      subProjectName: req.params.subProjectName
+    });
+    
     const { projectId, subProjectName } = req.params;
-    if (!projectId || !subProjectName) {
-      console.error('❌ Missing projectId or subProjectName', { projectId, subProjectName });
-      return res.status(400).json({ error: 'Missing projectId or subProjectName' });
-    }
-
-    // Decode the subproject name from URL
     const decodedName = decodeURIComponent(subProjectName);
-    if (!decodedName || decodedName.length < 2) {
-      console.error('❌ Invalid subProjectName', { subProjectName, decodedName });
-      return res.status(400).json({ error: 'Invalid subProjectName' });
-    }
 
-    // Try to find by name or code (case insensitive)
+    console.log('🔍 Fetching SubProject by name:', { projectId, decodedName });
+
     const subProject = await SubProject.findOne({
       project: projectId,
       $or: [
