@@ -126,5 +126,7 @@ ssl/
 uploads/
 
 # Documentation files (public repo - no sensitive docs)
+# Exclude all markdown files except in docs/ directory and README files
 *.md
 !README.md
+!task-tracker-app/docs/*.md
