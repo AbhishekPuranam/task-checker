@@ -63,6 +63,8 @@ docker-compose up -d
 - Infrastructure: `/opt/task-checker/task-tracker-app/infrastructure/docker/`
 
 ## Pre-Commit Checklist
+- [ ] do unit tests pass
+- [ ] Code formatted
 - [ ] Dead code removed
 - [ ] Duplicate code eliminated
 - [ ] Logging enabled and properly configured
@@ -79,3 +81,4 @@ docker-compose up -d
 - [ ] Deployed with docker-compose
 - [ ] Verified services are running
 - [ ] Checked logs in OpenSearch
+- [ ] test the code for UI use Playwright MCP 

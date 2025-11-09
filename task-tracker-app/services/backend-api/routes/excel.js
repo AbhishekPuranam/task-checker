@@ -462,30 +462,66 @@ router.post('/upload/:projectId/:subProjectId', auth, upload.single('excelFile')
   try {
     const { projectId, subProjectId } = req.params;
     
-    // Verify project exists
-    const project = await Task.findById(projectId);
-    if (!project) {
-      return res.status(404).json({ message: 'Project not found' });
+    // Validation 1: Check if file was uploaded
+    if (!req.file) {
+      console.error('❌ [UPLOAD] No file provided in request');
+      return res.status(400).json({ 
+        message: 'No Excel file uploaded',
+        error: 'Please select an Excel file (.xlsx or .xls) to upload',
+        errorCode: 'NO_FILE'
+      });
     }
 
-    // Verify subproject exists and belongs to this project
+    console.log(`📁 File received: ${req.file.originalname}`);
+    console.log(`📊 File size: ${(req.file.size / 1024).toFixed(2)} KB`);
+    console.log(`📂 File path: ${req.file.path}`);
+    
+    // Validation 2: Verify project exists
+    const project = await Task.findById(projectId);
+    if (!project) {
+      console.error(`❌ [UPLOAD] Project not found: ${projectId}`);
+      // Clean up uploaded file
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(404).json({ 
+        message: 'Project not found',
+        error: `The project with ID ${projectId} does not exist. Please verify the project and try again.`,
+        errorCode: 'PROJECT_NOT_FOUND'
+      });
+    }
+
+    // Validation 3: Verify subproject exists and belongs to this project
     const SubProject = require('../models/SubProject');
     const subProject = await SubProject.findOne({ _id: subProjectId, project: projectId });
     if (!subProject) {
-      return res.status(404).json({ message: 'SubProject not found or does not belong to this project' });
+      console.error(`❌ [UPLOAD] SubProject not found or doesn't belong to project: ${subProjectId}`);
+      // Clean up uploaded file
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(404).json({ 
+        message: 'SubProject not found',
+        error: `The subproject with ID ${subProjectId} does not exist or does not belong to this project. Please verify and try again.`,
+        errorCode: 'SUBPROJECT_NOT_FOUND'
+      });
     }
 
-    // Check if user has permission
+    // Validation 4: Check user permissions
     if (req.user.role !== 'admin' && project.createdBy.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to upload to this project' });
+      console.error(`❌ [UPLOAD] Permission denied for user ${req.user.email} on project ${projectId}`);
+      // Clean up uploaded file
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(403).json({ 
+        message: 'Not authorized',
+        error: 'You do not have permission to upload files to this project. Only admins and project owners can upload Excel files.',
+        errorCode: 'PERMISSION_DENIED'
+      });
     }
-
-    if (!req.file) {
-      return res.status(400).json({ message: 'No Excel file uploaded' });
-    }
-
-    console.log(`📁 File uploaded to: ${req.file.path}`);
-    console.log(`📊 File size: ${req.file.size} bytes`);
+    
+    console.log(`✅ [UPLOAD] All validations passed for SubProject: ${subProject.name}`);
     
     // Queue the job for async processing with subProjectId
     const job = await addExcelJob({
@@ -497,7 +533,8 @@ router.post('/upload/:projectId/:subProjectId', auth, upload.single('excelFile')
       subProjectName: subProject.name
     });
     
-    console.log(`✅ Excel processing job queued for SubProject: ${job.id}`);
+    console.log(`✅ [UPLOAD] Excel processing job queued for SubProject: ${job.id}`);
+    console.log(`📋 Job details: { projectId: ${projectId}, subProjectId: ${subProjectId}, fileName: ${req.file.originalname} }`);
     
     // Return immediately with job ID
     res.json({
@@ -506,16 +543,50 @@ router.post('/upload/:projectId/:subProjectId', auth, upload.single('excelFile')
       jobId: job.id,
       status: 'queued',
       subProjectId: subProjectId,
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
       tip: `Use GET /api/excel/status/${job.id} to check processing status`
     });
     
   } catch (error) {
-    console.error('Error queuing Excel upload for SubProject:', error);
+    console.error('❌ [UPLOAD] Error queuing Excel upload for SubProject:', error);
+    console.error('❌ [UPLOAD] Error stack:', error.stack);
+    
     // Clean up file on error
     if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+      try {
+        fs.unlinkSync(req.file.path);
+        console.log(`🗑️ [UPLOAD] Cleaned up file: ${req.file.path}`);
+      } catch (cleanupError) {
+        console.error('❌ [UPLOAD] Error cleaning up file:', cleanupError);
+      }
     }
-    res.status(500).json({ message: 'Error processing Excel file', error: error.message });
+    
+    // Provide detailed error message
+    const errorMessage = error.message || 'Unknown error occurred';
+    const isValidationError = error.name === 'ValidationError';
+    const isMongoError = error.name === 'MongoError' || error.name === 'MongoServerError';
+    
+    let userMessage = 'Error processing Excel file. Please try again.';
+    let errorCode = 'PROCESSING_ERROR';
+    
+    if (isValidationError) {
+      userMessage = `File validation error: ${errorMessage}`;
+      errorCode = 'VALIDATION_ERROR';
+    } else if (isMongoError) {
+      userMessage = 'Database error occurred. Please contact support if this persists.';
+      errorCode = 'DATABASE_ERROR';
+    } else if (errorMessage.includes('file') || errorMessage.includes('ENOENT')) {
+      userMessage = 'File system error. Please try uploading the file again.';
+      errorCode = 'FILE_SYSTEM_ERROR';
+    }
+    
+    res.status(500).json({ 
+      message: userMessage,
+      error: errorMessage,
+      errorCode: errorCode,
+      technical: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
@@ -529,23 +600,50 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
   try {
     const { projectId } = req.params;
     
-    // Verify project exists
+    // Validation 1: Check if file was uploaded
+    if (!req.file) {
+      console.error('❌ [UPLOAD] No file provided in request');
+      return res.status(400).json({ 
+        message: 'No Excel file uploaded',
+        error: 'Please select an Excel file (.xlsx or .xls) to upload',
+        errorCode: 'NO_FILE'
+      });
+    }
+
+    console.log(`📁 File received: ${req.file.originalname}`);
+    console.log(`📊 File size: ${(req.file.size / 1024).toFixed(2)} KB`);
+    console.log(`📂 File path: ${req.file.path}`);
+    
+    // Validation 2: Verify project exists
     const project = await Task.findById(projectId);
     if (!project) {
-      return res.status(404).json({ message: 'Project not found' });
+      console.error(`❌ [UPLOAD] Project not found: ${projectId}`);
+      // Clean up uploaded file
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(404).json({ 
+        message: 'Project not found',
+        error: `The project with ID ${projectId} does not exist. Please verify the project and try again.`,
+        errorCode: 'PROJECT_NOT_FOUND'
+      });
     }
 
-    // Check if user has permission
+    // Validation 3: Check user permissions
     if (req.user.role !== 'admin' && project.createdBy.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to upload to this project' });
+      console.error(`❌ [UPLOAD] Permission denied for user ${req.user.email} on project ${projectId}`);
+      // Clean up uploaded file
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(403).json({ 
+        message: 'Not authorized',
+        error: 'You do not have permission to upload files to this project. Only admins and project owners can upload Excel files.',
+        errorCode: 'PERMISSION_DENIED'
+      });
     }
-
-    if (!req.file) {
-      return res.status(400).json({ message: 'No Excel file uploaded' });
-    }
-
-    console.log(`📁 File uploaded to: ${req.file.path}`);
-    console.log(`📊 File size: ${req.file.size} bytes`);
+    
+    console.log(`✅ [UPLOAD] All validations passed for Project: ${project.projectName}`);
     
     // Queue the job for async processing
     const job = await addExcelJob({
@@ -555,7 +653,8 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
       projectName: project.projectName
     });
     
-    console.log(`✅ Excel processing job queued: ${job.id}`);
+    console.log(`✅ [UPLOAD] Excel processing job queued: ${job.id}`);
+    console.log(`📋 Job details: { projectId: ${projectId}, fileName: ${req.file.originalname} }`);
     
     // Return immediately with job ID
     res.json({
@@ -563,16 +662,50 @@ router.post('/upload/:projectId', auth, upload.single('excelFile'), async (req, 
       message: 'Excel file uploaded successfully. Processing in background...',
       jobId: job.id,
       status: 'queued',
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
       tip: `Use GET /api/excel/status/${job.id} to check processing status`
     });
     
   } catch (error) {
-    console.error('Error queuing Excel upload:', error);
+    console.error('❌ [UPLOAD] Error queuing Excel upload:', error);
+    console.error('❌ [UPLOAD] Error stack:', error.stack);
+    
     // Clean up file on error
     if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+      try {
+        fs.unlinkSync(req.file.path);
+        console.log(`🗑️ [UPLOAD] Cleaned up file: ${req.file.path}`);
+      } catch (cleanupError) {
+        console.error('❌ [UPLOAD] Error cleaning up file:', cleanupError);
+      }
     }
-    res.status(500).json({ message: 'Error processing Excel file', error: error.message });
+    
+    // Provide detailed error message
+    const errorMessage = error.message || 'Unknown error occurred';
+    const isValidationError = error.name === 'ValidationError';
+    const isMongoError = error.name === 'MongoError' || error.name === 'MongoServerError';
+    
+    let userMessage = 'Error processing Excel file. Please try again.';
+    let errorCode = 'PROCESSING_ERROR';
+    
+    if (isValidationError) {
+      userMessage = `File validation error: ${errorMessage}`;
+      errorCode = 'VALIDATION_ERROR';
+    } else if (isMongoError) {
+      userMessage = 'Database error occurred. Please contact support if this persists.';
+      errorCode = 'DATABASE_ERROR';
+    } else if (errorMessage.includes('file') || errorMessage.includes('ENOENT')) {
+      userMessage = 'File system error. Please try uploading the file again.';
+      errorCode = 'FILE_SYSTEM_ERROR';
+    }
+    
+    res.status(500).json({ 
+      message: userMessage,
+      error: errorMessage,
+      errorCode: errorCode,
+      technical: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 

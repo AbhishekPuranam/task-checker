@@ -171,7 +171,47 @@ const ExcelUpload = ({ open, onClose, projectId, subProjectId, onUploadSuccess }
       }
       
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to upload Excel file');
+      console.error('Upload error:', error);
+      
+      // Extract detailed error information
+      const errorResponse = error.response?.data;
+      const errorCode = errorResponse?.errorCode;
+      const errorMessage = errorResponse?.error || errorResponse?.message;
+      
+      // Provide user-friendly error messages based on error code
+      let displayMessage = 'Failed to upload Excel file';
+      
+      if (errorCode === 'NO_FILE') {
+        displayMessage = 'No file selected. Please choose an Excel file to upload.';
+      } else if (errorCode === 'PROJECT_NOT_FOUND') {
+        displayMessage = 'Project not found. Please refresh the page and try again.';
+      } else if (errorCode === 'SUBPROJECT_NOT_FOUND') {
+        displayMessage = 'SubProject not found. Please verify the subproject exists.';
+      } else if (errorCode === 'PERMISSION_DENIED') {
+        displayMessage = 'Permission denied. You do not have access to upload files to this project.';
+      } else if (errorCode === 'VALIDATION_ERROR') {
+        displayMessage = `Validation error: ${errorMessage || 'Invalid file format'}`;
+      } else if (errorCode === 'FILE_SYSTEM_ERROR') {
+        displayMessage = 'File upload error. Please try again.';
+      } else if (errorCode === 'DATABASE_ERROR') {
+        displayMessage = 'Database error. Please contact support.';
+      } else if (errorMessage) {
+        displayMessage = errorMessage;
+      }
+      
+      // Show detailed error message to user
+      toast.error(displayMessage, {
+        duration: 6000,
+        style: {
+          maxWidth: '500px',
+        }
+      });
+      
+      // Log technical details for debugging
+      if (errorResponse?.technical) {
+        console.error('Technical error details:', errorResponse.technical);
+      }
+      
       setUploadProgress(null);
       setUploading(false);
     }

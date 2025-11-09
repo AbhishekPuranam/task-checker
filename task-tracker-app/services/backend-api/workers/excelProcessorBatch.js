@@ -568,7 +568,16 @@ function createBatchExcelWorker() {
         };
 
       } catch (error) {
-        console.error(`❌ [WORKER] Job ${job.id} failed:`, error);
+        console.error(`❌ [WORKER] Job ${job.id} failed with error:`, {
+          errorMessage: error.message,
+          errorType: error.constructor.name,
+          uploadId: job.data.uploadId,
+          projectId: projectId,
+          subProjectId: subProjectId,
+          userId: userId,
+          filePath: filePath ? path.basename(filePath) : 'unknown',
+          stack: error.stack
+        });
 
         // Try to rollback and cleanup if upload session exists
         if (job.data.uploadId) {
@@ -577,6 +586,17 @@ function createBatchExcelWorker() {
             if (failedSession) {
               // Perform complete rollback if any elements were created
               const summary = failedSession.summary;
+              
+              console.log(`📊 [WORKER] Upload session status before cleanup:`, {
+                uploadId: job.data.uploadId,
+                status: failedSession.status,
+                totalBatches: summary.totalBatches,
+                successfulBatches: summary.successfulBatches,
+                failedBatches: summary.failedBatches,
+                elementsCreated: summary.totalElementsCreated,
+                jobsCreated: summary.totalJobsCreated
+              });
+              
               if (summary && summary.totalElementsCreated > 0) {
                 console.log(`🔄 [WORKER] Initiating rollback for failed upload: ${job.data.uploadId}`);
                 await completeRollback(failedSession, projectId, subProjectId);
@@ -588,14 +608,21 @@ function createBatchExcelWorker() {
                 await failedSession.save();
                 console.log(`📊 [WORKER] Marked upload session ${job.data.uploadId} as failed (no rollback needed)`);
               }
+            } else {
+              console.warn(`⚠️ [WORKER] Upload session ${job.data.uploadId} not found for cleanup`);
             }
           } catch (sessionError) {
-            console.error(`❌ [WORKER] Failed to handle upload session cleanup:`, sessionError);
+            console.error(`❌ [WORKER] Failed to handle upload session cleanup:`, {
+              uploadId: job.data.uploadId,
+              errorMessage: sessionError.message,
+              stack: sessionError.stack
+            });
           }
         }
 
         // Clean up Excel file on error
         if (filePath) {
+          console.log(`🗑️ [WORKER] Cleaning up Excel file: ${path.basename(filePath)}`);
           deleteExcelFile(filePath);
         }
 
