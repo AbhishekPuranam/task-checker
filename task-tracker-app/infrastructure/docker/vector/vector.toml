@@ -1,36 +1,339 @@
+# ============================================
+# Vector Configuration for OpenSearch
+# Separate Index per Service
+# ============================================
+
+# ============================================
+# SOURCES - Log Collection
+# ============================================
+
+# Collect Docker container logs
 [sources.docker_logs]
 type = "docker_logs"
+include_containers = [
+  "tasktracker-auth-service",
+  "tasktracker-excel-service", 
+  "tasktracker-project-service",
+  "tasktracker-subproject-service",
+  "tasktracker-structural-elements-service",
+  "tasktracker-jobs-service",
+  "tasktracker-metrics-service",
+  "tasktracker-mongodb",
+  "tasktracker-redis",
+  "tasktracker-traefik",
+  "tasktracker-vault",
+  "uptime-kuma"
+]
 
+# Collect application logs from file system
+[sources.app_logs]
+type = "file"
+include = ["/var/log/app/**/*.log"]
+read_from = "beginning"
+
+# ============================================
+# TRANSFORMS - Log Processing & Routing
+# ============================================
+
+# Base enrichment for all logs
 [transforms.enrich]
 type = "remap"
-inputs = ["docker_logs"]
+inputs = ["docker_logs", "app_logs"]
 source = """
   .timestamp = now()
   .environment = "production"
-  .level = "info"
   
+  # Extract service name from container name
   if exists(.container_name) {
-    .service = replace!(.container_name, r'^/', "")
+    .service_name = replace!(.container_name, r'^tasktracker-', "")
+    .service_name = replace!(.service_name, r'^/', "")
+  } else if exists(.file) {
+    # Extract from file path
+    .service_name = replace!(.file, r'^.*/([^/]+)\.log$', "$1")
   }
   
-  # Remove problematic label field
+  # Parse log level
+  if exists(.message) {
+    if match!(.message, r'(?i)(error|err|fatal|critical)') {
+      .level = "error"
+    } else if match!(.message, r'(?i)(warn|warning)') {
+      .level = "warn"
+    } else if match!(.message, r'(?i)(info|information)') {
+      .level = "info"
+    } else if match!(.message, r'(?i)(debug|trace)') {
+      .level = "debug"
+    } else {
+      .level = "info"
+    }
+  }
+  
+  # Try to parse JSON logs
+  if exists(.message) {
+    parsed, err = parse_json(.message)
+    if err == null {
+      . = merge(., parsed)
+    }
+  }
+  
+  # Remove problematic fields
   del(.label)
+  del(.labels)
 """
 
-[sinks.opensearch]
-type = "elasticsearch"
+# Route logs based on service name
+[transforms.route_by_service]
+type = "route"
 inputs = ["enrich"]
+
+# Auth Service routes
+[transforms.route_by_service.route.auth_service]
+type = "check_fields"
+"service_name.eq" = "auth-service"
+
+# Excel Service routes
+[transforms.route_by_service.route.excel_service]
+type = "check_fields"
+"service_name.eq" = "excel-service"
+
+# Project Service routes
+[transforms.route_by_service.route.project_service]
+type = "check_fields"
+"service_name.eq" = "project-service"
+
+# SubProject Service routes
+[transforms.route_by_service.route.subproject_service]
+type = "check_fields"
+"service_name.eq" = "subproject-service"
+
+# Structural Elements Service routes
+[transforms.route_by_service.route.structural_elements_service]
+type = "check_fields"
+"service_name.eq" = "structural-elements-service"
+
+# Jobs Service routes
+[transforms.route_by_service.route.jobs_service]
+type = "check_fields"
+"service_name.eq" = "jobs-service"
+
+# Metrics Service routes
+[transforms.route_by_service.route.metrics_service]
+type = "check_fields"
+"service_name.eq" = "metrics-service"
+
+# MongoDB routes
+[transforms.route_by_service.route.mongodb]
+type = "check_fields"
+"service_name.eq" = "mongodb"
+
+# Redis routes
+[transforms.route_by_service.route.redis]
+type = "check_fields"
+"service_name.eq" = "redis"
+
+# Traefik routes
+[transforms.route_by_service.route.traefik]
+type = "check_fields"
+"service_name.eq" = "traefik"
+
+# Vault routes
+[transforms.route_by_service.route.vault]
+type = "check_fields"
+"service_name.eq" = "vault"
+
+# Uptime Kuma routes
+[transforms.route_by_service.route.uptime_kuma]
+type = "check_fields"
+"service_name.eq" = "uptime-kuma"
+
+# ============================================
+# SINKS - OpenSearch Outputs (Separate Index per Service)
+# ============================================
+
+# Auth Service Sink
+[sinks.opensearch_auth]
+type = "elasticsearch"
+inputs = ["route_by_service.auth_service"]
 endpoints = ["http://opensearch:9200"]
 mode = "bulk"
 api_version = "v8"
 suppress_type_name = true
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "Admin@123456"
 
-[sinks.opensearch.bulk]
-index = "logs-docker-%Y.%m.%d"
+[sinks.opensearch_auth.bulk]
+index = "logs-auth-service-%Y.%m.%d"
 
-[sinks.console]
-type = "console"
-inputs = ["enrich"]
+# Excel Service Sink
+[sinks.opensearch_excel]
+type = "elasticsearch"
+inputs = ["route_by_service.excel_service"]
+endpoints = ["http://opensearch:9200"]
+mode = "bulk"
+api_version = "v8"
+suppress_type_name = true
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "Admin@123456"
 
-[sinks.console.encoding]
-codec = "json"
+[sinks.opensearch_excel.bulk]
+index = "logs-excel-service-%Y.%m.%d"
+
+# Project Service Sink
+[sinks.opensearch_project]
+type = "elasticsearch"
+inputs = ["route_by_service.project_service"]
+endpoints = ["http://opensearch:9200"]
+mode = "bulk"
+api_version = "v8"
+suppress_type_name = true
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "Admin@123456"
+
+[sinks.opensearch_project.bulk]
+index = "logs-project-service-%Y.%m.%d"
+
+# SubProject Service Sink
+[sinks.opensearch_subproject]
+type = "elasticsearch"
+inputs = ["route_by_service.subproject_service"]
+endpoints = ["http://opensearch:9200"]
+mode = "bulk"
+api_version = "v8"
+suppress_type_name = true
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "Admin@123456"
+
+[sinks.opensearch_subproject.bulk]
+index = "logs-subproject-service-%Y.%m.%d"
+
+# Structural Elements Service Sink
+[sinks.opensearch_structural_elements]
+type = "elasticsearch"
+inputs = ["route_by_service.structural_elements_service"]
+endpoints = ["http://opensearch:9200"]
+mode = "bulk"
+api_version = "v8"
+suppress_type_name = true
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "Admin@123456"
+
+[sinks.opensearch_structural_elements.bulk]
+index = "logs-structural-elements-service-%Y.%m.%d"
+
+# Jobs Service Sink
+[sinks.opensearch_jobs]
+type = "elasticsearch"
+inputs = ["route_by_service.jobs_service"]
+endpoints = ["http://opensearch:9200"]
+mode = "bulk"
+api_version = "v8"
+suppress_type_name = true
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "Admin@123456"
+
+[sinks.opensearch_jobs.bulk]
+index = "logs-jobs-service-%Y.%m.%d"
+
+# Metrics Service Sink
+[sinks.opensearch_metrics]
+type = "elasticsearch"
+inputs = ["route_by_service.metrics_service"]
+endpoints = ["http://opensearch:9200"]
+mode = "bulk"
+api_version = "v8"
+suppress_type_name = true
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "Admin@123456"
+
+[sinks.opensearch_metrics.bulk]
+index = "logs-metrics-service-%Y.%m.%d"
+
+# MongoDB Sink
+[sinks.opensearch_mongodb]
+type = "elasticsearch"
+inputs = ["route_by_service.mongodb"]
+endpoints = ["http://opensearch:9200"]
+mode = "bulk"
+api_version = "v8"
+suppress_type_name = true
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "Admin@123456"
+
+[sinks.opensearch_mongodb.bulk]
+index = "logs-mongodb-%Y.%m.%d"
+
+# Redis Sink
+[sinks.opensearch_redis]
+type = "elasticsearch"
+inputs = ["route_by_service.redis"]
+endpoints = ["http://opensearch:9200"]
+mode = "bulk"
+api_version = "v8"
+suppress_type_name = true
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "Admin@123456"
+
+[sinks.opensearch_redis.bulk]
+index = "logs-redis-%Y.%m.%d"
+
+# Traefik Sink
+[sinks.opensearch_traefik]
+type = "elasticsearch"
+inputs = ["route_by_service.traefik"]
+endpoints = ["http://opensearch:9200"]
+mode = "bulk"
+api_version = "v8"
+suppress_type_name = true
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "Admin@123456"
+
+[sinks.opensearch_traefik.bulk]
+index = "logs-traefik-%Y.%m.%d"
+
+# Vault Sink
+[sinks.opensearch_vault]
+type = "elasticsearch"
+inputs = ["route_by_service.vault"]
+endpoints = ["http://opensearch:9200"]
+mode = "bulk"
+api_version = "v8"
+suppress_type_name = true
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "Admin@123456"
+
+[sinks.opensearch_vault.bulk]
+index = "logs-vault-%Y.%m.%d"
+
+# Uptime Kuma Sink
+[sinks.opensearch_uptime]
+type = "elasticsearch"
+inputs = ["route_by_service.uptime_kuma"]
+endpoints = ["http://opensearch:9200"]
+mode = "bulk"
+api_version = "v8"
+suppress_type_name = true
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "Admin@123456"
+
+[sinks.opensearch_uptime.bulk]
+index = "logs-uptime-kuma-%Y.%m.%d"
+
+# ============================================
+# DEBUG SINK (Optional - for troubleshooting)
+# ============================================
+
+# [sinks.console]
+# type = "console"
+# inputs = ["enrich"]
+# encoding.codec = "json"

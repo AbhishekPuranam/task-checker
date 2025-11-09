@@ -7,17 +7,12 @@ const JWT_SECRET = fs.readFileSync('/run/secrets/jwt_secret', 'utf8').trim();
 
 const auth = async (req, res, next) => {
   try {
-    // Try to get token from Authorization header first, then from cookie, then from query params
+    // Try to get token from Authorization header first, then from cookie
     let token = req.header('Authorization')?.replace('Bearer ', '');
     
     // If no Authorization header, check for token in cookies
     if (!token && req.cookies && req.cookies.token) {
       token = req.cookies.token;
-    }
-    
-    // If no cookie token, check for token in query parameters (for direct download links)
-    if (!token && req.query && req.query.token) {
-      token = req.query.token;
     }
     
     if (!token) {
