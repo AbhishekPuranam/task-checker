@@ -40,6 +40,12 @@ app.use(express.static('public'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/health', require('./routes/health'));
 
+// Serve login page for root and /login paths
+const path = require('path');
+app.get(['/', '/login'], (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // Error handling
 app.use((err, req, res, next) => {
   console.error('Error:', err);
