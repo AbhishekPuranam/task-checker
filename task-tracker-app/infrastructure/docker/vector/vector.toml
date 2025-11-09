@@ -71,7 +71,7 @@ source = """
   if exists(.message) {
     parsed, err = parse_json(.message)
     if err == null {
-      . = merge(., parsed)
+      ., merge_err = merge(., parsed)
     }
   }
   
