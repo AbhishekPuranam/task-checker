@@ -533,7 +533,7 @@ function createBatchExcelWorker() {
           await invalidateCache(`/api/structural-elements?subProject=${subProjectId}`);
           await invalidateCache(`/api/subprojects/${subProjectId}/stats`);
           
-          const { scheduleBatchAggregation } = require('../utils/aggregationQueue');
+          const { scheduleBatchAggregation } = require('../shared/utils/aggregationQueue');
           scheduleBatchAggregation(subProjectId).catch(err =>
             console.error('[WORKER] Failed to queue aggregation job:', err)
           );
