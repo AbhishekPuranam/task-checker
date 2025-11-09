@@ -316,26 +316,33 @@ export default function SubProjectDetail() {
 
   // Fetch elements for a specific group when expanded
   const fetchGroupElements = async (groupIndex) => {
-    if (expandedGroups[groupIndex] || groupElementsLoading[groupIndex]) {
-      return; // Already loaded or loading
+    // Toggle collapse/expand
+    if (expandedGroups[groupIndex]) {
+      // Collapse the group
+      setExpandedGroups(prev => ({ ...prev, [groupIndex]: false }));
+      return;
+    }
+    
+    // If group already has elements, just expand
+    const group = groupedData.groups[groupIndex];
+    if (group.elements && group.elements.length > 0) {
+      setExpandedGroups(prev => ({ ...prev, [groupIndex]: true }));
+      return;
+    }
+    
+    // Otherwise, fetch elements
+    if (groupElementsLoading[groupIndex]) {
+      return; // Already loading
     }
     
     try {
+      setExpandedGroups(prev => ({ ...prev, [groupIndex]: true }));
       setGroupElementsLoading(prev => ({ ...prev, [groupIndex]: true }));
       
       const token = localStorage.getItem('token');
-      const group = groupedData.groups[groupIndex];
       
-      // Build filter criteria based on group ID
-      const filterCriteria = {};
-      if (groupBy && group._id[groupBy]) {
-        filterCriteria[groupBy] = group._id[groupBy];
-      }
-      if (subGroupBy && group._id[subGroupBy]) {
-        filterCriteria[subGroupBy] = group._id[subGroupBy];
-      }
-      
-      console.log('📊 [fetchGroupElements] Fetching elements for group:', { groupIndex, filterCriteria });
+      // Fetch ALL groups WITH elements, then extract just this group's elements
+      console.log('📊 [fetchGroupElements] Fetching elements for group:', groupIndex);
       
       const res = await axios.post(
         `${API_URL}/grouping/elements`,
@@ -353,16 +360,20 @@ export default function SubProjectDetail() {
         }
       );
       
-      // Update the specific group with full elements
-      setGroupedData(prev => {
-        const newData = { ...prev };
-        newData.groups[groupIndex] = res.data.groups[groupIndex];
-        return newData;
-      });
-      
-      setExpandedGroups(prev => ({ ...prev, [groupIndex]: true }));
+      // Update the specific group with full elements from the response
+      if (res.data.groups && res.data.groups[groupIndex]) {
+        setGroupedData(prev => {
+          const newData = { ...prev };
+          newData.groups[groupIndex] = {
+            ...newData.groups[groupIndex],
+            elements: res.data.groups[groupIndex].elements
+          };
+          return newData;
+        });
+      }
     } catch (err) {
       console.error('❌ [fetchGroupElements] Error:', err);
+      alert('Failed to load group elements');
     } finally {
       setGroupElementsLoading(prev => ({ ...prev, [groupIndex]: false }));
     }
@@ -1017,7 +1028,7 @@ export default function SubProjectDetail() {
           {groupBy && (
             <Button
               variant="contained"
-              onClick={fetchGroupedData}
+              onClick={() => fetchGroupedData(false, false)}
               disabled={loadingGroups}
               sx={{ 
                 mt: 3,
@@ -1051,7 +1062,26 @@ export default function SubProjectDetail() {
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {groupedData.groups?.map((group, index) => (
-              <Paper key={index} sx={{ p: 3, border: '1px solid #e0e0e0', borderRadius: 3, overflow: 'hidden' }}>
+              <Accordion 
+                key={index}
+                expanded={expandedGroups[index] || false}
+                onChange={() => fetchGroupElements(index)}
+                sx={{ 
+                  border: '1px solid #e0e0e0', 
+                  borderRadius: '12px !important',
+                  overflow: 'hidden',
+                  '&:before': { display: 'none' },
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                }}
+              >
+                <AccordionSummary
+                  expandIcon={<ExpandMoreIcon />}
+                  sx={{ 
+                    p: 3,
+                    background: 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)',
+                    '&:hover': { background: 'linear-gradient(135deg, #f5f5f5 0%, #eeeeee 100%)' }
+                  }}
+                >
                 {/* Compact Group Header with Inline Metrics */}
                 <Box sx={{ 
                   display: 'flex', 
@@ -1176,9 +1206,15 @@ export default function SubProjectDetail() {
                     )}
                   </Box>
                 </Box>
+                </AccordionSummary>
 
-                {/* All Elements */}
-                {group.elements && group.elements.length > 0 && (() => {
+                {/* All Elements - Lazy Loaded */}
+                <AccordionDetails sx={{ pt: 0, px: 3, pb: 3 }}>
+                {groupElementsLoading[index] ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                    <CircularProgress />
+                  </Box>
+                ) : group.elements && group.elements.length > 0 && (() => {
                   const filteredElements = filterElements(group.elements);
                   return (
                   <Box sx={{ mt: 2 }}>
@@ -1460,7 +1496,8 @@ export default function SubProjectDetail() {
                   </Box>
                   );
                 })()}
-              </Paper>
+                </AccordionDetails>
+              </Accordion>
             ))}
             </Box>
           </Paper>
