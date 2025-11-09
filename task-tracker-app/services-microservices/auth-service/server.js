@@ -33,6 +33,9 @@ mongoose.connect(mongoUri, {
   process.exit(1);
 });
 
+// Serve static files from public directory
+app.use(express.static('public'));
+
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/health', require('./routes/health'));
