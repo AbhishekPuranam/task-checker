@@ -23,7 +23,7 @@ import {
   Avatar,
   Divider,
 } from '@mui/material';
-import { Add, Upload, Download, Folder, ArrowBack, Edit, Delete } from '@mui/icons-material';
+import { Add, Upload, Download, Folder, ArrowBack, Edit, Delete, Search } from '@mui/icons-material';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -40,6 +40,7 @@ export default function SubProjectManagement() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedSubProject, setSelectedSubProject] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [newSubProject, setNewSubProject] = useState({
     name: '',
     code: '',
@@ -489,8 +490,56 @@ export default function SubProjectManagement() {
               </Button>
             </Box>
           ) : (
-            <Grid container spacing={3}>
-              {subProjects.map((subProject) => (
+            <>
+              {/* Search Bar */}
+              <Box sx={{ mb: 3 }}>
+                <TextField
+                  fullWidth
+                  placeholder="Search sub-projects by name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <Search sx={{ color: '#6a11cb', mr: 1 }} />
+                    ),
+                  }}
+                  sx={{
+                    bgcolor: 'white',
+                    borderRadius: 2,
+                    '& .MuiOutlinedInput-root': {
+                      '&:hover fieldset': {
+                        borderColor: '#6a11cb',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#6a11cb',
+                      },
+                    },
+                  }}
+                />
+              </Box>
+
+              {(() => {
+                const filteredSubProjects = subProjects.filter(sp => 
+                  sp.name?.toLowerCase().includes(searchQuery.toLowerCase())
+                );
+
+                if (filteredSubProjects.length === 0) {
+                  return (
+                    <Box sx={{ textAlign: 'center', py: 8 }}>
+                      <Search sx={{ fontSize: 80, color: '#e0d4ff', mb: 2 }} />
+                      <Typography variant="h5" sx={{ color: '#6a11cb', mb: 1 }}>
+                        No sub-projects match your search
+                      </Typography>
+                      <Typography sx={{ color: '#999' }}>
+                        Try a different search term or clear the search to see all sub-projects.
+                      </Typography>
+                    </Box>
+                  );
+                }
+
+                return (
+                  <Grid container spacing={3}>
+                    {filteredSubProjects.map((subProject) => (
                 <Grid item xs={12} md={6} lg={4} key={subProject._id}>
                   <Card 
                     sx={{ 
@@ -688,6 +737,9 @@ export default function SubProjectManagement() {
                 </Grid>
               ))}
             </Grid>
+            );
+          })()}
+          </>
           )}
         </Paper>
 

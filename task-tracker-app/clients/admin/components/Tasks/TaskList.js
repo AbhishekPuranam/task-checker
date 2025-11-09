@@ -26,6 +26,8 @@ import {
   DialogContentText,
   DialogActions,
   Grid,
+  TextField,
+  InputAdornment,
 } from '@mui/material';
 import { 
   Add, 
@@ -37,6 +39,7 @@ import {
   TrendingUp,
   ManageAccounts,
   Delete,
+  Search,
 } from '@mui/icons-material';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../contexts/AuthContext';
@@ -52,6 +55,7 @@ const ProjectList = () => {
   const [surfaceAreaTotals, setSurfaceAreaTotals] = useState({});
   const [projectProgress, setProjectProgress] = useState({}); // Store detailed progress for each project
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Project access management state
   const [accessManagerOpen, setAccessManagerOpen] = useState(false);
@@ -365,6 +369,42 @@ const ProjectList = () => {
           </Paper>
         )}
 
+        {/* Search Bar */}
+        <Paper 
+          elevation={2}
+          sx={{ 
+            p: 2, 
+            mb: 3, 
+            borderRadius: 2,
+            bgcolor: 'white',
+          }}
+        >
+          <TextField
+            fullWidth
+            placeholder="Search projects by name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search sx={{ color: '#6a11cb' }} />
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                '&:hover fieldset': {
+                  borderColor: '#6a11cb',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: '#6a11cb',
+                },
+              },
+            }}
+          />
+        </Paper>
+
         {/* Projects Grid/Cards View */}
         {(!projects || projects.length === 0) ? (
           <Paper 
@@ -399,9 +439,37 @@ const ProjectList = () => {
               </Button>
             )}
           </Paper>
-        ) : (
-          <Grid container spacing={3}>
-            {projects.map((project) => (
+        ) : (() => {
+          const filteredProjects = projects.filter(project => 
+            project.title?.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+          
+          if (filteredProjects.length === 0) {
+            return (
+              <Paper 
+                elevation={2}
+                sx={{ 
+                  p: 6, 
+                  textAlign: 'center', 
+                  borderRadius: 3, 
+                  bgcolor: 'white',
+                  boxShadow: '0 4px 20px rgba(106, 17, 203, 0.2)'
+                }}
+              >
+                <Search sx={{ fontSize: 80, color: '#e0d4ff', mb: 2 }} />
+                <Typography variant="h5" sx={{ color: '#6a11cb' }} gutterBottom>
+                  No projects match your search
+                </Typography>
+                <Typography variant="body1" color="textSecondary">
+                  Try a different search term or clear the search to see all projects.
+                </Typography>
+              </Paper>
+            );
+          }
+          
+          return (
+            <Grid container spacing={3}>
+              {filteredProjects.map((project) => (
               <Grid item xs={12} sm={6} md={4} key={project._id}>
                 <Card 
                   sx={{ 
@@ -533,7 +601,8 @@ const ProjectList = () => {
               </Grid>
             ))}
           </Grid>
-        )}
+          );
+        })()}
 
         {/* Project Access Manager Dialog */}
         <ProjectAccessManager
