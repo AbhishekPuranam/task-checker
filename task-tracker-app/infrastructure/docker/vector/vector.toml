@@ -49,10 +49,10 @@ source = """
     .service_name = replace!(.service_name, r'^/', "")
   } else if exists(.file) {
     # Extract from file path
-    .service_name = replace!(.file, r'^.*/([^/]+)\.log$', "$1")
+    .service_name = replace!(.file, r'^.*/([^/]+)\\.log$', "$1")
   }
   
-  # Parse log level
+  # Parse log level - Supports emoji logging (🚀✅❌⚠️📊💾)
   if exists(.message) {
     if match!(.message, r'(?i)(error|err|fatal|critical)') {
       .level = "error"
