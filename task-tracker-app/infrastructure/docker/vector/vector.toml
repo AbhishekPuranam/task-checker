@@ -56,17 +56,19 @@ source = """
   
   # Parse log level - Supports emoji logging (🚀✅❌⚠️📊💾)
   if exists(.message) {
-    msg = string(.message)
-    if match(msg, r'(?i)(error|err|fatal|critical)') ?? false {
-      .level = "error"
-    } else if match(msg, r'(?i)(warn|warning)') ?? false {
-      .level = "warn"
-    } else if match(msg, r'(?i)(info|information)') ?? false {
-      .level = "info"
-    } else if match(msg, r'(?i)(debug|trace)') ?? false {
-      .level = "debug"
-    } else {
-      .level = "info"
+    msg, err3 = string(.message)
+    if err3 == null {
+      if match(msg, r'(?i)(error|err|fatal|critical)') ?? false {
+        .level = "error"
+      } else if match(msg, r'(?i)(warn|warning)') ?? false {
+        .level = "warn"
+      } else if match(msg, r'(?i)(info|information)') ?? false {
+        .level = "info"
+      } else if match(msg, r'(?i)(debug|trace)') ?? false {
+        .level = "debug"
+      } else {
+        .level = "info"
+      }
     }
   }
   
