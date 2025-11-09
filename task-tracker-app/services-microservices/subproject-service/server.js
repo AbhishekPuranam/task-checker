@@ -12,6 +12,13 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`📥 [${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log(`   Headers:`, req.headers);
+  next();
+});
+
 // MongoDB connection
 const MONGODB_PASSWORD = fs.existsSync('/run/secrets/mongodb_password') 
   ? fs.readFileSync('/run/secrets/mongodb_password', 'utf8').trim()
