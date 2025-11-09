@@ -124,3 +124,7 @@ ssl/
 
 # Uploads directory (contains user uploaded files)
 uploads/
+
+# Documentation files (public repo - no sensitive docs)
+*.md
+!README.md
