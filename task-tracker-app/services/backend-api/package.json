@@ -45,6 +45,7 @@
     "socket.io": "^4.7.2",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
+    "winston": "^3.18.3",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

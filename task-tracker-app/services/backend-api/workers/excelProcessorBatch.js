@@ -7,9 +7,11 @@ const Job = require('../models/Job');
 const UploadSession = require('../models/UploadSession');
 const { invalidateCache } = require('../middleware/cache');
 const { addProgressJob } = require('../utils/queue');
-const XLSX = require('xlsx');
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
+const logger = require('../utils/logger');
+const { parseExcelFile, transformExcelRow } = require('../utils/excelTransform');
+const { createFireProofingJobs } = require('../utils/fireProofingJobs');
 
 /**
  * Delete Excel file safely
@@ -18,11 +20,18 @@ function deleteExcelFile(filePath) {
   try {
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
-      console.log(`🗑️ [CLEANUP] Deleted Excel file: ${path.basename(filePath)}`);
+      logger.info('Deleted Excel file', { 
+        file: path.basename(filePath),
+        category: 'cleanup'
+      });
       return true;
     }
   } catch (error) {
-    console.error(`❌ [CLEANUP] Failed to delete Excel file: ${error.message}`);
+    logger.error('Failed to delete Excel file', {
+      file: filePath,
+      error: error.message,
+      category: 'cleanup'
+    });
     return false;
   }
   return false;
@@ -32,7 +41,12 @@ function deleteExcelFile(filePath) {
  * Complete rollback - delete all created elements, jobs, and clean Redis
  */
 async function completeRollback(uploadSession, projectId, subProjectId = null) {
-  console.log(`🔄 [ROLLBACK] Starting complete rollback for upload: ${uploadSession.uploadId}`);
+  logger.info('Starting complete rollback', {
+    uploadId: uploadSession.uploadId,
+    projectId,
+    subProjectId,
+    category: 'rollback'
+  });
   
   const deletionStats = {
     elementsDeleted: 0,
@@ -55,14 +69,20 @@ async function completeRollback(uploadSession, projectId, subProjectId = null) {
         structuralElement: { $in: elementIds }
       });
       deletionStats.jobsDeleted = jobsResult.deletedCount;
-      console.log(`🗑️ [ROLLBACK] Deleted ${jobsResult.deletedCount} jobs`);
+      logger.info('Deleted jobs during rollback', {
+        count: jobsResult.deletedCount,
+        category: 'rollback'
+      });
 
       // Delete all elements
       const elementsResult = await StructuralElement.deleteMany({
         _id: { $in: elementIds }
       });
       deletionStats.elementsDeleted = elementsResult.deletedCount;
-      console.log(`🗑️ [ROLLBACK] Deleted ${elementsResult.deletedCount} elements`);
+      logger.info('Deleted elements during rollback', {
+        count: elementsResult.deletedCount,
+        category: 'rollback'
+      });
 
       // Update project count (decrement)
       if (deletionStats.elementsDeleted > 0) {
@@ -70,7 +90,11 @@ async function completeRollback(uploadSession, projectId, subProjectId = null) {
           projectId,
           { $inc: { structuralElementsCount: -deletionStats.elementsDeleted } }
         );
-        console.log(`📊 [ROLLBACK] Decremented project count by ${deletionStats.elementsDeleted}`);
+        logger.info('Decremented project count', {
+          projectId,
+          decrement: deletionStats.elementsDeleted,
+          category: 'rollback'
+        });
 
         // Update subproject count if applicable
         if (subProjectId) {
@@ -79,7 +103,11 @@ async function completeRollback(uploadSession, projectId, subProjectId = null) {
             subProjectId,
             { $inc: { structuralElementsCount: -deletionStats.elementsDeleted } }
           );
-          console.log(`📊 [ROLLBACK] Decremented subproject count by ${deletionStats.elementsDeleted}`);
+          logger.info('Decremented subproject count', {
+            subProjectId,
+            decrement: deletionStats.elementsDeleted,
+            category: 'rollback'
+          });
         }
       }
 
@@ -99,10 +127,18 @@ async function completeRollback(uploadSession, projectId, subProjectId = null) {
     uploadSession.updateSummary();
     await uploadSession.save();
 
-    console.log(`✅ [ROLLBACK] Complete! Deleted ${deletionStats.elementsDeleted} elements and ${deletionStats.jobsDeleted} jobs`);
+    logger.info('Rollback completed', {
+      elementsDeleted: deletionStats.elementsDeleted,
+      jobsDeleted: deletionStats.jobsDeleted,
+      category: 'rollback'
+    });
     
   } catch (error) {
-    console.error(`❌ [ROLLBACK] Error during rollback:`, error);
+    logger.logError(error, {
+      operation: 'rollback',
+      uploadId: uploadSession.uploadId,
+      category: 'rollback'
+    });
     deletionStats.errors.push(error.message);
   }
 
@@ -113,7 +149,12 @@ async function completeRollback(uploadSession, projectId, subProjectId = null) {
  * Verify data integrity in database
  */
 async function verifyUploadIntegrity(uploadSession, projectId, subProjectId = null) {
-  console.log(`🔍 [VERIFY] Checking data integrity for upload: ${uploadSession.uploadId}`);
+  logger.info('Verifying upload integrity', {
+    uploadId: uploadSession.uploadId,
+    projectId,
+    subProjectId,
+    category: 'verification'
+  });
   
   try {
     const summary = uploadSession.summary;
@@ -143,9 +184,12 @@ async function verifyUploadIntegrity(uploadSession, projectId, subProjectId = nu
     const isValid = (actualElements === summary.totalElementsCreated) &&
                     (actualJobs === summary.totalJobsCreated);
     
-    console.log(`📊 [VERIFY] Expected: ${summary.totalElementsCreated} elements, ${summary.totalJobsCreated} jobs`);
-    console.log(`📊 [VERIFY] Actual: ${actualElements} elements, ${actualJobs} jobs`);
-    console.log(`✅ [VERIFY] Data integrity: ${isValid ? 'VALID' : 'INVALID'}`);
+    logger.info('Data integrity verification', {
+      expected: { elements: summary.totalElementsCreated, jobs: summary.totalJobsCreated },
+      actual: { elements: actualElements, jobs: actualJobs },
+      isValid,
+      category: 'verification'
+    });
     
     return {
       isValid,
@@ -160,151 +204,16 @@ async function verifyUploadIntegrity(uploadSession, projectId, subProjectId = nu
     };
     
   } catch (error) {
-    console.error(`❌ [VERIFY] Error verifying data:`, error);
+    logger.logError(error, {
+      operation: 'verifyUploadIntegrity',
+      uploadId: uploadSession.uploadId,
+      category: 'verification'
+    });
     return {
       isValid: false,
       error: error.message
     };
   }
-}
-
-
-/**
- * Parse Excel file
- */
-function parseExcelFile(filePath) {
-  try {
-    const workbook = XLSX.readFile(filePath);
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(worksheet);
-    return data;
-  } catch (error) {
-    throw new Error(`Error parsing Excel file: ${error.message}`);
-  }
-}
-
-/**
- * Transform Excel row to structural element
- */
-function transformExcelRow(row, projectId, userId, project, subProjectId = null) {
-  const transformed = {
-    project: projectId,
-    subProject: subProjectId, // NEW: Support for SubProject
-    projectName: project.title || 'Untitled Project',
-    siteLocation: project.location || 'Not specified',
-    serialNo: row['Sl No'] || row['Serial No'] || row['S.No'],
-    structureNumber: row['Structure Number'] || row['Structure No'],
-    drawingNo: row['Drawing No'] || row['Drawing Number'],
-    level: row['Level'] || row['Floor'],
-    memberType: row['Member Type'] || row['Type'],
-    gridNo: row['GridNo'] || row['Grid'] || row['Grid No'],
-    partMarkNo: row['Part Mark No'] || row['Part Mark'] || row['Mark No'],
-    sectionSizes: row['Section Sizes'] || row['Section'],
-    lengthMm: parseFloat(row['Length in (mm)'] || row['Length']) || 0,
-    qty: parseInt(row['Qty'] || row['Quantity']) || 1,
-    sectionDepthMm: parseFloat(row['Section Depth (mm)D'] || row['Depth']) || 0,
-    flangeWidthMm: parseFloat(row['Flange Width (mm) B'] || row['Width']) || 0,
-    webThicknessMm: parseFloat(row['Thickness (mm) t Of Web'] || row['Web Thickness']) || 0,
-    flangeThicknessMm: parseFloat(row['Thickness (mm) TOf Flange'] || row['Flange Thickness']) || 0,
-    fireproofingThickness: parseFloat(row['Thickness of Fireproofing'] || row['Fireproofing']) || 0,
-    surfaceAreaSqm: parseFloat(row['Surface Area in Sqm'] || row['Area']) || 0,
-    fireProofingWorkflow: row['Fire Proofing Workflow'] || null,
-    createdBy: userId,
-  };
-
-  return transformed;
-}
-
-/**
- * Create fire proofing jobs for a structural element
- */
-async function createFireProofingJobs(structuralElement, userId, session = null) {
-  const workflowJobs = {
-    'cement_fire_proofing': [
-      { title: 'Surface Preparation', order: 1 },
-      { title: 'Rockwool Filling', order: 2 },
-      { title: 'Adhesive coat/Primer', order: 3 },
-      { title: 'Vermiculite-Cement', order: 4 },
-      { title: 'Thickness inspection', order: 5 },
-      { title: 'Sealer coat', order: 6 },
-      { title: 'WIR', order: 7 },
-    ],
-    'gypsum_fire_proofing': [
-      { title: 'Surface Preparation', order: 1 },
-      { title: 'Rockwool Filling', order: 2 },
-      { title: 'Adhesive coat/Primer', order: 3 },
-      { title: 'Vermiculite-Gypsum', order: 4 },
-      { title: 'Thickness inspection', order: 5 },
-      { title: 'Sealer coat', order: 6 },
-      { title: 'WIR', order: 7 },
-    ],
-    'intumescent_coatings': [
-      { title: 'Surface Preparation', order: 1 },
-      { title: 'Primer', order: 2 },
-      { title: 'Coat -1', order: 3 },
-      { title: 'Coat-2', order: 4 },
-      { title: 'Coat-3', order: 5 },
-      { title: 'Coat-4', order: 6 },
-      { title: 'Coat-5', order: 7 },
-      { title: 'Thickness inspection', order: 8 },
-      { title: 'Top Coat', order: 9 },
-    ],
-    'refinery_fire_proofing': [
-      { title: 'Scaffolding Errection', order: 1 },
-      { title: 'Surface Preparation', order: 2 },
-      { title: 'Primer/Adhesive coat', order: 3 },
-      { title: 'Mesh', order: 4 },
-      { title: 'FP 1 Coat', order: 5 },
-      { title: 'FP Finish coat', order: 6 },
-      { title: 'Sealer', order: 7 },
-      { title: 'Top coat Primer', order: 8 },
-      { title: 'Top coat', order: 9 },
-      { title: 'Sealant', order: 10 },
-      { title: 'Inspection', order: 11 },
-      { title: 'Scaffolding -Dismantling', order: 12 },
-    ],
-  };
-
-  const jobs = workflowJobs[structuralElement.fireProofingWorkflow] || [];
-  const createdJobs = [];
-
-  for (const jobTemplate of jobs) {
-    let fireProofingType;
-    switch (structuralElement.fireProofingWorkflow) {
-      case 'cement_fire_proofing':
-        fireProofingType = 'Cement';
-        break;
-      case 'gypsum_fire_proofing':
-        fireProofingType = 'Gypsum';
-        break;
-      case 'intumescent_coatings':
-        fireProofingType = 'Intumescent';
-        break;
-      case 'refinery_fire_proofing':
-        fireProofingType = 'Refinery';
-        break;
-      default:
-        fireProofingType = 'Other';
-    }
-    
-    const job = new Job({
-      structuralElement: structuralElement._id,
-      project: structuralElement.project,
-      jobTitle: jobTemplate.title,
-      jobDescription: `${jobTemplate.title} for ${structuralElement.structureNumber}`,
-      jobType: structuralElement.fireProofingWorkflow,
-      orderIndex: jobTemplate.order * 100,
-      fireProofingType: fireProofingType,
-      status: 'pending',
-      createdBy: userId,
-    });
-
-    const saved = await job.save({ session });
-    createdJobs.push(saved);
-  }
-
-  return createdJobs;
 }
 
 /**
