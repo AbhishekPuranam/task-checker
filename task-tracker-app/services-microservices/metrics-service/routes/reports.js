@@ -1,10 +1,10 @@
 const express = require('express');
 const ExcelJS = require('exceljs');
 const moment = require('moment');
-const StructuralElement = require('../models/StructuralElement');
-const Task = require('../models/Task');
-const Job = require('../models/Job');
-const { auth, adminAuth } = require('../middleware/auth');
+const StructuralElement = require('../shared/models/StructuralElement');
+const Task = require('../shared/models/Task');
+const Job = require('../shared/models/Job');
+const { auth, adminAuth } = require('../shared/middleware/auth');
 
 const router = express.Router();
 
@@ -541,7 +541,7 @@ router.get('/section-report', adminAuth, async (req, res) => {
     // Get project info if using projectId
     let actualProjectName = projectName;
     if (projectId && !projectName) {
-      const Task = require('../models/Task');
+      const Task = require('../shared/models/Task');
       const project = await Task.findById(projectId);
       actualProjectName = project ? (project.name || project.title || 'Unknown Project') : 'Unknown Project';
     }
@@ -837,7 +837,7 @@ router.get('/excel/project/:projectId', adminAuth, async (req, res) => {
     const { projectId } = req.params;
     const { status } = req.query; // Filter: active, non clearance, no_job, complete
     
-    const SubProject = require('../models/SubProject');
+    const SubProject = require('../shared/models/SubProject');
     
     // Set response headers for Excel file
     res.setHeader(
@@ -992,7 +992,7 @@ router.get('/excel/subproject/:subProjectId', adminAuth, async (req, res) => {
     const { subProjectId } = req.params;
     const { status } = req.query;
     
-    const SubProject = require('../models/SubProject');
+    const SubProject = require('../shared/models/SubProject');
     
     // Get subproject details
     const subProject = await SubProject.findById(subProjectId)

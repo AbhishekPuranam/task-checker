@@ -1,8 +1,8 @@
 const express = require('express');
-const StructuralElement = require('../models/StructuralElement');
-const { auth, adminAuth } = require('../middleware/auth');
-const { cacheMiddleware, invalidateCache } = require('../middleware/cache');
-const { addProgressJob } = require('../utils/queue');
+const StructuralElement = require('../shared/models/StructuralElement');
+const { auth, adminAuth } = require('../shared/middleware/auth');
+const { cacheMiddleware, invalidateCache } = require('../shared/middleware/cache');
+const { addProgressJob } = require('../shared/utils/queue');
 const multer = require('multer');
 const path = require('path');
 
@@ -66,7 +66,7 @@ router.get('/',
 
     // If user is engineer, only show elements from projects they have access to
     if (req.user.role === 'engineer') {
-      const Task = require('../models/Task');
+      const Task = require('../shared/models/Task');
       const userProjects = await Task.find({
         $or: [
           { createdBy: req.user.id },
@@ -93,7 +93,7 @@ router.get('/',
     const total = await StructuralElement.countDocuments(filter);
 
     // Get job counts and current pending job for each element
-    const Job = require('../models/Job');
+    const Job = require('../shared/models/Job');
     const elementIds = elements.map(e => e._id);
     
     const jobStats = await Job.aggregate([
@@ -335,7 +335,7 @@ router.put('/:id', adminAuth, async (req, res) => {
     
     // If status changed, update project status
     if (req.body.status && req.body.status !== oldStatus) {
-      const Task = require('../models/Task');
+      const Task = require('../shared/models/Task');
       const project = await Task.findById(element.project);
       if (project) {
         await project.updateProjectStatus();
@@ -365,7 +365,7 @@ router.delete('/:id', adminAuth, async (req, res) => {
     }
 
     // Delete associated jobs
-    const Job = require('../models/Job');
+    const Job = require('../shared/models/Job');
     await Job.deleteMany({ structuralElement: req.params.id });
 
     const projectId = element.project;
@@ -398,7 +398,7 @@ router.post('/bulk-delete', adminAuth, async (req, res) => {
     }
 
     // Delete associated jobs for all elements
-    const Job = require('../models/Job');
+    const Job = require('../shared/models/Job');
     const jobDeleteResult = await Job.deleteMany({ 
       structuralElement: { $in: elementIds } 
     });
@@ -486,7 +486,7 @@ router.get('/project/:projectId/summary',
       const total = await StructuralElement.countDocuments(filter);
       
       // Get job counts for each element using aggregation (much faster)
-      const Job = require('../models/Job');
+      const Job = require('../shared/models/Job');
       const elementIds = elements.map(e => e._id);
       
       const jobStats = await Job.aggregate([
@@ -561,7 +561,7 @@ router.get('/:elementId/jobs',
     try {
       const { elementId } = req.params;
       
-      const Job = require('../models/Job');
+      const Job = require('../shared/models/Job');
       const jobs = await Job.find({ structuralElement: elementId })
         .select('jobTitle jobType status orderIndex fireProofingType createdAt updatedAt assignedTo progress')
         .populate('assignedTo', 'name email')

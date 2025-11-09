@@ -5,9 +5,9 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const rateLimit = require('express-rate-limit');
-const User = require('../models/User');
-const { auth } = require('../middleware/auth');
-const { cacheMiddleware, invalidateCache } = require('../middleware/cache');
+const User = require('../shared/models/User');
+const { auth } = require('../shared/middleware/auth');
+const { cacheMiddleware, invalidateCache } = require('../shared/middleware/cache');
 
 const router = express.Router();
 

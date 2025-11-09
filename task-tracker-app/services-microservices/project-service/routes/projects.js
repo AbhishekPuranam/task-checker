@@ -1,12 +1,12 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const Task = require('../models/Task'); // Task model is used as Project model
-const StructuralElement = require('../models/StructuralElement');
-const Job = require('../models/Job');
-const User = require('../models/User');
-const { auth } = require('../middleware/auth');
-const { cacheMiddleware, invalidateCache } = require('../middleware/cache');
-const { addProgressJob } = require('../utils/queue');
+const Task = require('../shared/models/Task'); // Task model is used as Project model
+const StructuralElement = require('../shared/models/StructuralElement');
+const Job = require('../shared/models/Job');
+const User = require('../shared/models/User');
+const { auth } = require('../shared/middleware/auth');
+const { cacheMiddleware, invalidateCache } = require('../shared/middleware/cache');
+const { addProgressJob } = require('../shared/utils/queue');
 
 const router = express.Router();
 

@@ -4,11 +4,11 @@ const XLSX = require('xlsx');
 const path = require('path');
 const fs = require('fs');
 const router = express.Router();
-const StructuralElement = require('../models/StructuralElement');
-const Task = require('../models/Task');
-const Job = require('../models/Job');
-const { auth } = require('../middleware/auth');
-const { addExcelJob, getJobStatus } = require('../utils/queue');
+const StructuralElement = require('../shared/models/StructuralElement');
+const Task = require('../shared/models/Task');
+const Job = require('../shared/models/Job');
+const { auth } = require('../shared/middleware/auth');
+const { addExcelJob, getJobStatus } = require('../shared/utils/queue');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -492,7 +492,7 @@ router.post('/upload/:projectId/:subProjectId', auth, upload.single('excelFile')
     }
 
     // Validation 3: Verify subproject exists and belongs to this project
-    const SubProject = require('../models/SubProject');
+    const SubProject = require('../shared/models/SubProject');
     const subProject = await SubProject.findOne({ _id: subProjectId, project: projectId });
     if (!subProject) {
       console.error(`❌ [UPLOAD] SubProject not found or doesn't belong to project: ${subProjectId}`);

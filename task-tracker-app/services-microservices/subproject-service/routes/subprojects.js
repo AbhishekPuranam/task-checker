@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const SubProject = require('../models/SubProject');
-const StructuralElement = require('../models/StructuralElement');
-const { auth, adminAuth } = require('../middleware/auth');
-const cache = require('../utils/cache');
+const SubProject = require('../shared/models/SubProject');
+const StructuralElement = require('../shared/models/StructuralElement');
+const { auth, adminAuth } = require('../shared/middleware/auth');
+const cache = require('../shared/utils/cache');
 
 /**
  * @swagger

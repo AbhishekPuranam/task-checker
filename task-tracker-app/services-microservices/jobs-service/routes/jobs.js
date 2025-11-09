@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const Job = require('../models/Job');
-const StructuralElement = require('../models/StructuralElement');
-const Task = require('../models/Task');
-const { auth, adminAuth } = require('../middleware/auth');
-const { cacheMiddleware, invalidateCache, jobsCacheKeyGenerator, statsCacheKeyGenerator } = require('../middleware/cache');
-const { addProgressJob } = require('../utils/queue');
+const Job = require('../shared/models/Job');
+const StructuralElement = require('../shared/models/StructuralElement');
+const Task = require('../shared/models/Task');
+const { auth, adminAuth } = require('../shared/middleware/auth');
+const { cacheMiddleware, invalidateCache, jobsCacheKeyGenerator, statsCacheKeyGenerator } = require('../shared/middleware/cache');
+const { addProgressJob } = require('../shared/utils/queue');
 
 // Debug middleware to log all requests
 router.use((req, res, next) => {
@@ -1418,7 +1418,7 @@ router.post('/refresh-element-status/:elementId', auth, async (req, res) => {
     if (element.subProject) {
       await invalidateCache(`grouping:*subProjectId:${element.subProject}*`);
       console.log(`📊 Recalculating statistics for subproject: ${element.subProject}`);
-      const SubProject = require('../models/SubProject');
+      const SubProject = require('../shared/models/SubProject');
       await SubProject.recalculateStatistics(element.subProject);
       console.log(`✅ Subproject statistics updated`);
     } else {
