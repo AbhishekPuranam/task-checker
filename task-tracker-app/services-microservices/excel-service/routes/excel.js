@@ -409,8 +409,9 @@ router.post('/preview', auth, upload.single('excel'), async (req, res) => {
     // Convert to JSON
     const jsonData = XLSX.utils.sheet_to_json(worksheet);
     
-    // Clean up uploaded file
-    fs.unlinkSync(req.file.path);
+    // Don't delete the file here - let the cleanup worker handle it
+    // The frontend will upload again for actual processing
+    // fs.unlinkSync(req.file.path);
     
     // Transform and validate the first few rows for preview
     const previewData = jsonData.slice(0, 5).map((row, index) => {
