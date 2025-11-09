@@ -70,7 +70,7 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/auth/users');
+      const response = await api.get('/users');
       setUsers(response.data);
     } catch (error) {
       toast.error('Failed to fetch users');
@@ -135,7 +135,7 @@ const UserManagement = () => {
         if (!updateData.password) {
           delete updateData.password; // Don't update password if not provided
         }
-        await api.put(`/auth/users/${selectedUser._id}`, updateData);
+        await api.put(`/users/${selectedUser._id}`, updateData);
         toast.success('User updated successfully');
       } else {
         // Create user
@@ -143,7 +143,7 @@ const UserManagement = () => {
           setError('Name, username, and password are required');
           return;
         }
-        await api.post('/auth/users', formData);
+        await api.post('/users', formData);
         toast.success('User created successfully');
       }
       
@@ -171,7 +171,7 @@ const UserManagement = () => {
     }
 
     try {
-      await api.delete(`/auth/users/${userToDelete._id}`);
+      await api.delete(`/users/${userToDelete._id}`);
       
       // Refresh the user list
       fetchUsers();

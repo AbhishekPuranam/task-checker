@@ -45,30 +45,25 @@ source = """
   
   # Extract service name from container name
   if exists(.container_name) {
-    .service_name, err = replace(.container_name, r'^tasktracker-', "")
-    if exists(.service_name) {
-      .service_name = replace(.service_name, r'^/', "")
-    }
+    .service_name = replace!(.container_name, r'^tasktracker-', "")
+    .service_name = replace!(.service_name, r'^/', "")
   } else if exists(.file) {
     # Extract from file path
-    .service_name, err = replace(.file, r'^.*/([^/]+)\\.log$', "$1")
+    .service_name = replace!(.file, r'^.*/([^/]+)\.log$', "$1")
   }
   
-  # Parse log level - Supports emoji logging (🚀✅❌⚠️📊💾)
+  # Parse log level
   if exists(.message) {
-    msg, err3 = string(.message)
-    if err3 == null {
-      if match(msg, r'(?i)(error|err|fatal|critical)') {
-        .level = "error"
-      } else if match(msg, r'(?i)(warn|warning)') {
-        .level = "warn"
-      } else if match(msg, r'(?i)(info|information)') {
-        .level = "info"
-      } else if match(msg, r'(?i)(debug|trace)') {
-        .level = "debug"
-      } else {
-        .level = "info"
-      }
+    if match!(.message, r'(?i)(error|err|fatal|critical)') {
+      .level = "error"
+    } else if match!(.message, r'(?i)(warn|warning)') {
+      .level = "warn"
+    } else if match!(.message, r'(?i)(info|information)') {
+      .level = "info"
+    } else if match!(.message, r'(?i)(debug|trace)') {
+      .level = "debug"
+    } else {
+      .level = "info"
     }
   }
   
@@ -76,7 +71,7 @@ source = """
   if exists(.message) {
     parsed, err = parse_json(.message)
     if err == null {
-      ., merge_err = merge(., parsed)
+      . = merge(., parsed)
     }
   }
   
@@ -90,65 +85,65 @@ source = """
 type = "route"
 inputs = ["enrich"]
 
+# Auth Service routes
 [transforms.route_by_service.route.auth_service]
-type = "vrl"
-source = '.service_name == "auth-service"'
+type = "check_fields"
+"service_name.eq" = "auth-service"
 
+# Excel Service routes
 [transforms.route_by_service.route.excel_service]
-type = "vrl"
-source = '.service_name == "excel-service"'
+type = "check_fields"
+"service_name.eq" = "excel-service"
 
+# Project Service routes
 [transforms.route_by_service.route.project_service]
-type = "vrl"
-source = '.service_name == "project-service"'
+type = "check_fields"
+"service_name.eq" = "project-service"
 
+# SubProject Service routes
 [transforms.route_by_service.route.subproject_service]
-type = "vrl"
-source = '.service_name == "subproject-service"'
+type = "check_fields"
+"service_name.eq" = "subproject-service"
 
+# Structural Elements Service routes
 [transforms.route_by_service.route.structural_elements_service]
-type = "vrl"
-source = '.service_name == "structural-elements-service"'
+type = "check_fields"
+"service_name.eq" = "structural-elements-service"
 
+# Jobs Service routes
 [transforms.route_by_service.route.jobs_service]
-type = "vrl"
-source = '.service_name == "jobs-service"'
+type = "check_fields"
+"service_name.eq" = "jobs-service"
 
+# Metrics Service routes
 [transforms.route_by_service.route.metrics_service]
-type = "vrl"
-source = '.service_name == "metrics-service"'
+type = "check_fields"
+"service_name.eq" = "metrics-service"
 
+# MongoDB routes
 [transforms.route_by_service.route.mongodb]
-type = "vrl"
-source = '.service_name == "mongodb"'
+type = "check_fields"
+"service_name.eq" = "mongodb"
 
+# Redis routes
 [transforms.route_by_service.route.redis]
-type = "vrl"
-source = '.service_name == "redis"'
+type = "check_fields"
+"service_name.eq" = "redis"
 
+# Traefik routes
 [transforms.route_by_service.route.traefik]
-type = "vrl"
-source = '.service_name == "traefik"'
+type = "check_fields"
+"service_name.eq" = "traefik"
 
+# Vault routes
 [transforms.route_by_service.route.vault]
-type = "vrl"
-source = '.service_name == "vault"'
+type = "check_fields"
+"service_name.eq" = "vault"
 
+# Uptime Kuma routes
 [transforms.route_by_service.route.uptime_kuma]
-type = "vrl"
-source = '.service_name == "uptime-kuma"'
-
-[transforms.route_by_service.route.admin_ui]
-type = "vrl"
-source = 'contains(string!(.container_name), "admin")'
-
-[transforms.route_by_service.route.engineer_ui]
-type = "vrl"
-source = 'contains(string!(.container_name), "engineer")'
-
-[transforms.route_by_service.route.other]
-type = "vrl"
-source = 'true'
+type = "check_fields"
+"service_name.eq" = "uptime-kuma"
 
 # ============================================
 # SINKS - OpenSearch Outputs (Separate Index per Service)
@@ -333,51 +328,6 @@ auth.password = "Admin@123456"
 
 [sinks.opensearch_uptime.bulk]
 index = "logs-uptime-kuma-%Y.%m.%d"
-
-# Admin UI Sink
-[sinks.opensearch_admin_ui]
-type = "elasticsearch"
-inputs = ["route_by_service.admin_ui"]
-endpoints = ["http://opensearch:9200"]
-mode = "bulk"
-api_version = "v8"
-suppress_type_name = true
-auth.strategy = "basic"
-auth.user = "admin"
-auth.password = "Admin@123456"
-
-[sinks.opensearch_admin_ui.bulk]
-index = "logs-admin-ui-%Y.%m.%d"
-
-# Engineer UI Sink
-[sinks.opensearch_engineer_ui]
-type = "elasticsearch"
-inputs = ["route_by_service.engineer_ui"]
-endpoints = ["http://opensearch:9200"]
-mode = "bulk"
-api_version = "v8"
-suppress_type_name = true
-auth.strategy = "basic"
-auth.user = "admin"
-auth.password = "Admin@123456"
-
-[sinks.opensearch_engineer_ui.bulk]
-index = "logs-engineer-ui-%Y.%m.%d"
-
-# Other Services Sink (catch-all)
-[sinks.opensearch_other]
-type = "elasticsearch"
-inputs = ["route_by_service.other"]
-endpoints = ["http://opensearch:9200"]
-mode = "bulk"
-api_version = "v8"
-suppress_type_name = true
-auth.strategy = "basic"
-auth.user = "admin"
-auth.password = "Admin@123456"
-
-[sinks.opensearch_other.bulk]
-index = "logs-other-%Y.%m.%d"
 
 # ============================================
 # DEBUG SINK (Optional - for troubleshooting)
