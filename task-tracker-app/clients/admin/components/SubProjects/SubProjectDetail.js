@@ -1077,9 +1077,14 @@ export default function SubProjectDetail() {
                 <AccordionSummary
                   expandIcon={<ExpandMoreIcon />}
                   sx={{ 
-                    p: 3,
+                    py: 1.5,
+                    px: 2,
+                    minHeight: '56px !important',
                     background: 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)',
-                    '&:hover': { background: 'linear-gradient(135deg, #f5f5f5 0%, #eeeeee 100%)' }
+                    '&:hover': { background: 'linear-gradient(135deg, #f5f5f5 0%, #eeeeee 100%)' },
+                    '& .MuiAccordionSummary-content': {
+                      margin: '8px 0 !important'
+                    }
                   }}
                 >
                 {/* Compact Group Header with Inline Metrics */}
@@ -1087,9 +1092,9 @@ export default function SubProjectDetail() {
                   display: 'flex', 
                   alignItems: 'center', 
                   gap: 2, 
-                  mb: 2,
-                  pb: 2,
-                  borderBottom: '2px solid #f0f0f0',
+                  mb: 0,
+                  pb: 0,
+                  borderBottom: 'none',
                   flexWrap: 'wrap'
                 }}>
                   {/* Group Title */}
