@@ -31,6 +31,12 @@ mongoose.connect(mongoUri, {
   process.exit(1);
 });
 
+// Load models to register schemas
+require('./shared/models/Project');
+require('./shared/models/SubProject');
+require('./shared/models/StructuralElement');
+require('./shared/models/User');
+
 // Routes
 app.use('/health', require('./routes/health'));
 app.use('/api/subprojects', require('./routes/subprojects'));
