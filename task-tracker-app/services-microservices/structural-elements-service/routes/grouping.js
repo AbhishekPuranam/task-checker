@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const StructuralElement = require('../../../shared/models/StructuralElement');
-const Job = require('../../../shared/models/Job');
-const { auth } = require('../../../shared/middleware/auth');
-const cache = require('../../../shared/utils/cache');
+const StructuralElement = require('../shared/models/StructuralElement');
+const Job = require('../shared/models/Job');
+const { auth } = require('../shared/middleware/auth');
+const cache = require('../shared/utils/cache');
 
 /**
  * @swagger
