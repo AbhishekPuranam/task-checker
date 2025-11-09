@@ -5,13 +5,13 @@ const StructuralElement = require('../shared/models/StructuralElement');
 const Task = require('../shared/models/Task');
 const Job = require('../shared/models/Job');
 const UploadSession = require('../shared/models/UploadSession');
-const { invalidateCache } = require('../middleware/cache');
-const { addProgressJob } = require('../utils/queue');
+const { invalidateCache } = require('../shared/middleware/cache');
+const { addProgressJob } = require('../shared/utils/queue');
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
-const logger = require('../utils/logger');
-const { parseExcelFile, transformExcelRow } = require('../utils/excelTransform');
-const { createFireProofingJobs } = require('../utils/fireProofingJobs');
+const logger = require('../shared/utils/logger');
+const { parseExcelFile, transformExcelRow } = require('../shared/utils/excelTransform');
+const { createFireProofingJobs } = require('../shared/utils/fireProofingJobs');
 
 /**
  * Delete Excel file safely
