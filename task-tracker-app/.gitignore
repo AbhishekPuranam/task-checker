@@ -55,3 +55,55 @@ ssl/*.crt
 *.test.js
 *.spec.js
 coverage/
+
+# Production documents and sensitive files
+*.production.*
+*-production.*
+production-*
+production/
+prod-config*
+prod-secrets*
+credentials*
+passwords*
+secrets*
+*.secret
+*.credentials
+
+# Docker Compose production files with sensitive data
+docker-compose.prod.yml
+docker-compose.production.yml
+**/docker-compose.prod.yml
+**/docker-compose.production.yml
+
+# Database dumps and backups with sensitive data
+*.dump
+*.backup
+*.sql
+backups/
+dumps/
+
+# Configuration files with sensitive data
+vault-config.hcl
+**/vault-config.hcl
+*.vault
+vault-data/
+
+# Infrastructure secrets
+infrastructure/**/secrets/
+infrastructure/**/*.secret
+infrastructure/**/*-secrets.*
+
+# Monitoring and APM configs with tokens
+**/*-apm-config.*
+**/*-monitoring-config.*
+
+# SSH keys
+*.pem
+*.key
+id_rsa*
+*.ppk
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
