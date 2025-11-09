@@ -318,7 +318,7 @@ router.post('/login', authLimiter, async (req, res) => {
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
 
     // Determine redirect URL based on role
-    const redirectUrl = user.role === 'admin' ? '/admin' : '/engineer';
+    const redirectUrl = user.role === 'admin' ? '/admin/projects' : '/engineer';
 
     res.json({
       token,
