@@ -269,6 +269,7 @@ services:
       - vault_token
       - mongodb_password
       - redis_password
+      - jwt_secret
     depends_on:
       - mongodb
       - redis
@@ -320,6 +321,7 @@ services:
       - vault_token
       - mongodb_password
       - redis_password
+      - jwt_secret
     depends_on:
       - mongodb
       - redis
@@ -383,6 +385,7 @@ services:
       - vault_token
       - mongodb_password
       - redis_password
+      - jwt_secret
     depends_on:
       - mongodb
       - redis
@@ -437,6 +440,7 @@ services:
       - vault_token
       - mongodb_password
       - redis_password
+      - jwt_secret
     depends_on:
       - mongodb
       - redis
@@ -445,7 +449,7 @@ services:
       - tasktracker-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.metrics.rule=Host(`projects.sapcindia.com`) && (PathPrefix(`/api/reports`) || PathPrefix(`/api/metrics`))"
+      - "traefik.http.routers.metrics.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api/metrics`)"
       - "traefik.http.routers.metrics.entrypoints=web"
       - "traefik.http.routers.metrics.priority=80"
       - "traefik.http.routers.metrics-secure.rule=Host(`projects.sapcindia.com`) && (PathPrefix(`/api/reports`) || PathPrefix(`/api/metrics`))"
