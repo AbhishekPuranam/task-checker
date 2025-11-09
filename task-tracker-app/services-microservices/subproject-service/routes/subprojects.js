@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const SubProject = require('../shared/models/SubProject');
-const Task = require('../shared/models/Task'); // Task model is used as Project
 const StructuralElement = require('../shared/models/StructuralElement');
 const { auth, adminAuth } = require('../shared/middleware/auth');
 const cache = require('../shared/utils/cache');
@@ -158,24 +157,17 @@ router.get('/:id', auth, async (req, res) => {
  * @swagger
  * /api/subprojects/by-name/:projectId/:subProjectName:
  *   get:
- *     summary: Get SubProject by project ID and name/code
+ *     summary: Get a specific SubProject by name or code with statistics
  *     tags: [SubProjects]
  */
 router.get('/by-name/:projectId/:subProjectName', auth, async (req, res) => {
   try {
-    console.log('🔍 [SUBPROJECT] REQUEST RECEIVED:', {
-      method: req.method,
-      url: req.url,
-      params: req.params,
-      projectId: req.params.projectId,
-      subProjectName: req.params.subProjectName
-    });
-    
     const { projectId, subProjectName } = req.params;
+    
+    // Decode the subproject name from URL
     const decodedName = decodeURIComponent(subProjectName);
-
-    console.log('🔍 Fetching SubProject by name:', { projectId, decodedName });
-
+    
+    // Try to find by name or code (case insensitive)
     const subProject = await SubProject.findOne({
       project: projectId,
       $or: [
@@ -186,30 +178,20 @@ router.get('/by-name/:projectId/:subProjectName', auth, async (req, res) => {
       .populate('project', 'title description')
       .populate('createdBy', 'name email')
       .lean();
-
+    
     if (!subProject) {
-      console.error('❌ SubProject not found', { projectId, decodedName });
       return res.status(404).json({ error: 'SubProject not found' });
     }
-
+    
     // Always calculate statistics on-the-fly to ensure fresh data
-    try {
-      console.log('📊 Calculating statistics for subproject:', subProject._id);
-      const stats = await SubProject.recalculateStatistics(subProject._id);
-      console.log('📊 Calculated statistics:', JSON.stringify(stats, null, 2));
-      subProject.statistics = stats;
-    } catch (statsError) {
-      console.error('❌ Error calculating statistics:', statsError);
-      subProject.statistics = { error: statsError.message };
-    }
-
+    console.log('📊 Calculating statistics for subproject:', subProject._id);
+    const stats = await SubProject.recalculateStatistics(subProject._id);
+    console.log('📊 Calculated statistics:', JSON.stringify(stats, null, 2));
+    subProject.statistics = stats;
+    
     res.json(subProject);
   } catch (error) {
-    console.error('❌ Error fetching SubProject by name:', {
-      error: error.message,
-      stack: error.stack,
-      params: req.params
-    });
+    console.error('Error fetching SubProject by name:', error);
     res.status(500).json({ error: error.message });
   }
 });

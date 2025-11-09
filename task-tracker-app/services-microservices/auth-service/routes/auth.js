@@ -317,14 +317,6 @@ router.post('/login', authLimiter, async (req, res) => {
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
 
-    // Determine redirect URL based on role
-    let redirectUrl;
-    if (user.role === 'admin') {
-      redirectUrl = '/admin/projects';
-    } else {
-      redirectUrl = '/engineer';
-    }
-
     res.json({
       token,
       user: {
@@ -334,8 +326,7 @@ router.post('/login', authLimiter, async (req, res) => {
         email: user.email,
         role: user.role,
         department: user.department
-      },
-      redirectUrl
+      }
     });
   } catch (error) {
     console.error(error);

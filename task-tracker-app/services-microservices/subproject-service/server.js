@@ -12,13 +12,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Request logging middleware
-app.use((req, res, next) => {
-  console.log(`📥 [${new Date().toISOString()}] ${req.method} ${req.url}`);
-  console.log(`   Headers:`, req.headers);
-  next();
-});
-
 // MongoDB connection
 const MONGODB_PASSWORD = fs.existsSync('/run/secrets/mongodb_password') 
   ? fs.readFileSync('/run/secrets/mongodb_password', 'utf8').trim()
@@ -37,13 +30,6 @@ mongoose.connect(mongoUri, {
   console.error('❌ MongoDB connection error:', err);
   process.exit(1);
 });
-
-// Load models to register schemas (Task model is used as Project)
-require('./shared/models/Task');
-require('./shared/models/SubProject');
-require('./shared/models/StructuralElement');
-require('./shared/models/User');
-require('./shared/models/Job');
 
 // Routes
 app.use('/health', require('./routes/health'));

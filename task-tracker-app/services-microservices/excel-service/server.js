@@ -33,7 +33,7 @@ mongoose.connect(mongoUri, {
 
 // Routes
 app.use('/health', require('./routes/health'));
-app.use('/api/excel', require('./routes/excel'));
+app.use('/', require('./routes/excel'));
 
 app.use((err, req, res, next) => {
   console.error('Error:', err);
