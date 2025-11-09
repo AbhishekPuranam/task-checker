@@ -29,13 +29,12 @@ mongoose.connect(mongoUri, {
   console.log('✅ MongoDB connected to excel-service');
   
   // Start the Excel processing worker
-  createBatchExcelWorker()
-    .then(worker => {
-      console.log('✅ Excel batch processing worker started');
-    })
-    .catch(err => {
-      console.error('❌ Failed to start Excel worker:', err);
-    });
+  try {
+    createBatchExcelWorker();
+    console.log('✅ Excel batch processing worker started');
+  } catch (err) {
+    console.error('❌ Failed to start Excel worker:', err);
+  }
 }).catch(err => {
   console.error('❌ MongoDB connection error:', err);
   process.exit(1);
