@@ -86,49 +86,64 @@ type = "route"
 inputs = ["enrich"]
 
 [transforms.route_by_service.route.auth_service]
-.service_name == "auth-service"
+type = "vrl"
+source = '.service_name == "auth-service"'
 
 [transforms.route_by_service.route.excel_service]
-.service_name == "excel-service"
+type = "vrl"
+source = '.service_name == "excel-service"'
 
 [transforms.route_by_service.route.project_service]
-.service_name == "project-service"
+type = "vrl"
+source = '.service_name == "project-service"'
 
 [transforms.route_by_service.route.subproject_service]
-.service_name == "subproject-service"
+type = "vrl"
+source = '.service_name == "subproject-service"'
 
 [transforms.route_by_service.route.structural_elements_service]
-.service_name == "structural-elements-service"
+type = "vrl"
+source = '.service_name == "structural-elements-service"'
 
 [transforms.route_by_service.route.jobs_service]
-.service_name == "jobs-service"
+type = "vrl"
+source = '.service_name == "jobs-service"'
 
 [transforms.route_by_service.route.metrics_service]
-.service_name == "metrics-service"
+type = "vrl"
+source = '.service_name == "metrics-service"'
 
 [transforms.route_by_service.route.mongodb]
-.service_name == "mongodb"
+type = "vrl"
+source = '.service_name == "mongodb"'
 
 [transforms.route_by_service.route.redis]
-.service_name == "redis"
+type = "vrl"
+source = '.service_name == "redis"'
 
 [transforms.route_by_service.route.traefik]
-.service_name == "traefik"
+type = "vrl"
+source = '.service_name == "traefik"'
 
 [transforms.route_by_service.route.vault]
-.service_name == "vault"
+type = "vrl"
+source = '.service_name == "vault"'
 
 [transforms.route_by_service.route.uptime_kuma]
-.service_name == "uptime-kuma"
+type = "vrl"
+source = '.service_name == "uptime-kuma"'
 
 [transforms.route_by_service.route.admin_ui]
-contains(string!(.container_name), "admin")
+type = "vrl"
+source = 'contains(string!(.container_name), "admin")'
 
 [transforms.route_by_service.route.engineer_ui]
-contains(string!(.container_name), "engineer")
+type = "vrl"
+source = 'contains(string!(.container_name), "engineer")'
 
 [transforms.route_by_service.route.other]
-true
+type = "vrl"
+source = 'true'
 
 # ============================================
 # SINKS - OpenSearch Outputs (Separate Index per Service)
