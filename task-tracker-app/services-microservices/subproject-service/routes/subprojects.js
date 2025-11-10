@@ -35,8 +35,7 @@ router.post('/', adminAuth, async (req, res) => {
     
     await subProject.save();
     
-    // Invalidate project cache
-    await cache.invalidateProject(projectId);
+    console.log('✅ SubProject created successfully:', subProject._id);
     
     // Prevent browser caching
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
@@ -224,11 +223,7 @@ router.put('/:id', adminAuth, async (req, res) => {
       return res.status(404).json({ error: 'SubProject not found' });
     }
     
-    // Invalidate caches
-    await Promise.all([
-      cache.invalidateSubProject(req.params.id),
-      cache.invalidateProject(subProject.project)
-    ]);
+    console.log('✅ SubProject updated successfully:', req.params.id);
     
     // Prevent browser caching
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
@@ -279,11 +274,7 @@ router.delete('/:id', adminAuth, async (req, res) => {
     // Now delete the subproject
     await SubProject.findByIdAndDelete(req.params.id);
     
-    // Invalidate caches
-    await Promise.all([
-      cache.invalidateSubProject(req.params.id),
-      cache.invalidateProject(subProject.project)
-    ]);
+    console.log('✅ SubProject deleted successfully:', req.params.id);
     
     // Prevent browser caching
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
