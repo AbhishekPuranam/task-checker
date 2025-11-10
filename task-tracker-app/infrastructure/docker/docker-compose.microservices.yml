@@ -97,10 +97,10 @@ services:
       NODE_ENV: production
       PORT: 6000
       SERVICE_NAME: auth-service
-      MONGO_HOST: mongodb
+      MONGO_HOST: tasktracker-mongodb
       MONGO_PORT: 27017
       MONGO_DB: tasktracker
-      REDIS_HOST: redis
+      REDIS_HOST: tasktracker-redis
       REDIS_PORT: 6379
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN_FILE: /run/secrets/vault_token
@@ -115,9 +115,9 @@ services:
       - session_secret
       - redis_password
     depends_on:
-      - mongodb
-      - redis
-      - vault
+      - tasktracker-mongodb
+      - tasktracker-redis
+      - tasktracker-vault
     networks:
       - tasktracker-network
     labels:
@@ -161,10 +161,10 @@ services:
       NODE_ENV: production
       PORT: 6001
       SERVICE_NAME: excel-service
-      MONGO_HOST: mongodb
+      MONGO_HOST: tasktracker-mongodb
       MONGO_PORT: 27017
       MONGO_DB: tasktracker
-      REDIS_HOST: redis
+      REDIS_HOST: tasktracker-redis
       REDIS_PORT: 6379
       EXCEL_BATCH_MODE: 'true'
       VAULT_ADDR: http://vault:8200
@@ -179,9 +179,9 @@ services:
       - redis_password
       - jwt_secret
     depends_on:
-      - mongodb
-      - redis
-      - vault
+      - tasktracker-mongodb
+      - tasktracker-redis
+      - tasktracker-vault
     networks:
       - tasktracker-network
     labels:
@@ -218,10 +218,10 @@ services:
       NODE_ENV: production
       PORT: 6002
       SERVICE_NAME: project-service
-      MONGO_HOST: mongodb
+      MONGO_HOST: tasktracker-mongodb
       MONGO_PORT: 27017
       MONGO_DB: tasktracker
-      REDIS_HOST: redis
+      REDIS_HOST: tasktracker-redis
       REDIS_PORT: 6379
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN_FILE: /run/secrets/vault_token
@@ -234,9 +234,9 @@ services:
       - redis_password
       - jwt_secret
     depends_on:
-      - mongodb
-      - redis
-      - vault
+      - tasktracker-mongodb
+      - tasktracker-redis
+      - tasktracker-vault
     networks:
       - tasktracker-network
     labels:
@@ -270,10 +270,10 @@ services:
       NODE_ENV: production
       PORT: 6003
       SERVICE_NAME: subproject-service
-      MONGO_HOST: mongodb
+      MONGO_HOST: tasktracker-mongodb
       MONGO_PORT: 27017
       MONGO_DB: tasktracker
-      REDIS_HOST: redis
+      REDIS_HOST: tasktracker-redis
       REDIS_PORT: 6379
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN_FILE: /run/secrets/vault_token
@@ -286,9 +286,9 @@ services:
       - redis_password
       - jwt_secret
     depends_on:
-      - mongodb
-      - redis
-      - vault
+      - tasktracker-mongodb
+      - tasktracker-redis
+      - tasktracker-vault
     networks:
       - tasktracker-network
     labels:
@@ -322,10 +322,10 @@ services:
       NODE_ENV: production
       PORT: 6004
       SERVICE_NAME: structural-elements-service
-      MONGO_HOST: mongodb
+      MONGO_HOST: tasktracker-mongodb
       MONGO_PORT: 27017
       MONGO_DB: tasktracker
-      REDIS_HOST: redis
+      REDIS_HOST: tasktracker-redis
       REDIS_PORT: 6379
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN_FILE: /run/secrets/vault_token
@@ -338,9 +338,9 @@ services:
       - redis_password
       - jwt_secret
     depends_on:
-      - mongodb
-      - redis
-      - vault
+      - tasktracker-mongodb
+      - tasktracker-redis
+      - tasktracker-vault
     networks:
       - tasktracker-network
     labels:
@@ -377,10 +377,10 @@ services:
       NODE_ENV: production
       PORT: 6007
       SERVICE_NAME: jobs-service
-      MONGO_HOST: mongodb
+      MONGO_HOST: tasktracker-mongodb
       MONGO_PORT: 27017
       MONGO_DB: tasktracker
-      REDIS_HOST: redis
+      REDIS_HOST: tasktracker-redis
       REDIS_PORT: 6379
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN_FILE: /run/secrets/vault_token
@@ -392,9 +392,9 @@ services:
       - mongodb_password
       - redis_password
     depends_on:
-      - mongodb
-      - redis
-      - vault
+      - tasktracker-mongodb
+      - tasktracker-redis
+      - tasktracker-vault
     networks:
       - tasktracker-network
     labels:
@@ -431,10 +431,10 @@ services:
       NODE_ENV: production
       PORT: 6010
       SERVICE_NAME: metrics-service
-      MONGO_HOST: mongodb
+      MONGO_HOST: tasktracker-mongodb
       MONGO_PORT: 27017
       MONGO_DB: tasktracker
-      REDIS_HOST: redis
+      REDIS_HOST: tasktracker-redis
       REDIS_PORT: 6379
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN_FILE: /run/secrets/vault_token
@@ -447,9 +447,9 @@ services:
       - redis_password
       - jwt_secret
     depends_on:
-      - mongodb
-      - redis
-      - vault
+      - tasktracker-mongodb
+      - tasktracker-redis
+      - tasktracker-vault
     networks:
       - tasktracker-network
     labels:
