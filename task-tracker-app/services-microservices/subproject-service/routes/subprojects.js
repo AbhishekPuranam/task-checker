@@ -257,22 +257,27 @@ router.put('/:id', adminAuth, async (req, res) => {
  */
 router.delete('/:id', adminAuth, async (req, res) => {
   try {
-    // Check if subproject has elements
-    const elementCount = await StructuralElement.countDocuments({ 
-      subProject: req.params.id 
-    });
-    
-    if (elementCount > 0) {
-      return res.status(400).json({ 
-        error: `Cannot delete SubProject with ${elementCount} structural elements. Please reassign or delete elements first.` 
-      });
-    }
-    
-    const subProject = await SubProject.findByIdAndDelete(req.params.id);
+    // Get subproject first
+    const subProject = await SubProject.findById(req.params.id);
     
     if (!subProject) {
       return res.status(404).json({ error: 'SubProject not found' });
     }
+    
+    // Delete all associated structural elements and their jobs
+    const Job = require('../shared/models/Job');
+    const elements = await StructuralElement.find({ subProject: req.params.id });
+    const elementIds = elements.map(e => e._id);
+    
+    // Delete all jobs associated with these elements
+    if (elementIds.length > 0) {
+      await Job.deleteMany({ structuralElement: { $in: elementIds } });
+      await StructuralElement.deleteMany({ subProject: req.params.id });
+      console.log(`🗑️ Deleted ${elementIds.length} structural elements and their jobs for subproject ${req.params.id}`);
+    }
+    
+    // Now delete the subproject
+    await SubProject.findByIdAndDelete(req.params.id);
     
     // Invalidate caches
     await Promise.all([
