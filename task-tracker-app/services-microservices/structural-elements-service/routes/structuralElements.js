@@ -481,7 +481,7 @@ router.get('/project/:projectId/summary',
       
       // Get elements with minimal data
       const elements = await StructuralElement.find(filter)
-        .select('structureNumber drawingNo level memberType gridNo partMarkNo sectionSizes lengthMm qty surfaceAreaSqm fireProofingWorkflow')
+        .select('structureNumber drawingNo level memberType gridNo partMarkNo sectionSizes lengthMm qty fireproofingThickness surfaceAreaSqm fireProofingWorkflow')
         .sort(sort)
         .limit(parseInt(limit))
         .skip((parseInt(page) - 1) * parseInt(limit))

@@ -164,7 +164,7 @@ const StructuralElementsList = ({ projectSlug }) => {
     flangeWidthMm: false,
     webThicknessMm: false,
     flangeThicknessMm: false,
-    fireproofingThickness: false,
+    fireproofingThickness: true,
     surfaceAreaSqm: true,
     fireProofingWorkflow: true,
     projectName: false,
