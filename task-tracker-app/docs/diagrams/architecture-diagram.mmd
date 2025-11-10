@@ -1,0 +1,96 @@
+graph TB
+    subgraph "Client Layer"
+        AdminUI[Admin Portal<br/>Next.js<br/>Port 3002<br/>2 Replicas]
+        EngUI[Engineer Portal<br/>Next.js<br/>Port 3001<br/>2 Replicas]
+    end
+    
+    subgraph "API Gateway"
+        Traefik[Traefik Reverse Proxy<br/>Port 80/443<br/>SSL/TLS]
+    end
+    
+    subgraph "Microservices Layer"
+        AuthService[Auth Service<br/>Port 6000<br/>Login/JWT]
+        ProjectService[Project Service<br/>Port 6002<br/>Project CRUD]
+        SubProjectService[SubProject Service<br/>Port 6003<br/>SubProject Management]
+        ExcelService[Excel Service<br/>Port 6001<br/>Upload Processing]
+        StructuralService[Structural Elements<br/>Port 6004<br/>3 Replicas]
+        JobsService[Jobs Service<br/>Port 6007<br/>3 Replicas]
+        MetricsService[Metrics Service<br/>Port 6010<br/>Reports/Analytics]
+    end
+    
+    subgraph "Background Workers"
+        ExcelWorker[Excel Processor<br/>Batch Processing]
+        ProgressWorker[Progress Calculator<br/>Aggregation]
+        AggregationWorker[Stats Aggregation<br/>SubProject/Project]
+    end
+    
+    subgraph "Data Layer"
+        MongoDB[(MongoDB 7.0<br/>Replica Set<br/>Port 27017)]
+        Redis[(Redis 7<br/>Cache & Queue<br/>Port 6379)]
+    end
+    
+    subgraph "Monitoring"
+        UptimeKuma[Uptime Kuma<br/>Service Monitoring<br/>Port 3001]
+        Vector[Vector<br/>Log Aggregation]
+        OpenSearch[(OpenSearch<br/>Logs & Traces)]
+        OpenSearchDash[OpenSearch Dashboards<br/>Visualization]
+    end
+    
+    AdminUI --> Traefik
+    EngUI --> Traefik
+    
+    Traefik --> AuthService
+    Traefik --> ProjectService
+    Traefik --> SubProjectService
+    Traefik --> ExcelService
+    Traefik --> StructuralService
+    Traefik --> JobsService
+    Traefik --> MetricsService
+    
+    AuthService --> MongoDB
+    AuthService --> Redis
+    ProjectService --> MongoDB
+    ProjectService --> Redis
+    SubProjectService --> MongoDB
+    ExcelService --> MongoDB
+    ExcelService --> Redis
+    StructuralService --> MongoDB
+    StructuralService --> Redis
+    JobsService --> MongoDB
+    JobsService --> Redis
+    MetricsService --> MongoDB
+    
+    ExcelService --> ExcelWorker
+    ExcelWorker --> Redis
+    ExcelWorker --> MongoDB
+    
+    StructuralService --> ProgressWorker
+    ProgressWorker --> Redis
+    ProgressWorker --> MongoDB
+    
+    SubProjectService --> AggregationWorker
+    AggregationWorker --> Redis
+    AggregationWorker --> MongoDB
+    
+    UptimeKuma -.Monitor.-> AuthService
+    UptimeKuma -.Monitor.-> ProjectService
+    UptimeKuma -.Monitor.-> ExcelService
+    UptimeKuma -.Monitor.-> StructuralService
+    UptimeKuma -.Monitor.-> JobsService
+    UptimeKuma -.Monitor.-> MongoDB
+    UptimeKuma -.Monitor.-> Redis
+    
+    Vector -.Collect Logs.-> AuthService
+    Vector -.Collect Logs.-> ProjectService
+    Vector -.Collect Logs.-> ExcelService
+    Vector --> OpenSearch
+    OpenSearch --> OpenSearchDash
+    
+    style AdminUI fill:#4c6ef5
+    style EngUI fill:#4c6ef5
+    style Traefik fill:#ffd43b
+    style MongoDB fill:#51cf66
+    style Redis fill:#ff6b6b
+    style UptimeKuma fill:#a61e4d
+    style OpenSearch fill:#e64980
+    style Vector fill:#e64980

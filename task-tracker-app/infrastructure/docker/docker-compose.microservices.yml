@@ -4,32 +4,6 @@ services:
   # ============================================
   # INFRASTRUCTURE SERVICES
   # ============================================
-  
-  # HashiCorp Vault for Secret Management
-  vault:
-    image: hashicorp/vault:1.15
-    container_name: tasktracker-vault
-    restart: unless-stopped
-    ports:
-      - "8200:8200"
-    environment:
-      VAULT_ADDR: 'http://0.0.0.0:8200'
-      VAULT_DEV_ROOT_TOKEN_ID: 'dev-only-token'
-      VAULT_DEV_LISTEN_ADDRESS: '0.0.0.0:8200'
-    cap_add:
-      - IPC_LOCK
-    volumes:
-      - vault_data:/vault/file
-      - vault_logs:/vault/logs
-      - ./vault-config.hcl:/vault/config/vault.hcl:ro
-    command: server
-    networks:
-      - tasktracker-network
-    healthcheck:
-      test: ["CMD", "vault", "status"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
 
   # MongoDB Database (Replica Set for Transactions)
   mongodb:
@@ -102,14 +76,11 @@ services:
       MONGO_DB: tasktracker
       REDIS_HOST: tasktracker-redis
       REDIS_PORT: 6379
-      VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN_FILE: /run/secrets/vault_token
     volumes:
       - ../../uploads:/app/uploads
       - ../../logs:/app/logs
       - ../../shared:/app/shared:ro
     secrets:
-      - vault_token
       - mongodb_password
       - jwt_secret
       - session_secret
@@ -117,7 +88,6 @@ services:
     depends_on:
       - mongodb
       - redis
-      - vault
     networks:
       - tasktracker-network
     labels:
@@ -167,21 +137,17 @@ services:
       REDIS_HOST: tasktracker-redis
       REDIS_PORT: 6379
       EXCEL_BATCH_MODE: 'true'
-      VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN_FILE: /run/secrets/vault_token
     volumes:
       - ../../uploads:/app/uploads
       - ../../logs:/app/logs
       - ../../shared:/app/shared:ro
     secrets:
-      - vault_token
       - mongodb_password
       - redis_password
       - jwt_secret
     depends_on:
       - mongodb
       - redis
-      - vault
     networks:
       - tasktracker-network
     labels:
@@ -223,20 +189,16 @@ services:
       MONGO_DB: tasktracker
       REDIS_HOST: tasktracker-redis
       REDIS_PORT: 6379
-      VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN_FILE: /run/secrets/vault_token
     volumes:
       - ../../logs:/app/logs
       - ../../shared:/app/shared:ro
     secrets:
-      - vault_token
       - mongodb_password
       - redis_password
       - jwt_secret
     depends_on:
       - mongodb
       - redis
-      - vault
     networks:
       - tasktracker-network
     labels:
@@ -275,20 +237,16 @@ services:
       MONGO_DB: tasktracker
       REDIS_HOST: tasktracker-redis
       REDIS_PORT: 6379
-      VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN_FILE: /run/secrets/vault_token
     volumes:
       - ../../logs:/app/logs
       - ../../shared:/app/shared:ro
     secrets:
-      - vault_token
       - mongodb_password
       - redis_password
       - jwt_secret
     depends_on:
       - mongodb
       - redis
-      - vault
     networks:
       - tasktracker-network
     labels:
@@ -327,20 +285,16 @@ services:
       MONGO_DB: tasktracker
       REDIS_HOST: tasktracker-redis
       REDIS_PORT: 6379
-      VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN_FILE: /run/secrets/vault_token
     volumes:
       - ../../logs:/app/logs
       - ../../shared:/app/shared:ro
     secrets:
-      - vault_token
       - mongodb_password
       - redis_password
       - jwt_secret
     depends_on:
       - mongodb
       - redis
-      - vault
     networks:
       - tasktracker-network
     labels:
@@ -382,20 +336,16 @@ services:
       MONGO_DB: tasktracker
       REDIS_HOST: tasktracker-redis
       REDIS_PORT: 6379
-      VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN_FILE: /run/secrets/vault_token
     volumes:
       - ../../logs:/app/logs
       - ../../shared:/app/shared:ro
     secrets:
-      - vault_token
       - mongodb_password
       - redis_password
       - jwt_secret
     depends_on:
       - mongodb
       - redis
-      - vault
     networks:
       - tasktracker-network
     labels:
@@ -437,20 +387,16 @@ services:
       MONGO_DB: tasktracker
       REDIS_HOST: tasktracker-redis
       REDIS_PORT: 6379
-      VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN_FILE: /run/secrets/vault_token
     volumes:
       - ../../logs:/app/logs
       - ../../shared:/app/shared:ro
     secrets:
-      - vault_token
       - mongodb_password
       - redis_password
       - jwt_secret
     depends_on:
       - mongodb
       - redis
-      - vault
     networks:
       - tasktracker-network
     labels:
@@ -591,8 +537,6 @@ services:
 # SECRETS MANAGEMENT
 # ============================================
 secrets:
-  vault_token:
-    file: ./secrets/vault_token
   mongodb_password:
     file: ./secrets/mongodb_password
   redis_password:
@@ -611,10 +555,6 @@ volumes:
   redis_data:
     driver: local
   traefik_letsencrypt:
-    driver: local
-  vault_data:
-    driver: local
-  vault_logs:
     driver: local
   uptime_kuma_data:
     driver: local
