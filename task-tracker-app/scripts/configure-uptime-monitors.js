@@ -56,9 +56,9 @@ const MONITORS = [
     description: 'Redis cache and BullMQ'
   },
   
-  // Microservices - Backend APIs (Use login page as proxy for auth check)
+  // Microservices - Specific Endpoint Monitoring
   {
-    name: '🔐 Auth Service',
+    name: '🔐 Auth Service - Login',
     type: 'http',
     url: `https://${BASE_DOMAIN}/login`,
     interval: 60,
@@ -68,7 +68,7 @@ const MONITORS = [
     keyword: 'Login'
   },
   {
-    name: '📊 Excel Service',
+    name: '📊 Excel Service - Health',
     type: 'http',
     url: `https://${BASE_DOMAIN}/api/excel/health`,
     interval: 60,
@@ -78,47 +78,67 @@ const MONITORS = [
     accepted_statuscodes: ['200-299', '401']
   },
   {
-    name: '📁 Project Service',
+    name: '📁 Project Service - API',
     type: 'http',
     url: `https://${BASE_DOMAIN}/api/projects`,
     interval: 60,
     maxretries: 3,
     retryInterval: 60,
     description: 'Project management service',
-    accepted_statuscodes: ['200-299', '401']
+    accepted_statuscodes: ['200-299', '401', '404']
   },
   {
-    name: '📋 SubProject Service',
+    name: '📋 SubProject Service - API',
     type: 'http',
     url: `https://${BASE_DOMAIN}/api/subprojects`,
     interval: 60,
     maxretries: 3,
     retryInterval: 60,
     description: 'SubProject management service',
+    accepted_statuscodes: ['200-299', '401', '404']
+  },
+  {
+    name: '📋 SubProject - Available Fields',
+    type: 'http',
+    url: `https://${BASE_DOMAIN}/api/grouping/available-fields`,
+    interval: 60,
+    maxretries: 3,
+    retryInterval: 60,
+    description: 'Grouping service - available fields endpoint',
     accepted_statuscodes: ['200-299', '401']
   },
   {
-    name: '🏗️ Structural Elements Service',
+    name: '📋 SubProject - Statistics',
+    type: 'http',
+    url: `https://${BASE_DOMAIN}/api/subprojects/project/690e225ea5cea88e240cbf16/statistics`,
+    interval: 60,
+    maxretries: 3,
+    retryInterval: 60,
+    description: 'SubProject statistics endpoint',
+    accepted_statuscodes: ['200-299', '401', '404']
+  },
+  {
+    name: '🏗️ Structural Elements - API',
     type: 'http',
     url: `https://${BASE_DOMAIN}/api/structural-elements`,
     interval: 60,
     maxretries: 3,
     retryInterval: 60,
     description: 'Structural elements service (3 replicas)',
-    accepted_statuscodes: ['200-299', '401']
+    accepted_statuscodes: ['200-299', '401', '404']
   },
   {
-    name: '⚙️ Jobs Service',
+    name: '⚙️ Jobs Service - API',
     type: 'http',
     url: `https://${BASE_DOMAIN}/api/jobs`,
     interval: 60,
     maxretries: 3,
     retryInterval: 60,
     description: 'Jobs management service (3 replicas)',
-    accepted_statuscodes: ['200-299', '401']
+    accepted_statuscodes: ['200-299', '401', '404']
   },
   {
-    name: '📈 Metrics Service',
+    name: '📈 Metrics Service - API',
     type: 'http',
     url: `https://${BASE_DOMAIN}/api/metrics`,
     interval: 60,
@@ -188,16 +208,6 @@ const MONITORS = [
     maxretries: 3,
     retryInterval: 60,
     description: 'Main application landing page'
-  },
-  {
-    name: '🔑 Login Page',
-    type: 'http',
-    url: `https://${BASE_DOMAIN}/login`,
-    interval: 60,
-    maxretries: 3,
-    retryInterval: 60,
-    description: 'Login page availability',
-    keyword: 'Login'
   }
 ];
 
@@ -333,6 +343,26 @@ class UptimeKumaClient {
     });
   }
 
+  async deleteMonitor(monitorId, monitorName) {
+    return new Promise((resolve, reject) => {
+      console.log(`🗑️  Deleting monitor: ${monitorName} (ID: ${monitorId})...`);
+      
+      this.socket.emit('deleteMonitor', monitorId, (response) => {
+        if (response.ok) {
+          console.log(`✅ Monitor deleted: ${monitorName}`);
+          resolve(response);
+        } else {
+          console.error(`❌ Failed to delete monitor ${monitorName}:`, response.msg);
+          reject(new Error(response.msg));
+        }
+      });
+
+      setTimeout(() => {
+        reject(new Error(`Timeout deleting monitor: ${monitorName}`));
+      }, 5000);
+    });
+  }
+
   disconnect() {
     if (this.socket) {
       this.socket.disconnect();
@@ -354,23 +384,34 @@ async function main() {
     // Get existing monitors
     const existingMonitors = await client.getMonitors();
     const existingNames = Object.values(existingMonitors).map(m => m.name);
+    const monitorsToCreate = MONITORS.map(m => m.name);
     
-    console.log('\n📊 Starting monitor creation...\n');
+    // Delete existing monitors that match our monitor names
+    console.log('\n🗑️  Cleaning up existing monitors...\n');
+    let deleteCount = 0;
+    
+    for (const [id, monitor] of Object.entries(existingMonitors)) {
+      if (monitorsToCreate.includes(monitor.name)) {
+        try {
+          await client.deleteMonitor(id, monitor.name);
+          deleteCount++;
+          await new Promise(resolve => setTimeout(resolve, 300));
+        } catch (error) {
+          console.error(`❌ Error deleting ${monitor.name}:`, error.message);
+        }
+      }
+    }
+    
+    console.log(`\n✅ Deleted ${deleteCount} existing monitors\n`);
+    
+    console.log('📊 Starting monitor creation...\n');
     
     // Create monitors
     let successCount = 0;
-    let skipCount = 0;
     let failCount = 0;
     
     for (const monitor of MONITORS) {
       try {
-        // Check if monitor already exists
-        if (existingNames.includes(monitor.name)) {
-          console.log(`⏭️  Skipping ${monitor.name} (already exists)`);
-          skipCount++;
-          continue;
-        }
-        
         await client.addMonitor(monitor);
         successCount++;
         
@@ -383,8 +424,8 @@ async function main() {
     }
     
     console.log('\n📊 Summary:');
+    console.log(`🗑️  Deleted (duplicates): ${deleteCount}`);
     console.log(`✅ Successfully created: ${successCount}`);
-    console.log(`⏭️  Skipped (existing): ${skipCount}`);
     console.log(`❌ Failed: ${failCount}`);
     console.log(`📝 Total monitors: ${MONITORS.length}`);
     
