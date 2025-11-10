@@ -115,9 +115,9 @@ services:
       - session_secret
       - redis_password
     depends_on:
-      - tasktracker-mongodb
-      - tasktracker-redis
-      - tasktracker-vault
+      - mongodb
+      - redis
+      - vault
     networks:
       - tasktracker-network
     labels:
@@ -179,9 +179,9 @@ services:
       - redis_password
       - jwt_secret
     depends_on:
-      - tasktracker-mongodb
-      - tasktracker-redis
-      - tasktracker-vault
+      - mongodb
+      - redis
+      - vault
     networks:
       - tasktracker-network
     labels:
@@ -234,9 +234,9 @@ services:
       - redis_password
       - jwt_secret
     depends_on:
-      - tasktracker-mongodb
-      - tasktracker-redis
-      - tasktracker-vault
+      - mongodb
+      - redis
+      - vault
     networks:
       - tasktracker-network
     labels:
@@ -286,9 +286,9 @@ services:
       - redis_password
       - jwt_secret
     depends_on:
-      - tasktracker-mongodb
-      - tasktracker-redis
-      - tasktracker-vault
+      - mongodb
+      - redis
+      - vault
     networks:
       - tasktracker-network
     labels:
@@ -338,9 +338,9 @@ services:
       - redis_password
       - jwt_secret
     depends_on:
-      - tasktracker-mongodb
-      - tasktracker-redis
-      - tasktracker-vault
+      - mongodb
+      - redis
+      - vault
     networks:
       - tasktracker-network
     labels:
@@ -392,9 +392,9 @@ services:
       - mongodb_password
       - redis_password
     depends_on:
-      - tasktracker-mongodb
-      - tasktracker-redis
-      - tasktracker-vault
+      - mongodb
+      - redis
+      - vault
     networks:
       - tasktracker-network
     labels:
@@ -447,9 +447,9 @@ services:
       - redis_password
       - jwt_secret
     depends_on:
-      - tasktracker-mongodb
-      - tasktracker-redis
-      - tasktracker-vault
+      - mongodb
+      - redis
+      - vault
     networks:
       - tasktracker-network
     labels:
