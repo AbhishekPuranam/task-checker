@@ -43,6 +43,10 @@ router.get('/',
       sortBy = 'serialNo',
       sortOrder = 'asc'
     } = req.query;
+    
+    // Parse pagination parameters properly
+    const parsedPage = parseInt(page, 10) || 1;
+    const parsedLimit = parseInt(limit, 10) || 10;
 
     // Build filter object
     const filter = {};
@@ -86,8 +90,8 @@ router.get('/',
     const elements = await StructuralElement.find(filter)
       .populate('createdBy', 'name email role')
       .sort(sort)
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
+      .limit(parsedLimit)
+      .skip((parsedPage - 1) * parsedLimit)
       .lean();
 
     const total = await StructuralElement.countDocuments(filter);
@@ -172,8 +176,8 @@ router.get('/',
 
     res.json({
       elements: elementsWithJobs,
-      totalPages: Math.ceil(total / limit),
-      currentPage: page,
+      totalPages: Math.ceil(total / parsedLimit),
+      currentPage: parsedPage,
       total
     });
   } catch (error) {
