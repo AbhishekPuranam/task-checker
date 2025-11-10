@@ -1334,6 +1334,18 @@ export default function SubProjectDetail() {
                                   </Typography>
                                 </Box>
                                 
+                                {/* FP Thickness */}
+                                {visibleColumns.fireproofingThickness && element.fireproofingThickness && (
+                                  <Box sx={{ minWidth: '110px' }}>
+                                    <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>
+                                      FP Thickness
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: '0.95rem', color: '#ff9800' }}>
+                                      {element.fireproofingThickness} mm
+                                    </Typography>
+                                  </Box>
+                                )}
+                                
                                 {/* FP Workflow */}
                                 <Box sx={{ minWidth: '120px' }}>
                                   <Typography variant="caption" sx={{ color: '#888', fontSize: '0.7rem', display: 'block' }}>

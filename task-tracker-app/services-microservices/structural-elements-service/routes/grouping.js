@@ -149,6 +149,7 @@ router.post('/elements', auth, async (req, res) => {
             lengthMm: '$lengthMm',
             qty: '$qty',
             surfaceAreaSqm: '$surfaceAreaSqm',
+            fireproofingThickness: '$fireproofingThickness',
             status: '$status',
             fireProofingWorkflow: '$fireProofingWorkflow'
           }
