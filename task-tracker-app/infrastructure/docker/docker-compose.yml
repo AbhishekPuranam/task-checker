@@ -63,103 +63,6 @@ services:
       timeout: 10s
       retries: 3
 
-  # Backend API - Scaled to 3 replicas
-  tasktracker-app:
-    build:
-      context: ../../services/backend-api
-      dockerfile: Dockerfile
-      target: production
-    restart: unless-stopped
-    deploy:
-      replicas: 3
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1024M
-        reservations:
-          cpus: '0.5'
-          memory: 512M
-    environment:
-      NODE_ENV: production
-      PORT: 5000
-      VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN_FILE: /run/secrets/vault_token
-      REDIS_HOST: tasktracker-redis
-      REDIS_PORT: 6379
-      REDIS_CACHE_DB: 1
-      EXCEL_BATCH_MODE: 'true'
-      # Secrets are fetched from Vault at runtime
-    volumes:
-      - ../../uploads:/app/uploads
-      - ../../logs:/app/logs
-    secrets:
-      - vault_token
-      - mongodb_password
-      - jwt_secret
-      - session_secret
-      - redis_password
-    depends_on:
-      - mongodb
-      - redis
-      - vault
-    networks:
-      - tasktracker-network
-    labels:
-      - "traefik.enable=true"
-      # HTTP router
-      - "traefik.http.routers.backend.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.backend.entrypoints=web"
-      - "traefik.http.routers.backend.service=backend"
-      - "traefik.http.routers.backend.priority=50"
-      # HTTPS router
-      - "traefik.http.routers.backend-secure.rule=Host(`projects.sapcindia.com`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.backend-secure.entrypoints=websecure"
-      - "traefik.http.routers.backend-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.backend-secure.service=backend"
-      - "traefik.http.routers.backend-secure.priority=50"
-      # Load balancer configuration
-      - "traefik.http.services.backend.loadbalancer.server.port=5000"
-      - "traefik.http.services.backend.loadbalancer.sticky.cookie=true"
-      - "traefik.http.services.backend.loadbalancer.sticky.cookie.name=backend_sticky"
-      - "traefik.http.services.backend.loadbalancer.healthcheck.path=/health"
-      - "traefik.http.services.backend.loadbalancer.healthcheck.interval=10s"
-      - "traefik.http.services.backend.loadbalancer.healthcheck.timeout=3s"
-
-  # Auth Service
-  tasktracker-auth:
-    build:
-      context: ../../services/auth-service
-      dockerfile: Dockerfile
-    container_name: tasktracker-auth
-    restart: unless-stopped
-    environment:
-      NODE_ENV: production
-      PORT: 4000
-      VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN_FILE: /run/secrets/vault_token
-    secrets:
-      - vault_token
-      - mongodb_password
-      - jwt_secret
-      - session_secret
-    depends_on:
-      - mongodb
-      - vault
-    networks:
-      - tasktracker-network
-    labels:
-      - "traefik.enable=true"
-      # HTTP router
-      - "traefik.http.routers.auth.rule=Host(`projects.sapcindia.com`) && (Path(`/`) || Path(`/login`) || PathPrefix(`/api/auth`))"
-      - "traefik.http.routers.auth.entrypoints=web"
-      - "traefik.http.routers.auth.priority=100"
-      # HTTPS router
-      - "traefik.http.routers.auth-secure.rule=Host(`projects.sapcindia.com`) && (Path(`/`) || Path(`/login`) || PathPrefix(`/api/auth`))"
-      - "traefik.http.routers.auth-secure.entrypoints=websecure"
-      - "traefik.http.routers.auth-secure.priority=100"
-      - "traefik.http.routers.auth-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.services.auth.loadbalancer.server.port=4000"
-
   # Admin Client - Scaled to 2 replicas
   tasktracker-admin:
     build:
@@ -178,8 +81,6 @@ services:
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: https://projects.sapcindia.com/api
-    depends_on:
-      - tasktracker-app
     networks:
       - tasktracker-network
     labels:
@@ -214,8 +115,6 @@ services:
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: https://projects.sapcindia.com/api
-    depends_on:
-      - tasktracker-app
     networks:
       - tasktracker-network
     labels:
