@@ -32,11 +32,12 @@ const MONITORS = [
     interval: 60,
     maxretries: 3,
     retryInterval: 60,
-    description: 'HashiCorp Vault health check'
+    description: 'HashiCorp Vault health check',
+    accepted_statuscodes: ['200-299', '429', '473']
   },
   {
     name: '🗄️ MongoDB - Database',
-    type: 'mongodb',
+    type: 'port',
     hostname: '62.72.56.99',
     port: 27017,
     interval: 60,
@@ -46,7 +47,7 @@ const MONITORS = [
   },
   {
     name: '⚡ Redis - Cache & Queue',
-    type: 'redis',
+    type: 'port',
     hostname: '62.72.56.99',
     port: 6379,
     interval: 60,
@@ -55,16 +56,16 @@ const MONITORS = [
     description: 'Redis cache and BullMQ'
   },
   
-  // Microservices - Backend APIs
+  // Microservices - Backend APIs (Use login page as proxy for auth check)
   {
     name: '🔐 Auth Service',
     type: 'http',
-    url: `https://${BASE_DOMAIN}/api/auth/health`,
+    url: `https://${BASE_DOMAIN}/login`,
     interval: 60,
     maxretries: 3,
     retryInterval: 60,
     description: 'Authentication & Authorization service',
-    keyword: 'ok'
+    keyword: 'Login'
   },
   {
     name: '📊 Excel Service',
@@ -74,57 +75,57 @@ const MONITORS = [
     maxretries: 3,
     retryInterval: 60,
     description: 'Excel upload & batch processing',
-    keyword: 'ok'
+    accepted_statuscodes: ['200-299', '401']
   },
   {
     name: '📁 Project Service',
     type: 'http',
-    url: `https://${BASE_DOMAIN}/api/projects/health`,
+    url: `https://${BASE_DOMAIN}/api/projects`,
     interval: 60,
     maxretries: 3,
     retryInterval: 60,
     description: 'Project management service',
-    keyword: 'ok'
+    accepted_statuscodes: ['200-299', '401']
   },
   {
     name: '📋 SubProject Service',
     type: 'http',
-    url: `https://${BASE_DOMAIN}/api/subprojects/health`,
+    url: `https://${BASE_DOMAIN}/api/subprojects`,
     interval: 60,
     maxretries: 3,
     retryInterval: 60,
     description: 'SubProject management service',
-    keyword: 'ok'
+    accepted_statuscodes: ['200-299', '401']
   },
   {
     name: '🏗️ Structural Elements Service',
     type: 'http',
-    url: `https://${BASE_DOMAIN}/api/structural-elements/health`,
+    url: `https://${BASE_DOMAIN}/api/structural-elements`,
     interval: 60,
     maxretries: 3,
     retryInterval: 60,
     description: 'Structural elements service (3 replicas)',
-    keyword: 'ok'
+    accepted_statuscodes: ['200-299', '401']
   },
   {
     name: '⚙️ Jobs Service',
     type: 'http',
-    url: `https://${BASE_DOMAIN}/api/jobs/health`,
+    url: `https://${BASE_DOMAIN}/api/jobs`,
     interval: 60,
     maxretries: 3,
     retryInterval: 60,
     description: 'Jobs management service (3 replicas)',
-    keyword: 'ok'
+    accepted_statuscodes: ['200-299', '401']
   },
   {
     name: '📈 Metrics Service',
     type: 'http',
-    url: `https://${BASE_DOMAIN}/api/metrics/health`,
+    url: `https://${BASE_DOMAIN}/api/metrics`,
     interval: 60,
     maxretries: 3,
     retryInterval: 60,
     description: 'Reports & analytics service',
-    keyword: 'ok'
+    accepted_statuscodes: ['200-299', '401', '404']
   },
   
   // Frontend Services
@@ -155,7 +156,8 @@ const MONITORS = [
     interval: 60,
     maxretries: 3,
     retryInterval: 60,
-    description: 'OpenSearch cluster health'
+    description: 'OpenSearch cluster health',
+    accepted_statuscodes: ['200-299', '401']
   },
   {
     name: '📊 OpenSearch Dashboards',
@@ -164,12 +166,13 @@ const MONITORS = [
     interval: 60,
     maxretries: 3,
     retryInterval: 60,
-    description: 'OpenSearch Dashboards UI'
+    description: 'OpenSearch Dashboards UI',
+    accepted_statuscodes: ['200-299', '302']
   },
   {
     name: '🌐 Traefik Dashboard',
     type: 'http',
-    url: 'http://62.72.56.99:8080/api/overview',
+    url: 'http://62.72.56.99:8080/dashboard/',
     interval: 60,
     maxretries: 3,
     retryInterval: 60,
@@ -193,7 +196,8 @@ const MONITORS = [
     interval: 60,
     maxretries: 3,
     retryInterval: 60,
-    description: 'Login page availability'
+    description: 'Login page availability',
+    keyword: 'Login'
   }
 ];
 

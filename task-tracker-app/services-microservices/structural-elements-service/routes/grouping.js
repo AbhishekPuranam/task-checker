@@ -172,7 +172,7 @@ router.post('/elements', auth, async (req, res) => {
         pipeline.push({ $skip: skip });
         pipeline.push({ $limit: parseInt(limit) });
         
-        // If includeElements is true, keep all elements; otherwise exclude elements
+        // If includeElements is true, keep all elements; otherwise limit to 5 for preview
         if (includeElements) {
           // Keep all elements in each group
           pipeline.push({
@@ -186,7 +186,7 @@ router.post('/elements', auth, async (req, res) => {
             }
           });
         } else {
-          // Exclude elements array to reduce payload size
+          // Limit elements array to first 5 per group (for preview)
           pipeline.push({
             $project: {
               _id: 1,
@@ -194,7 +194,7 @@ router.post('/elements', auth, async (req, res) => {
               totalSqm: 1,
               totalQty: 1,
               totalLengthMm: 1,
-              elements: []  // Return empty array instead of preview
+              elements: { $slice: ['$elements', 5] }
             }
           });
         }
