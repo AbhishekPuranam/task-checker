@@ -26,6 +26,10 @@ mongoose.connect(mongoUri, {
   useUnifiedTopology: true
 }).then(() => {
   console.log('✅ MongoDB connected to subproject-service');
+  // Load required models for populate to work
+  require('./shared/models/Task');
+  require('./shared/models/SubProject');
+  require('./shared/models/StructuralElement');
 }).catch(err => {
   console.error('❌ MongoDB connection error:', err);
   process.exit(1);
