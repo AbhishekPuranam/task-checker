@@ -89,13 +89,21 @@ export default function EngineerDashboard() {
     }
   }, [selectedProject, activeTab, groupBy, subGroupBy]);
 
+  // Clear all caches when project changes
+  useEffect(() => {
+    setExpandedGroups({});
+    setGroupJobs({});
+    setGroupMetrics({});
+    setAllJobsCache({});
+  }, [selectedProject]);
+
   // Reset expanded groups when filters change
   useEffect(() => {
     setExpandedGroups({});
     setGroupJobs({});
     setGroupMetrics({});
     // Note: Don't clear allJobsCache here - it persists across group/subgroup changes
-    // Only clear when activeTab changes (which triggers fetchMetrics)
+    // Only clear when activeTab or selectedProject changes
   }, [activeTab, groupBy, subGroupBy, searchTerm]);
 
   const fetchProjects = async () => {
