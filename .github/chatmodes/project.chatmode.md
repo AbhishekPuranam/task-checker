@@ -1,84 +1,82 @@
-# GitHub Copilot Custom Instructions
+---
+description: Production-ready development mode with automated deployment and quality checks
+tools: ['edit', 'search', 'fetch', 'usages']
+---
 
-## Repository Guidelines
+# Project Mode - Task Tracker Production Development
 
-### 1. Git Push Policy
-- **ALWAYS** push code changes to production after writing code
-- Commit regularly with meaningful commit messages
-- Ensure code is tested before pushing
+You are operating in production development mode for a task tracking application. Follow these critical guidelines for all development work.
 
-### 2. Security & Privacy
-- This is a **PUBLIC** repository
+## Core Principles
+
+### Code Quality Standards
+- Remove all dead code before committing
+- Eliminate duplicate code - use shared utilities and DRY principles
+- Format code properly before pushing
+- Write clean, maintainable code with proper error handling
+- Always enable logging for all code changes (info, warn, error levels)
+- Include relevant context in log messages for debugging in OpenSearch
+
+### Security & Privacy (PUBLIC REPOSITORY)
 - **NEVER** push production documents, credentials, or sensitive data
-- All sensitive files must be added to `.gitignore`
-- Use environment variables for secrets
-- Reference credentials from Docker Compose files only (they should already be gitignored)
+- Use environment variables for all secrets
+- Reference credentials only from Docker Compose files (already gitignored)
+- Ensure all sensitive files are in `.gitignore`
 
-### 3. Code Quality
-- **Remove dead code** before every commit
-- **Eliminate duplicate code** before committing
-- Run code cleanup and formatting before pushing
-- Keep codebase clean and maintainable
+### Testing Requirements
+- Run unit tests before committing
+- Test code locally before pushing to production
+- Use Playwright MCP for UI testing
+- Verify all functionality works as expected
 
-### 4. Logging & Monitoring
-- **ALWAYS** ensure logging is enabled in code changes
-- Use proper logging levels (info, warn, error)
-- All logs are monitored in OpenSearch
-- Include relevant context in log messages for debugging
+## Infrastructure & Deployment
 
-### 5. Deployment Process
-After committing code, follow these steps:
-
-```bash
-# 1. SSH into production server
-ssh root@62.72.56.99
-
-# 2. Navigate to project directory
-cd /opt/task-checker/task-tracker-app
-
-# 3. Pull latest changes
-git pull origin main
-
-# 4. Navigate to infrastructure directory
-cd infrastructure/docker
-
-# 5. Build containers
-docker-compose build
-
-# 6. Deploy using docker-compose
-docker-compose up -d
-```
-
-### 6. Infrastructure Details
-- Infrastructure code location: `/opt/task-checker/task-tracker-app/infrastructure/docker`
-- **ALWAYS** build containers before deploying
-- **ALWAYS** use `docker-compose` for deployment
-- Redis and MongoDB passwords are configured in Docker Compose files
-- Reference these credentials from the compose files - do not hardcode
-
-### 7. Key Paths
+### Key Paths
 - Production server: `root@62.72.56.99`
 - Project root: `/opt/task-checker/`
-- App root: `/opt/task-checker/task-tracker-app/`
+- Application root: `/opt/task-checker/task-tracker-app/`
 - Infrastructure: `/opt/task-checker/task-tracker-app/infrastructure/docker/`
 
+### Deployment Workflow
+After completing code changes, follow this sequence:
+
+1. **Commit & Push**
+   - Commit with meaningful messages
+   - Push to main branch
+
+2. **Deploy to Production**
+   ```bash
+   # SSH into production
+   ssh root@62.72.56.99
+   
+   # Navigate and pull changes
+   cd /opt/task-checker/task-tracker-app
+   git pull origin main
+   
+   # Build and deploy
+   cd infrastructure/docker
+   docker-compose build
+   docker-compose up -d
+   ```
+
+3. **Verify Deployment**
+   - Check services are running
+   - Monitor logs in OpenSearch
+   - Run smoke tests if applicable
+
+### Infrastructure Notes
+- Always use `docker-compose` for deployment
+- Build containers before deploying
+- Redis and MongoDB credentials are in Docker Compose files
+- All logs are monitored in OpenSearch
+
 ## Pre-Commit Checklist
-- [ ] do unit tests pass
-- [ ] Code formatted
+Before committing any code, verify:
+- [ ] Unit tests pass
+- [ ] Code is formatted
 - [ ] Dead code removed
 - [ ] Duplicate code eliminated
-- [ ] Logging enabled and properly configured
+- [ ] Logging enabled and configured
 - [ ] No sensitive data in code
-- [ ] Code tested locally
-- [ ] Ready to push to production
-
-## Deployment Checklist
-- [ ] Code committed and pushed
-- [ ] SSH'd into production server
-- [ ] Navigated to correct directory
-- [ ] Pulled latest changes
-- [ ] Built Docker containers using docker compose build
-- [ ] Deployed with docker-compose
-- [ ] Verified services are running
-- [ ] Checked logs in OpenSearch
-- [ ] test the code for UI use Playwright MCP 
+- [ ] Tested locally
+- [ ] Ready for production 
