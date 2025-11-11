@@ -150,6 +150,10 @@ export default function EngineerDashboard() {
   const calculateGroupMetrics = (jobsData) => {
     const metrics = {};
     
+    // Track unique structural elements per group to avoid counting SQM multiple times
+    const groupElementSqm = {};
+    const subGroupElementSqm = {};
+    
     jobsData.forEach(job => {
       const jobStatus = !job.status || job.status === 'in_progress' ? 'pending' : job.status;
       
@@ -173,19 +177,33 @@ export default function EngineerDashboard() {
       
       if (!metrics[primaryKey]) {
         metrics[primaryKey] = { count: 0, sqm: 0, subGroups: {} };
+        groupElementSqm[primaryKey] = new Set();
+        subGroupElementSqm[primaryKey] = {};
       }
       
       metrics[primaryKey].count += 1;
-      metrics[primaryKey].sqm += job.structuralElement?.surfaceAreaSqm || 0;
+      
+      // Track unique structural elements for SQM calculation
+      const elementId = job.structuralElement?._id?.toString();
+      if (elementId && !groupElementSqm[primaryKey].has(elementId)) {
+        groupElementSqm[primaryKey].add(elementId);
+        metrics[primaryKey].sqm += job.structuralElement?.surfaceAreaSqm || 0;
+      }
       
       // Track sub-group metrics
       if (subGroupBy) {
         const secondaryKey = job[subGroupBy] || job.structuralElement?.[subGroupBy] || 'Other';
         if (!metrics[primaryKey].subGroups[secondaryKey]) {
           metrics[primaryKey].subGroups[secondaryKey] = { count: 0, sqm: 0 };
+          subGroupElementSqm[primaryKey][secondaryKey] = new Set();
         }
         metrics[primaryKey].subGroups[secondaryKey].count += 1;
-        metrics[primaryKey].subGroups[secondaryKey].sqm += job.structuralElement?.surfaceAreaSqm || 0;
+        
+        // Track unique structural elements for sub-group SQM
+        if (elementId && !subGroupElementSqm[primaryKey][secondaryKey].has(elementId)) {
+          subGroupElementSqm[primaryKey][secondaryKey].add(elementId);
+          metrics[primaryKey].subGroups[secondaryKey].sqm += job.structuralElement?.surfaceAreaSqm || 0;
+        }
       }
     });
     
