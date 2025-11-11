@@ -26,6 +26,12 @@ import {
   AccordionSummary,
   AccordionDetails,
   Divider,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import {
   CheckCircle,
@@ -120,9 +126,9 @@ export default function EngineerDashboard() {
       
       // Update overall stats from metrics endpoint
       setStats({
-        pending: metricsData.statusBreakdown.pending || { count: 0, sqm: 0 },
-        completed: metricsData.statusBreakdown.completed || { count: 0, sqm: 0 },
-        not_applicable: metricsData.statusBreakdown.not_applicable || { count: 0, sqm: 0 }
+        pending: { count: metricsData.statusBreakdown.pending?.count || 0, sqm: metricsData.statusBreakdown.pending?.sqm || 0 },
+        completed: { count: metricsData.statusBreakdown.completed?.count || 0, sqm: metricsData.statusBreakdown.completed?.sqm || 0 },
+        not_applicable: { count: metricsData.statusBreakdown.not_applicable?.count || 0, sqm: metricsData.statusBreakdown.not_applicable?.sqm || 0 }
       });
       
       // For grouped view, we still need to fetch jobs to group them
@@ -660,7 +666,7 @@ export default function EngineerDashboard() {
 
                 const colors = getColorScheme(tab.color);
                 const isActive = activeTab === tab.id;
-                const count = stats[tab.id].elementCount || 0;
+                const count = stats[tab.id].count || 0;
                 const sqm = stats[tab.id].sqm || 0;
 
                 return (
@@ -735,7 +741,7 @@ export default function EngineerDashboard() {
                             fontWeight: 600
                           }}
                         >
-                          Elements
+                          Jobs
                         </Typography>
                       </Box>
                       
@@ -1078,9 +1084,9 @@ export default function EngineerDashboard() {
                               <CircularProgress size={30} />
                               <Typography sx={{ mt: 2, color: '#666' }}>Loading jobs...</Typography>
                             </Box>
-                          ) : !group ? (
+                          ) : !group || (subGroupBy && !Object.keys(group).length) || (!subGroupBy && (!group.jobs || !group.jobs.length)) ? (
                             <Box sx={{ p: 2, textAlign: 'center' }}>
-                              <Typography color="text.secondary">Expand to load jobs</Typography>
+                              <Typography color="text.secondary">No jobs found in this group</Typography>
                             </Box>
                           ) : subGroupBy && Object.keys(metrics.subGroups || {}).length > 0 ? (
                             // Show sub-groups
@@ -1098,423 +1104,223 @@ export default function EngineerDashboard() {
                                     </Typography>
                                     <Chip label={`${subGroupMetrics.count || 0} jobs (${(subGroupMetrics.sqm || 0).toFixed(2)} SQM)`} size="small" />
                                   </Box>
-                                  <Grid container spacing={2}>
-                                    {subGroupJobsList.map(job => (
-                                      <Grid item xs={12} key={job._id}>
-                                        <Card 
-                                          variant="outlined" 
-                                          sx={{ 
-                                            borderRadius: 3,
-                                            border: '1px solid #e0e0e0',
-                                            transition: 'all 0.3s ease',
-                                            '&:hover': { 
-                                              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                                              transform: 'translateY(-2px)',
-                                              borderColor: '#2196f3'
-                                            } 
-                                          }}
-                                        >
-                                          <CardContent sx={{ p: 3 }}>
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                                              <Box sx={{ flex: 1 }}>
-                                                <Typography 
-                                                  variant="h6" 
-                                                  sx={{ 
-                                                    fontWeight: 700, 
-                                                    mb: 1.5,
-                                                    color: '#1976d2',
-                                                    fontSize: '1.1rem'
-                                                  }}
+                                  
+                                  {/* Compact Table View */}
+                                  <TableContainer component={Paper} variant="outlined">
+                                    <Table size="small">
+                                      <TableHead>
+                                        <TableRow>
+                                          <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Job Title</TableCell>
+                                          <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Structure</TableCell>
+                                          <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Level</TableCell>
+                                          <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Grid</TableCell>
+                                          <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Part Mark</TableCell>
+                                          <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Member Type</TableCell>
+                                          <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>SQM</TableCell>
+                                          <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>FP Workflow</TableCell>
+                                          <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold', textAlign: 'center' }}>Actions</TableCell>
+                                        </TableRow>
+                                      </TableHead>
+                                      <TableBody>
+                                        {subGroupJobsList.map(job => (
+                                          <TableRow 
+                                            key={job._id}
+                                            sx={{ 
+                                              '&:hover': { bgcolor: 'action.hover' },
+                                              '&:nth-of-type(odd)': { bgcolor: 'grey.50' }
+                                            }}
+                                          >
+                                            <TableCell>
+                                              <Typography variant="body2" fontWeight="600">
+                                                {job.jobTitle}
+                                              </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                              <Typography variant="body2">
+                                                {job.structuralElement?.structureNumber || 'N/A'}
+                                              </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                              <Typography variant="body2">
+                                                {job.structuralElement?.level || 'N/A'}
+                                              </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                              <Typography variant="body2">
+                                                {job.structuralElement?.gridNo || 'N/A'}
+                                              </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                              <Typography variant="body2">
+                                                {job.structuralElement?.partMarkNo || 'N/A'}
+                                              </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                              <Typography variant="body2">
+                                                {job.structuralElement?.memberType || 'N/A'}
+                                              </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                              <Typography variant="body2" fontWeight="600">
+                                                {job.structuralElement?.surfaceAreaSqm ? job.structuralElement.surfaceAreaSqm.toFixed(2) : 'N/A'}
+                                              </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                              <Chip 
+                                                label={job.structuralElement?.fireProofingWorkflow || 'N/A'} 
+                                                size="small"
+                                                sx={{ fontSize: '0.7rem' }}
+                                              />
+                                            </TableCell>
+                                            <TableCell>
+                                              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'center' }}>
+                                                <Button
+                                                  variant={activeTab === 'pending' ? 'contained' : 'outlined'}
+                                                  color="warning"
+                                                  size="small"
+                                                  onClick={() => handleStatusUpdate(job._id, 'pending')}
+                                                  disabled={updatingJob === job._id}
+                                                  sx={{ minWidth: 80, fontSize: '0.7rem', py: 0.5 }}
                                                 >
-                                                  {job.jobTitle}
-                                                </Typography>
-                                                
-                                                {/* Structure Info */}
-                                                <Box sx={{ 
-                                                  display: 'flex', 
-                                                  alignItems: 'center', 
-                                                  gap: 1, 
-                                                  mb: 1,
-                                                  p: 1.5,
-                                                  bgcolor: '#e3f2fd',
-                                                  borderRadius: 2,
-                                                  border: '1px solid #90caf9'
-                                                }}>
-                                                  <Box sx={{ 
-                                                    width: 32, 
-                                                    height: 32, 
-                                                    borderRadius: 1,
-                                                    bgcolor: '#2196f3',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    color: 'white',
-                                                    fontWeight: 'bold',
-                                                    fontSize: '0.9rem'
-                                                  }}>
-                                                    🏗️
-                                                  </Box>
-                                                  <Box>
-                                                    <Typography variant="caption" sx={{ color: '#1565c0', fontWeight: 600, fontSize: '0.7rem', display: 'block' }}>
-                                                      STRUCTURE
-                                                    </Typography>
-                                                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#0d47a1' }}>
-                                                      {job.structuralElement?.structureNumber || 'N/A'}
-                                                    </Typography>
-                                                  </Box>
-                                                </Box>
-
-                                                {/* Details Grid */}
-                                                <Grid container spacing={1} sx={{ mb: 1.5 }}>
-                                                  <Grid item xs={4}>
-                                                    <Box sx={{ p: 1, bgcolor: '#fff3e0', borderRadius: 1, border: '1px solid #ffb74d' }}>
-                                                      <Typography variant="caption" sx={{ color: '#e65100', fontWeight: 600, fontSize: '0.65rem', display: 'block' }}>
-                                                        LEVEL
-                                                      </Typography>
-                                                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#bf360c' }}>
-                                                        {job.structuralElement?.level || 'N/A'}
-                                                      </Typography>
-                                                    </Box>
-                                                  </Grid>
-                                                  <Grid item xs={4}>
-                                                    <Box sx={{ p: 1, bgcolor: '#f3e5f5', borderRadius: 1, border: '1px solid #ce93d8' }}>
-                                                      <Typography variant="caption" sx={{ color: '#6a1b9a', fontWeight: 600, fontSize: '0.65rem', display: 'block' }}>
-                                                        GRID
-                                                      </Typography>
-                                                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#4a148c' }}>
-                                                        {job.structuralElement?.gridNo || 'N/A'}
-                                                      </Typography>
-                                                    </Box>
-                                                  </Grid>
-                                                  <Grid item xs={4}>
-                                                    <Box sx={{ p: 1, bgcolor: '#e8f5e9', borderRadius: 1, border: '1px solid #81c784' }}>
-                                                      <Typography variant="caption" sx={{ color: '#2e7d32', fontWeight: 600, fontSize: '0.65rem', display: 'block' }}>
-                                                        PART MARK
-                                                      </Typography>
-                                                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#1b5e20' }}>
-                                                        {job.structuralElement?.partMarkNo || 'N/A'}
-                                                      </Typography>
-                                                    </Box>
-                                                  </Grid>
-                                                </Grid>
-
-                                                {/* Measurements */}
-                                                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
-                                                  <Chip 
-                                                    label={`Length: ${job.structuralElement?.lengthMm ? `${job.structuralElement.lengthMm} mm` : 'N/A'}`}
-                                                    size="small"
-                                                    sx={{ 
-                                                      bgcolor: '#e1f5fe', 
-                                                      color: '#01579b',
-                                                      fontWeight: 600,
-                                                      border: '1px solid #4fc3f7'
-                                                    }}
-                                                  />
-                                                  <Chip 
-                                                    label={`SQM: ${job.structuralElement?.surfaceAreaSqm ? job.structuralElement.surfaceAreaSqm.toFixed(2) : 'N/A'}`}
-                                                    size="small"
-                                                    sx={{ 
-                                                      bgcolor: '#f3e5f5', 
-                                                      color: '#4a148c',
-                                                      fontWeight: 600,
-                                                      border: '1px solid #ba68c8'
-                                                    }}
-                                                  />
-                                                  <Chip 
-                                                    label={`FP Thickness: ${job.structuralElement?.fpThicknessMm ? `${job.structuralElement.fpThicknessMm} mm` : 'N/A'}`}
-                                                    size="small"
-                                                    sx={{ 
-                                                      bgcolor: '#fff3e0', 
-                                                      color: '#e65100',
-                                                      fontWeight: 600,
-                                                      border: '1px solid #ffb74d'
-                                                    }}
-                                                  />
-                                                </Box>
-
-                                                {/* FP Workflow */}
-                                                <Box sx={{ 
-                                                  p: 1.5, 
-                                                  bgcolor: '#fce4ec', 
-                                                  borderRadius: 2,
-                                                  border: '1px solid #f48fb1'
-                                                }}>
-                                                  <Typography variant="caption" sx={{ color: '#c2185b', fontWeight: 600, fontSize: '0.7rem', display: 'block' }}>
-                                                    FP WORKFLOW
-                                                  </Typography>
-                                                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#880e4f' }}>
-                                                    {job.structuralElement?.fireProofingWorkflow || 'N/A'}
-                                                  </Typography>
-                                                </Box>
+                                                  Pending
+                                                </Button>
+                                                <Button
+                                                  variant={activeTab === 'completed' ? 'contained' : 'outlined'}
+                                                  color="success"
+                                                  size="small"
+                                                  onClick={() => handleStatusUpdate(job._id, 'completed')}
+                                                  disabled={updatingJob === job._id}
+                                                  sx={{ minWidth: 80, fontSize: '0.7rem', py: 0.5 }}
+                                                >
+                                                  Complete
+                                                </Button>
+                                                <Button
+                                                  variant={activeTab === 'not_applicable' ? 'contained' : 'outlined'}
+                                                  color="error"
+                                                  size="small"
+                                                  onClick={() => handleStatusUpdate(job._id, 'not_applicable')}
+                                                  disabled={updatingJob === job._id}
+                                                  sx={{ minWidth: 90, fontSize: '0.7rem', py: 0.5 }}
+                                                >
+                                                  No Clearance
+                                                </Button>
                                               </Box>
-                                            </Box>
-                                            <Divider sx={{ my: 2 }} />
-                                            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', justifyContent: 'center' }}>
-                                              <Button
-                                                variant={activeTab === 'pending' ? 'contained' : 'outlined'}
-                                                color="warning"
-                                                size="medium"
-                                                onClick={() => handleStatusUpdate(job._id, 'pending')}
-                                                disabled={updatingJob === job._id}
-                                                sx={{ 
-                                                  minWidth: 120,
-                                                  fontWeight: 600,
-                                                  borderRadius: 2,
-                                                  textTransform: 'none',
-                                                  px: 3
-                                                }}
-                                              >
-                                                🟠 Pending
-                                              </Button>
-                                              <Button
-                                                variant={activeTab === 'completed' ? 'contained' : 'outlined'}
-                                                color="success"
-                                                size="medium"
-                                                onClick={() => handleStatusUpdate(job._id, 'completed')}
-                                                disabled={updatingJob === job._id}
-                                                sx={{ 
-                                                  minWidth: 120,
-                                                  fontWeight: 600,
-                                                  borderRadius: 2,
-                                                  textTransform: 'none',
-                                                  px: 3
-                                                }}
-                                              >
-                                                🟢 Complete
-                                              </Button>
-                                              <Button
-                                                variant={activeTab === 'not_applicable' ? 'contained' : 'outlined'}
-                                                color="error"
-                                                size="medium"
-                                                onClick={() => handleStatusUpdate(job._id, 'not_applicable')}
-                                                disabled={updatingJob === job._id}
-                                                sx={{ 
-                                                  minWidth: 120,
-                                                  fontWeight: 600,
-                                                  borderRadius: 2,
-                                                  textTransform: 'none',
-                                                  px: 3
-                                                }}
-                                              >
-                                                🔴 No Clearance
-                                              </Button>
-                                            </Box>
-                                          </CardContent>
-                                        </Card>
-                                      </Grid>
-                                    ))}
-                                  </Grid>
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </TableContainer>
                                 </Box>
                               );
                             })
                           ) : (
                             // Show jobs directly (no sub-grouping)
-                            <Grid container spacing={2}>
-                              {(group.jobs || []).map(job => (
-                                <Grid item xs={12} key={job._id}>
-                                  <Card 
-                                    variant="outlined" 
-                                    sx={{ 
-                                      borderRadius: 3,
-                                      border: '1px solid #e0e0e0',
-                                      transition: 'all 0.3s ease',
-                                      '&:hover': { 
-                                        boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                                        transform: 'translateY(-2px)',
-                                        borderColor: '#2196f3'
-                                      } 
-                                    }}
-                                  >
-                                    <CardContent sx={{ p: 3 }}>
-                                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                                        <Box sx={{ flex: 1 }}>
-                                          <Typography 
-                                            variant="h6" 
-                                            sx={{ 
-                                              fontWeight: 700, 
-                                              mb: 1.5,
-                                              color: '#1976d2',
-                                              fontSize: '1.1rem'
-                                            }}
+                            <TableContainer component={Paper} variant="outlined">
+                              <Table size="small">
+                                <TableHead>
+                                  <TableRow>
+                                    <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Job Title</TableCell>
+                                    <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Structure</TableCell>
+                                    <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Level</TableCell>
+                                    <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Grid</TableCell>
+                                    <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Part Mark</TableCell>
+                                    <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Member Type</TableCell>
+                                    <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>SQM</TableCell>
+                                    <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>FP Workflow</TableCell>
+                                    <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold', textAlign: 'center' }}>Actions</TableCell>
+                                  </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                  {(group.jobs || []).map(job => (
+                                    <TableRow 
+                                      key={job._id}
+                                      sx={{ 
+                                        '&:hover': { bgcolor: 'action.hover' },
+                                        '&:nth-of-type(odd)': { bgcolor: 'grey.50' }
+                                      }}
+                                    >
+                                      <TableCell>
+                                        <Typography variant="body2" fontWeight="600">
+                                          {job.jobTitle}
+                                        </Typography>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Typography variant="body2">
+                                          {job.structuralElement?.structureNumber || 'N/A'}
+                                        </Typography>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Typography variant="body2">
+                                          {job.structuralElement?.level || 'N/A'}
+                                        </Typography>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Typography variant="body2">
+                                          {job.structuralElement?.gridNo || 'N/A'}
+                                        </Typography>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Typography variant="body2">
+                                          {job.structuralElement?.partMarkNo || 'N/A'}
+                                        </Typography>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Typography variant="body2">
+                                          {job.structuralElement?.memberType || 'N/A'}
+                                        </Typography>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Typography variant="body2" fontWeight="600">
+                                          {job.structuralElement?.surfaceAreaSqm ? job.structuralElement.surfaceAreaSqm.toFixed(2) : 'N/A'}
+                                        </Typography>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Chip 
+                                          label={job.structuralElement?.fireProofingWorkflow || 'N/A'} 
+                                          size="small"
+                                          sx={{ fontSize: '0.7rem' }}
+                                        />
+                                      </TableCell>
+                                      <TableCell>
+                                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'center' }}>
+                                          <Button
+                                            variant={activeTab === 'pending' ? 'contained' : 'outlined'}
+                                            color="warning"
+                                            size="small"
+                                            onClick={() => handleStatusUpdate(job._id, 'pending')}
+                                            disabled={updatingJob === job._id}
+                                            sx={{ minWidth: 80, fontSize: '0.7rem', py: 0.5 }}
                                           >
-                                            {job.jobTitle}
-                                          </Typography>
-                                          
-                                          {/* Structure Info */}
-                                          <Box sx={{ 
-                                            display: 'flex', 
-                                            alignItems: 'center', 
-                                            gap: 1, 
-                                            mb: 1,
-                                            p: 1.5,
-                                            bgcolor: '#e3f2fd',
-                                            borderRadius: 2,
-                                            border: '1px solid #90caf9'
-                                          }}>
-                                            <Box sx={{ 
-                                              width: 32, 
-                                              height: 32, 
-                                              borderRadius: 1,
-                                              bgcolor: '#2196f3',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              color: 'white',
-                                              fontWeight: 'bold',
-                                              fontSize: '0.9rem'
-                                            }}>
-                                              🏗️
-                                            </Box>
-                                            <Box>
-                                              <Typography variant="caption" sx={{ color: '#1565c0', fontWeight: 600, fontSize: '0.7rem', display: 'block' }}>
-                                                STRUCTURE
-                                              </Typography>
-                                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#0d47a1' }}>
-                                                {job.structuralElement?.structureNumber || 'N/A'}
-                                              </Typography>
-                                            </Box>
-                                          </Box>
-
-                                          {/* Details Grid */}
-                                          <Grid container spacing={1} sx={{ mb: 1.5 }}>
-                                            <Grid item xs={4}>
-                                              <Box sx={{ p: 1, bgcolor: '#fff3e0', borderRadius: 1, border: '1px solid #ffb74d' }}>
-                                                <Typography variant="caption" sx={{ color: '#e65100', fontWeight: 600, fontSize: '0.65rem', display: 'block' }}>
-                                                  LEVEL
-                                                </Typography>
-                                                <Typography variant="body2" sx={{ fontWeight: 700, color: '#bf360c' }}>
-                                                  {job.structuralElement?.level || 'N/A'}
-                                                </Typography>
-                                              </Box>
-                                            </Grid>
-                                            <Grid item xs={4}>
-                                              <Box sx={{ p: 1, bgcolor: '#f3e5f5', borderRadius: 1, border: '1px solid #ce93d8' }}>
-                                                <Typography variant="caption" sx={{ color: '#6a1b9a', fontWeight: 600, fontSize: '0.65rem', display: 'block' }}>
-                                                  GRID
-                                                </Typography>
-                                                <Typography variant="body2" sx={{ fontWeight: 700, color: '#4a148c' }}>
-                                                  {job.structuralElement?.gridNo || 'N/A'}
-                                                </Typography>
-                                              </Box>
-                                            </Grid>
-                                            <Grid item xs={4}>
-                                              <Box sx={{ p: 1, bgcolor: '#e8f5e9', borderRadius: 1, border: '1px solid #81c784' }}>
-                                                <Typography variant="caption" sx={{ color: '#2e7d32', fontWeight: 600, fontSize: '0.65rem', display: 'block' }}>
-                                                  PART MARK
-                                                </Typography>
-                                                <Typography variant="body2" sx={{ fontWeight: 700, color: '#1b5e20' }}>
-                                                  {job.structuralElement?.partMarkNo || 'N/A'}
-                                                </Typography>
-                                              </Box>
-                                            </Grid>
-                                          </Grid>
-
-                                          {/* Measurements */}
-                                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
-                                            <Chip 
-                                              label={`Length: ${job.structuralElement?.lengthMm ? `${job.structuralElement.lengthMm} mm` : 'N/A'}`}
-                                              size="small"
-                                              sx={{ 
-                                                bgcolor: '#e1f5fe', 
-                                                color: '#01579b',
-                                                fontWeight: 600,
-                                                border: '1px solid #4fc3f7'
-                                              }}
-                                            />
-                                            <Chip 
-                                              label={`SQM: ${job.structuralElement?.surfaceAreaSqm ? job.structuralElement.surfaceAreaSqm.toFixed(2) : 'N/A'}`}
-                                              size="small"
-                                              sx={{ 
-                                                bgcolor: '#f3e5f5', 
-                                                color: '#4a148c',
-                                                fontWeight: 600,
-                                                border: '1px solid #ba68c8'
-                                              }}
-                                            />
-                                            <Chip 
-                                              label={`FP Thickness: ${job.structuralElement?.fpThicknessMm ? `${job.structuralElement.fpThicknessMm} mm` : 'N/A'}`}
-                                              size="small"
-                                              sx={{ 
-                                                bgcolor: '#fff3e0', 
-                                                color: '#e65100',
-                                                fontWeight: 600,
-                                                border: '1px solid #ffb74d'
-                                              }}
-                                            />
-                                          </Box>
-
-                                          {/* FP Workflow */}
-                                          <Box sx={{ 
-                                            p: 1.5, 
-                                            bgcolor: '#fce4ec', 
-                                            borderRadius: 2,
-                                            border: '1px solid #f48fb1'
-                                          }}>
-                                            <Typography variant="caption" sx={{ color: '#c2185b', fontWeight: 600, fontSize: '0.7rem', display: 'block' }}>
-                                              FP WORKFLOW
-                                            </Typography>
-                                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#880e4f' }}>
-                                              {job.structuralElement?.fireProofingWorkflow || 'N/A'}
-                                            </Typography>
-                                          </Box>
+                                            Pending
+                                          </Button>
+                                          <Button
+                                            variant={activeTab === 'completed' ? 'contained' : 'outlined'}
+                                            color="success"
+                                            size="small"
+                                            onClick={() => handleStatusUpdate(job._id, 'completed')}
+                                            disabled={updatingJob === job._id}
+                                            sx={{ minWidth: 80, fontSize: '0.7rem', py: 0.5 }}
+                                          >
+                                            Complete
+                                          </Button>
+                                          <Button
+                                            variant={activeTab === 'not_applicable' ? 'contained' : 'outlined'}
+                                            color="error"
+                                            size="small"
+                                            onClick={() => handleStatusUpdate(job._id, 'not_applicable')}
+                                            disabled={updatingJob === job._id}
+                                            sx={{ minWidth: 90, fontSize: '0.7rem', py: 0.5 }}
+                                          >
+                                            No Clearance
+                                          </Button>
                                         </Box>
-                                      </Box>
-                                      <Divider sx={{ my: 2 }} />
-                                      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', justifyContent: 'center' }}>
-                                        <Button
-                                          variant={activeTab === 'pending' ? 'contained' : 'outlined'}
-                                          color="warning"
-                                          size="medium"
-                                          onClick={() => handleStatusUpdate(job._id, 'pending')}
-                                          disabled={updatingJob === job._id}
-                                          sx={{ 
-                                            minWidth: 120,
-                                            fontWeight: 600,
-                                            borderRadius: 2,
-                                            textTransform: 'none',
-                                            px: 3
-                                          }}
-                                        >
-                                          🟠 Pending
-                                        </Button>
-                                        <Button
-                                          variant={activeTab === 'completed' ? 'contained' : 'outlined'}
-                                          color="success"
-                                          size="medium"
-                                          onClick={() => handleStatusUpdate(job._id, 'completed')}
-                                          disabled={updatingJob === job._id}
-                                          sx={{ 
-                                            minWidth: 120,
-                                            fontWeight: 600,
-                                            borderRadius: 2,
-                                            textTransform: 'none',
-                                            px: 3
-                                          }}
-                                        >
-                                          🟢 Complete
-                                        </Button>
-                                        <Button
-                                          variant={activeTab === 'not_applicable' ? 'contained' : 'outlined'}
-                                          color="error"
-                                          size="medium"
-                                          onClick={() => handleStatusUpdate(job._id, 'not_applicable')}
-                                          disabled={updatingJob === job._id}
-                                          sx={{ 
-                                            minWidth: 120,
-                                            fontWeight: 600,
-                                            borderRadius: 2,
-                                            textTransform: 'none',
-                                            px: 3
-                                          }}
-                                        >
-                                          🔴 No Clearance
-                                        </Button>
-                                      </Box>
-                                    </CardContent>
-                                  </Card>
-                                </Grid>
-                              ))}
-                            </Grid>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </TableContainer>
                           )}
                         </AccordionDetails>
                       </Accordion>
