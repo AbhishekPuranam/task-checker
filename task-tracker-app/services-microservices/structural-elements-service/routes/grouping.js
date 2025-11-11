@@ -23,7 +23,7 @@ router.post('/elements', auth, async (req, res) => {
       subGroupBy, // Secondary grouping field (optional)
       page = 1,
       limit = 100,
-      includeElements = false // Whether to include full element details
+      includeElements = false // DEPRECATED: Now always includes all elements for proper pagination
     } = req.body;
     
     if (!groupBy) {
@@ -172,32 +172,18 @@ router.post('/elements', auth, async (req, res) => {
         pipeline.push({ $skip: skip });
         pipeline.push({ $limit: parseInt(limit) });
         
-        // If includeElements is true, keep all elements; otherwise limit to 5 for preview
-        if (includeElements) {
-          // Keep all elements in each group
-          pipeline.push({
-            $project: {
-              _id: 1,
-              count: 1,
-              totalSqm: 1,
-              totalQty: 1,
-              totalLengthMm: 1,
-              elements: 1  // Include all elements
-            }
-          });
-        } else {
-          // Limit elements array to first 5 per group (for preview)
-          pipeline.push({
-            $project: {
-              _id: 1,
-              count: 1,
-              totalSqm: 1,
-              totalQty: 1,
-              totalLengthMm: 1,
-              elements: { $slice: ['$elements', 5] }
-            }
-          });
-        }
+        // Always include all elements in each group to support proper client-side pagination
+        // The frontend will handle pagination of elements within each group
+        pipeline.push({
+          $project: {
+            _id: 1,
+            count: 1,
+            totalSqm: 1,
+            totalQty: 1,
+            totalLengthMm: 1,
+            elements: 1  // Include all elements (no limit)
+          }
+        });
         
         // Execute both pipelines in parallel
         const [groupResults, countResults] = await Promise.all([

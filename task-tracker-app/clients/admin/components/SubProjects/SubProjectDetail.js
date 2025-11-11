@@ -323,14 +323,18 @@ export default function SubProjectDetail() {
       return;
     }
     
-    // If group already has elements, just expand
+    // Check if group has full elements loaded
     const group = groupedData.groups[groupIndex];
-    if (group.elements && group.elements.length > 0) {
+    const hasFullElements = group.elements && group.elements.length >= group.count;
+    
+    // If group already has ALL elements (count matches), just expand
+    if (hasFullElements) {
+      console.log('✅ [fetchGroupElements] Group already has all elements, just expanding');
       setExpandedGroups(prev => ({ ...prev, [groupIndex]: true }));
       return;
     }
     
-    // Otherwise, fetch elements
+    // Otherwise, fetch all elements for this group
     if (groupElementsLoading[groupIndex]) {
       return; // Already loading
     }
@@ -341,8 +345,8 @@ export default function SubProjectDetail() {
       
       const token = localStorage.getItem('token');
       
-      // Fetch ALL groups WITH elements, then extract just this group's elements
-      console.log('📊 [fetchGroupElements] Fetching elements for group:', groupIndex);
+      // Fetch ALL groups WITH full elements, then extract just this group's elements
+      console.log('📊 [fetchGroupElements] Fetching ALL elements for group:', groupIndex, 'Expected count:', group.count);
       
       const res = await axios.post(
         `${API_URL}/grouping/elements`,
@@ -353,23 +357,35 @@ export default function SubProjectDetail() {
           subGroupBy: subGroupBy || undefined,
           page: 1,
           limit: 10000,
-          includeElements: true
+          includeElements: true // Force full element fetch
         },
         {
           headers: { Authorization: `Bearer ${token}` }
         }
       );
       
+      console.log('📊 [fetchGroupElements] Response received, updating group', groupIndex);
+      
       // Update the specific group with full elements from the response
       if (res.data.groups && res.data.groups[groupIndex]) {
+        const fetchedElements = res.data.groups[groupIndex].elements;
+        console.log('✅ [fetchGroupElements] Fetched', fetchedElements?.length, 'elements for group (expected:', group.count, ')');
+        
         setGroupedData(prev => {
           const newData = { ...prev };
           newData.groups[groupIndex] = {
             ...newData.groups[groupIndex],
-            elements: res.data.groups[groupIndex].elements
+            elements: fetchedElements
           };
           return newData;
         });
+        
+        // Also update cache with full elements
+        const cacheKey = `${activeSection}-${groupBy}-${subGroupBy || 'none'}-full`;
+        setCachedGroupedData(prev => ({
+          ...prev,
+          [cacheKey]: res.data
+        }));
       }
     } catch (err) {
       console.error('❌ [fetchGroupElements] Error:', err);
