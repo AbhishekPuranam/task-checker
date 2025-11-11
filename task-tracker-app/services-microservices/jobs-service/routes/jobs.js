@@ -1606,8 +1606,11 @@ router.get('/engineer/metrics', auth, cacheMiddleware(120, engineerMetricsCacheK
 
     metrics.forEach(metric => {
       const statusKey = metric._id || 'pending';
-      const sqmTotal = metric.elementIds.reduce((sum, elementId) => {
-        return sum + (elementSqmMap[elementId.toString()] || 0);
+      
+      // Count unique structural elements to avoid duplicate SQM
+      const uniqueElements = new Set(metric.elementIds.map(id => id.toString()));
+      const sqmTotal = Array.from(uniqueElements).reduce((sum, elementId) => {
+        return sum + (elementSqmMap[elementId] || 0);
       }, 0);
 
       if (statusBreakdown[statusKey]) {
