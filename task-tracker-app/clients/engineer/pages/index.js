@@ -633,36 +633,29 @@ export default function EngineerDashboard() {
               {TABS.map(tab => {
                 const getColorScheme = (color) => {
                   const schemes = {
-                    '#4caf50': { // green
-                      primary: '#4caf50',
-                      light: '#e8f5e9',
-                      lighter: '#f1f8e9',
-                      dark: '#2e7d32',
-                      gradient: 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)'
-                    },
-                    '#2196f3': { // blue
-                      primary: '#2196f3',
-                      light: '#e3f2fd',
-                      lighter: '#bbdefb',
-                      dark: '#1565c0',
-                      gradient: 'linear-gradient(135deg, #2196f3 0%, #42a5f5 100%)'
-                    },
-                    '#ff9800': { // orange
-                      primary: '#ff9800',
+                    '#f59e0b': { // orange - pending
+                      primary: '#f59e0b',
                       light: '#fff3e0',
                       lighter: '#ffe0b2',
                       dark: '#e65100',
-                      gradient: 'linear-gradient(135deg, #ff9800 0%, #fb8c00 100%)'
+                      gradient: 'linear-gradient(135deg, #f59e0b 0%, #fb8c00 100%)'
                     },
-                    '#9e9e9e': { // grey
-                      primary: '#9e9e9e',
-                      light: '#f5f5f5',
-                      lighter: '#eeeeee',
-                      dark: '#616161',
-                      gradient: 'linear-gradient(135deg, #9e9e9e 0%, #bdbdbd 100%)'
+                    '#10b981': { // green - complete
+                      primary: '#10b981',
+                      light: '#e8f5e9',
+                      lighter: '#f1f8e9',
+                      dark: '#059669',
+                      gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                    },
+                    '#ef4444': { // red - no clearance
+                      primary: '#ef4444',
+                      light: '#fee2e2',
+                      lighter: '#fecaca',
+                      dark: '#dc2626',
+                      gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
                     }
                   };
-                  return schemes[color] || schemes['#9e9e9e'];
+                  return schemes[color] || schemes['#f59e0b'];
                 };
 
                 const colors = getColorScheme(tab.color);
