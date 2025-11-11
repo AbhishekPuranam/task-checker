@@ -150,9 +150,29 @@ export default function EngineerDashboard() {
         not_applicable: metricsData.statusBreakdown.not_applicable?.count || 0
       });
       
-      // Don't fetch jobs upfront - let accordion expansion handle it
-      // This avoids timeout issues with large datasets
-      console.log('Metrics loaded. Jobs will be fetched on accordion expansion.');
+      // Fetch a small sample of jobs to calculate groups (just for accordion headers)
+      // Full job data will be loaded when accordion expands
+      const statusForCurrentTab = activeTab === 'pending' ? '' : activeTab;
+      const sampleSize = 1000; // Small sample to determine groups quickly
+      
+      try {
+        const sampleResponse = await api.get(`/jobs/engineer/jobs?page=1&limit=${sampleSize}&project=${selectedProject}${statusForCurrentTab ? `&status=${statusForCurrentTab}` : ''}`);
+        const sampleJobs = sampleResponse.data.jobs || [];
+        
+        if (sampleJobs.length > 0) {
+          const metrics = calculateGroupMetrics(sampleJobs);
+          setGroupMetrics(metrics);
+          console.log(`Calculated groups from ${sampleJobs.length} sample jobs`);
+        } else {
+          setGroupMetrics({});
+          console.log('No jobs in sample - no groups to display');
+        }
+      } catch (error) {
+        console.error('Error fetching sample jobs:', error);
+        setGroupMetrics({});
+      }
+      
+      console.log('Metrics loaded. Full job data will be fetched on accordion expansion.');
       
     } catch (error) {
       console.error('Error fetching metrics:', error);
