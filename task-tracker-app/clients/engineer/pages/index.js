@@ -1144,7 +1144,7 @@ export default function EngineerDashboard() {
                               return (
                                 <Accordion key={subGroupKey} sx={{ mb: 2, boxShadow: 1 }}>
                                   <AccordionSummary 
-                                    expandIcon={<ExpandMore />}
+                                    expandIcon={<ExpandMoreIcon />}
                                     sx={{ 
                                       bgcolor: '#f8f9fa',
                                       '&:hover': { bgcolor: '#e9ecef' }
