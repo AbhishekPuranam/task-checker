@@ -1596,13 +1596,16 @@ router.get('/engineer/metrics', auth, cacheMiddleware(120, engineerMetricsCacheK
       }
     ]);
 
-    // Calculate SQM for each status
+    // Calculate SQM and element counts for each status
     const statusBreakdown = {
-      pending: { count: 0, sqm: 0 },
-      in_progress: { count: 0, sqm: 0 },
-      completed: { count: 0, sqm: 0 },
-      not_applicable: { count: 0, sqm: 0 }
+      pending: { count: 0, elementCount: 0, sqm: 0 },
+      in_progress: { count: 0, elementCount: 0, sqm: 0 },
+      completed: { count: 0, elementCount: 0, sqm: 0 },
+      not_applicable: { count: 0, elementCount: 0, sqm: 0 }
     };
+
+    // Track all unique elements across all statuses
+    const allUniqueElements = new Set();
 
     metrics.forEach(metric => {
       const statusKey = metric._id || 'pending';
@@ -1613,9 +1616,13 @@ router.get('/engineer/metrics', auth, cacheMiddleware(120, engineerMetricsCacheK
         return sum + (elementSqmMap[elementId] || 0);
       }, 0);
 
+      // Add to global unique elements set
+      uniqueElements.forEach(id => allUniqueElements.add(id));
+
       if (statusBreakdown[statusKey]) {
         statusBreakdown[statusKey] = {
           count: metric.count,
+          elementCount: uniqueElements.size,
           sqm: parseFloat(sqmTotal.toFixed(2))
         };
       }
@@ -1623,16 +1630,19 @@ router.get('/engineer/metrics', auth, cacheMiddleware(120, engineerMetricsCacheK
 
     // Combine pending and in_progress
     statusBreakdown.pending.count += statusBreakdown.in_progress.count;
+    statusBreakdown.pending.elementCount += statusBreakdown.in_progress.elementCount;
     statusBreakdown.pending.sqm += statusBreakdown.in_progress.sqm;
     delete statusBreakdown.in_progress;
 
     const totalCount = Object.values(statusBreakdown).reduce((sum, s) => sum + s.count, 0);
+    const totalElements = allUniqueElements.size;
     const totalSqm = parseFloat(Object.values(statusBreakdown).reduce((sum, s) => sum + s.sqm, 0).toFixed(2));
 
-    console.log(`✅ Metrics calculated: ${totalCount} jobs, ${totalSqm} SQM`);
+    console.log(`✅ Metrics calculated: ${totalCount} jobs, ${totalElements} elements, ${totalSqm} SQM`);
 
     res.json({
       totalCount,
+      totalElements,
       totalSqm,
       statusBreakdown
     });

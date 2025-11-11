@@ -67,9 +67,9 @@ export default function EngineerDashboard() {
 
   // Stats for metrics
   const [stats, setStats] = useState({
-    pending: { count: 0, sqm: 0 },
-    completed: { count: 0, sqm: 0 },
-    not_applicable: { count: 0, sqm: 0 },
+    pending: { count: 0, elementCount: 0, sqm: 0 },
+    completed: { count: 0, elementCount: 0, sqm: 0 },
+    not_applicable: { count: 0, elementCount: 0, sqm: 0 },
   });
 
   useEffect(() => {
@@ -349,9 +349,10 @@ export default function EngineerDashboard() {
 
   // Race Track Visualization Component
   const RaceTrackMetrics = ({ stats }) => {
-    const total = stats.pending.count + stats.completed.count + stats.not_applicable.count;
-    const completedPercentage = total > 0 ? (stats.completed.count / total) * 100 : 0;
-    const pendingPercentage = total > 0 ? (stats.pending.count / total) * 100 : 0;
+    // Use element counts instead of job counts for progress tracking
+    const total = stats.pending.elementCount + stats.completed.elementCount + stats.not_applicable.elementCount;
+    const completedPercentage = total > 0 ? (stats.completed.elementCount / total) * 100 : 0;
+    const pendingPercentage = total > 0 ? (stats.pending.elementCount / total) * 100 : 0;
 
     const totalSqm = stats.pending.sqm + stats.completed.sqm + stats.not_applicable.sqm;
     const completedSqmPercentage = totalSqm > 0 ? (stats.completed.sqm / totalSqm) * 100 : 0;
@@ -369,7 +370,7 @@ export default function EngineerDashboard() {
               Elements Progress
             </Typography>
             <Typography variant="body2" fontWeight="600" sx={{ color: '#6a11cb' }}>
-              {stats.completed.count} / {total} ({completedPercentage.toFixed(1)}%)
+              {stats.completed.elementCount} / {total} ({completedPercentage.toFixed(1)}%)
             </Typography>
           </Box>
           
@@ -427,7 +428,7 @@ export default function EngineerDashboard() {
                   Pending
                 </Typography>
                 <Typography variant="h6" sx={{ color: '#f59e0b', fontWeight: 'bold' }}>
-                  {stats.pending.count}
+                  {stats.pending.elementCount}
                 </Typography>
               </Box>
             </Grid>
@@ -437,7 +438,7 @@ export default function EngineerDashboard() {
                   Completed
                 </Typography>
                 <Typography variant="h6" sx={{ color: '#10b981', fontWeight: 'bold' }}>
-                  {stats.completed.count}
+                  {stats.completed.elementCount}
                 </Typography>
               </Box>
             </Grid>
@@ -447,7 +448,7 @@ export default function EngineerDashboard() {
                   No Clearance
                 </Typography>
                 <Typography variant="h6" sx={{ color: '#ef4444', fontWeight: 'bold' }}>
-                  {stats.not_applicable.count}
+                  {stats.not_applicable.elementCount}
                 </Typography>
               </Box>
             </Grid>
