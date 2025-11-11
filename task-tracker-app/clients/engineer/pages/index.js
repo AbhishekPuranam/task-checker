@@ -142,11 +142,20 @@ export default function EngineerDashboard() {
         not_applicable: { count: metricsData.statusBreakdown.not_applicable?.count || 0, sqm: metricsData.statusBreakdown.not_applicable?.sqm || 0 }
       });
       
-      // Fetch only a small sample of jobs to calculate group metrics structure
-      // Don't load all jobs - let accordion expansion handle that
-      const response = await api.get(`/jobs/engineer/jobs?page=1&limit=1000&project=${selectedProject}`);
+      // Fetch ALL jobs for current status to get accurate group metrics
+      // This is necessary for correct job counts per group
+      const totalJobsForStatus = metricsData.statusBreakdown[activeTab]?.count || 0;
+      const limit = Math.min(totalJobsForStatus + 100, 200000);
+      
+      console.log(`Fetching ${limit} jobs for status ${activeTab} to calculate group metrics`);
+      
+      const statusParam = activeTab === 'pending' ? '' : activeTab;
+      const response = await api.get(`/jobs/engineer/jobs?page=1&limit=${limit}&project=${selectedProject}${statusParam ? `&status=${statusParam}` : ''}`);
       const fetchedJobs = response.data.jobs || [];
-      console.log('Fetched sample jobs for grouping:', fetchedJobs.length);
+      console.log('Fetched jobs for grouping:', fetchedJobs.length);
+      
+      // Cache the fetched jobs for this status to avoid refetching when accordions expand
+      setAllJobsCache(prev => ({ ...prev, [activeTab]: fetchedJobs }));
       
       // Calculate group metrics without storing actual jobs
       const metrics = calculateGroupMetrics(fetchedJobs);
