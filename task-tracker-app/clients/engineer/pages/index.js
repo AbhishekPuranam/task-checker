@@ -84,6 +84,7 @@ export default function EngineerDashboard() {
   }, []);
 
   useEffect(() => {
+    console.log('🔄 Engineer Portal v2.1 - Batch Fetching Enabled');
     if (selectedProject) {
       fetchMetrics(); // Only fetch metrics initially, not all jobs
     }
@@ -417,6 +418,8 @@ export default function EngineerDashboard() {
   const toggleGroup = async (groupKey) => {
     const isExpanding = !expandedGroups[groupKey];
     
+    console.log(`📂 ${isExpanding ? 'Expanding' : 'Collapsing'} group: ${groupKey}`);
+    
     setExpandedGroups(prev => ({
       ...prev,
       [groupKey]: isExpanding
@@ -424,6 +427,7 @@ export default function EngineerDashboard() {
     
     // Load jobs when expanding for the first time
     if (isExpanding && !groupJobs[groupKey]) {
+      console.log(`🚀 Loading jobs for group: ${groupKey}`);
       await fetchGroupJobs(groupKey);
     }
   };
