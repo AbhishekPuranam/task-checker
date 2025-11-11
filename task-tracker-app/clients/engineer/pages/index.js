@@ -159,6 +159,8 @@ export default function EngineerDashboard() {
     // Track unique structural elements per group
     const groupElements = {};
     const subGroupElements = {};
+    const groupJobCounts = {};
+    const subGroupJobCounts = {};
     
     jobsData.forEach(job => {
       const jobStatus = !job.status || job.status === 'in_progress' ? 'pending' : job.status;
@@ -182,10 +184,15 @@ export default function EngineerDashboard() {
       const primaryKey = job.structuralElement?.[groupBy] || job[groupBy] || 'Other';
       
       if (!metrics[primaryKey]) {
-        metrics[primaryKey] = { count: 0, sqm: 0, qty: 0, subGroups: {} };
+        metrics[primaryKey] = { count: 0, jobCount: 0, sqm: 0, qty: 0, subGroups: {} };
         groupElements[primaryKey] = new Set();
+        groupJobCounts[primaryKey] = 0;
         subGroupElements[primaryKey] = {};
+        subGroupJobCounts[primaryKey] = {};
       }
+      
+      // Count every job
+      groupJobCounts[primaryKey]++;
       
       // Track unique structural elements
       const elementId = job.structuralElement?._id?.toString();
@@ -202,9 +209,13 @@ export default function EngineerDashboard() {
       if (subGroupBy) {
         const secondaryKey = job[subGroupBy] || job.structuralElement?.[subGroupBy] || 'Other';
         if (!metrics[primaryKey].subGroups[secondaryKey]) {
-          metrics[primaryKey].subGroups[secondaryKey] = { count: 0, sqm: 0, qty: 0 };
+          metrics[primaryKey].subGroups[secondaryKey] = { count: 0, jobCount: 0, sqm: 0, qty: 0 };
           subGroupElements[primaryKey][secondaryKey] = new Set();
+          subGroupJobCounts[primaryKey][secondaryKey] = 0;
         }
+        
+        // Count every job in subgroup
+        subGroupJobCounts[primaryKey][secondaryKey]++;
         
         // Track unique structural elements for sub-group
         if (elementId && !subGroupElements[primaryKey][secondaryKey].has(elementId)) {
@@ -215,13 +226,15 @@ export default function EngineerDashboard() {
       }
     });
     
-    // Update counts with unique element counts
+    // Update counts with unique element counts and job counts
     Object.keys(metrics).forEach(primaryKey => {
       metrics[primaryKey].count = groupElements[primaryKey].size;
+      metrics[primaryKey].jobCount = groupJobCounts[primaryKey];
       
       if (subGroupBy) {
         Object.keys(metrics[primaryKey].subGroups).forEach(secondaryKey => {
           metrics[primaryKey].subGroups[secondaryKey].count = subGroupElements[primaryKey][secondaryKey].size;
+          metrics[primaryKey].subGroups[secondaryKey].jobCount = subGroupJobCounts[primaryKey][secondaryKey];
         });
       }
     });
@@ -969,6 +982,39 @@ export default function EngineerDashboard() {
                             
                             {/* Inline Compact Metrics */}
                             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                              {/* Jobs Count */}
+                              <Box sx={{ 
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
+                                px: 2,
+                                py: 1,
+                                background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)',
+                                borderRadius: 2,
+                                border: '1px solid #81c784'
+                              }}>
+                                <Box sx={{ 
+                                  width: 32, 
+                                  height: 32, 
+                                  borderRadius: 1,
+                                  background: 'linear-gradient(135deg, #4caf50 0%, #388e3c 100%)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '1rem'
+                                }}>
+                                  💼
+                                </Box>
+                                <Box>
+                                  <Typography variant="caption" sx={{ color: '#2e7d32', fontWeight: 600, fontSize: '0.65rem', textTransform: 'uppercase', display: 'block', lineHeight: 1 }}>
+                                    Jobs
+                                  </Typography>
+                                  <Typography variant="h6" fontWeight="900" sx={{ color: '#1b5e20', lineHeight: 1, mt: 0.3 }}>
+                                    {metrics.jobCount || 0}
+                                  </Typography>
+                                </Box>
+                              </Box>
+
                               {/* Elements Count */}
                               <Box sx={{ 
                                 display: 'flex',
@@ -1089,21 +1135,34 @@ export default function EngineerDashboard() {
                               <Typography color="text.secondary">No jobs found in this group</Typography>
                             </Box>
                           ) : subGroupBy && Object.keys(metrics.subGroups || {}).length > 0 ? (
-                            // Show sub-groups
+                            // Show sub-groups with collapse
                             Object.keys(metrics.subGroups).sort().map(subGroupKey => {
-                              const subGroupMetrics = metrics.subGroups[subGroupKey] || { count: 0, sqm: 0 };
+                              const subGroupMetrics = metrics.subGroups[subGroupKey] || { count: 0, jobCount: 0, sqm: 0 };
                               const subGroupJobsList = group[subGroupKey] || [];
                               if (!Array.isArray(subGroupJobsList)) return null;
 
                               return (
-                                <Box key={subGroupKey} sx={{ mb: 3 }}>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, p: 2, bgcolor: '#f8f9fa', borderRadius: 2 }}>
-                                    <LocalFireDepartment sx={{ color: '#ff6b35' }} />
-                                    <Typography variant="subtitle1" fontWeight="600" sx={{ color: '#666' }}>
-                                      {getFireProofingLabel(subGroupKey)}
-                                    </Typography>
-                                    <Chip label={`${subGroupMetrics.count || 0} jobs (${(subGroupMetrics.sqm || 0).toFixed(2)} SQM)`} size="small" />
-                                  </Box>
+                                <Accordion key={subGroupKey} sx={{ mb: 2, boxShadow: 1 }}>
+                                  <AccordionSummary 
+                                    expandIcon={<ExpandMore />}
+                                    sx={{ 
+                                      bgcolor: '#f8f9fa',
+                                      '&:hover': { bgcolor: '#e9ecef' }
+                                    }}
+                                  >
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                                      <LocalFireDepartment sx={{ color: '#ff6b35' }} />
+                                      <Typography variant="subtitle1" fontWeight="600" sx={{ color: '#666', flexGrow: 1 }}>
+                                        {getFireProofingLabel(subGroupKey)}
+                                      </Typography>
+                                      <Chip 
+                                        label={`${subGroupMetrics.jobCount || 0} Jobs • ${subGroupMetrics.count || 0} Elements (${(subGroupMetrics.sqm || 0).toFixed(2)} SQM)`} 
+                                        size="small" 
+                                        sx={{ bgcolor: '#e3f2fd', color: '#1976d2' }}
+                                      />
+                                    </Box>
+                                  </AccordionSummary>
+                                  <AccordionDetails sx={{ p: 2 }}>
                                   
                                   {/* Compact Table View */}
                                   <TableContainer component={Paper} variant="outlined">
@@ -1211,7 +1270,8 @@ export default function EngineerDashboard() {
                                       </TableBody>
                                     </Table>
                                   </TableContainer>
-                                </Box>
+                                  </AccordionDetails>
+                                </Accordion>
                               );
                             })
                           ) : (
