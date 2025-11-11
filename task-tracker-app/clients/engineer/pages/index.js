@@ -754,15 +754,20 @@ export default function EngineerDashboard() {
                         sx={{ '&:before': { display: 'none' } }}
                       >
                         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-                            <Typography variant="h6" sx={{ fontWeight: 600, color: '#6a11cb' }}>
-                              {groupKey}
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography variant="h6" sx={{ fontWeight: 600, color: '#6a11cb' }}>
+                                {groupKey}
+                              </Typography>
+                              <Chip
+                                label={`${metrics.count || 0} jobs`}
+                                size="small"
+                                sx={{ bgcolor: TABS.find(t => t.id === activeTab)?.color, color: 'white', fontWeight: 'bold' }}
+                              />
+                            </Box>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: TABS.find(t => t.id === activeTab)?.color }}>
+                              {(metrics.sqm || 0).toFixed(2)} SQM
                             </Typography>
-                            <Chip
-                              label={`${metrics.count || 0} jobs (${(metrics.sqm || 0).toFixed(2)} SQM)`}
-                              size="small"
-                              sx={{ bgcolor: TABS.find(t => t.id === activeTab)?.color, color: 'white', fontWeight: 'bold' }}
-                            />
                           </Box>
                         </AccordionSummary>
                         <AccordionDetails>
