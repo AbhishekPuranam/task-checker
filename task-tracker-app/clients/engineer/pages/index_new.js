@@ -100,8 +100,10 @@ export default function EngineerDashboard() {
     
     try {
       setLoading(true);
-      const response = await api.get(`/jobs?project=${selectedProject}&limit=10000`);
+      // Use the new engineer-specific endpoint that fetches jobs from all subprojects
+      const response = await api.get(`/jobs/engineer/jobs?page=1&limit=10000`);
       const fetchedJobs = response.data.jobs || [];
+      console.log('Fetched jobs from subprojects:', fetchedJobs.length);
       setJobs(fetchedJobs);
       calculateStats(fetchedJobs);
     } catch (error) {
@@ -187,9 +189,9 @@ export default function EngineerDashboard() {
       setUpdatingJob(jobId);
       toast.loading('Updating job status...', { id: 'status-update' });
       
-      await api.put(`/jobs/${jobId}`, {
-        status: newStatus,
-        progressPercentage: newStatus === 'completed' ? 100 : 0
+      // Use the new engineer-specific status update endpoint
+      await api.patch(`/jobs/engineer/${jobId}/status`, {
+        status: newStatus
       });
 
       toast.success('Job status updated successfully!', { id: 'status-update' });

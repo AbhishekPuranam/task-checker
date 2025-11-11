@@ -1445,4 +1445,223 @@ router.post('/refresh-element-status/:elementId', auth, async (req, res) => {
   }
 });
 
+/**
+ * Engineer-specific endpoints
+ * Get jobs from all subprojects within the engineer's assigned project
+ */
+router.get('/engineer/jobs', auth, async (req, res) => {
+  try {
+    console.log('🔧 Engineer jobs endpoint called by user:', req.user.id, 'role:', req.user.role);
+    
+    // Only site-engineers can access this endpoint
+    if (req.user.role !== 'site-engineer') {
+      return res.status(403).json({ message: 'Access denied. Site engineers only.' });
+    }
+
+    const { page = 1, limit = 10000, status } = req.query;
+
+    // Get all projects assigned to this engineer
+    const assignedProjects = await Task.find({
+      assignedEngineers: req.user.id
+    }).select('_id title');
+
+    if (assignedProjects.length === 0) {
+      return res.json({
+        jobs: [],
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: 0,
+          totalJobs: 0,
+          hasNext: false,
+          hasPrev: false
+        },
+        message: 'No projects assigned to this engineer'
+      });
+    }
+
+    const projectIds = assignedProjects.map(p => p._id);
+    console.log('📋 Engineer assigned to projects:', projectIds.map(id => id.toString()));
+
+    // Get all subprojects within these projects
+    const SubProject = require('../shared/models/SubProject');
+    const subProjects = await SubProject.find({
+      project: { $in: projectIds }
+    }).select('_id project');
+
+    console.log('📦 Found subprojects:', subProjects.length);
+
+    // Get all structural elements from these subprojects
+    const subProjectIds = subProjects.map(sp => sp._id);
+    const structuralElements = await StructuralElement.find({
+      subProject: { $in: subProjectIds }
+    }).select('_id');
+
+    console.log('🏗️ Found structural elements:', structuralElements.length);
+
+    if (structuralElements.length === 0) {
+      return res.json({
+        jobs: [],
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: 0,
+          totalJobs: 0,
+          hasNext: false,
+          hasPrev: false
+        },
+        message: 'No structural elements found in assigned projects'
+      });
+    }
+
+    const elementIds = structuralElements.map(el => el._id);
+
+    // Build filter for jobs
+    const filter = {
+      structuralElement: { $in: elementIds }
+    };
+
+    // Add status filter if provided
+    if (status) {
+      filter.status = status;
+    }
+
+    // Get jobs with pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const jobs = await Job.find(filter)
+      .populate({
+        path: 'structuralElement',
+        select: 'structureNumber memberType partMarkNo gridNo level drawingNo fireProofingWorkflow subProject',
+        populate: {
+          path: 'subProject',
+          select: 'name code'
+        }
+      })
+      .populate('project', 'title')
+      .populate('assignedTo', 'name email')
+      .populate('createdBy', 'name email')
+      .sort({ orderIndex: 1, stepNumber: 1, createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    const totalJobs = await Job.countDocuments(filter);
+
+    console.log(`✅ Found ${jobs.length} jobs (total: ${totalJobs})`);
+
+    res.json({
+      jobs,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalJobs / parseInt(limit)),
+        totalJobs,
+        hasNext: skip + parseInt(limit) < totalJobs,
+        hasPrev: parseInt(page) > 1
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching engineer jobs:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+/**
+ * Engineer endpoint to update job status
+ * Allows site engineers to update job status (pending -> completed/not_applicable)
+ */
+router.patch('/engineer/:id/status', auth, async (req, res) => {
+  try {
+    const jobId = req.params.id;
+    const { status } = req.body;
+    
+    console.log('🔧 Engineer status update for job:', jobId, 'new status:', status);
+    
+    // Only site-engineers can access this endpoint
+    if (req.user.role !== 'site-engineer') {
+      return res.status(403).json({ message: 'Access denied. Site engineers only.' });
+    }
+
+    if (!status) {
+      return res.status(400).json({ message: 'Status is required' });
+    }
+    
+    // Site engineers can only set these statuses
+    const allowedStatuses = ['pending', 'completed', 'not_applicable'];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ 
+        message: `Invalid status. Site engineers can only set: ${allowedStatuses.join(', ')}` 
+      });
+    }
+
+    // Find the job
+    const job = await Job.findById(jobId).populate('structuralElement');
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+
+    // Verify the engineer has access to this job's project
+    const hasAccess = await Task.exists({
+      _id: job.project,
+      assignedEngineers: req.user.id
+    });
+
+    if (!hasAccess) {
+      return res.status(403).json({ message: 'Not authorized to update jobs for this project' });
+    }
+
+    // Update status and related fields
+    const updates = { status };
+    if (status === 'completed' || status === 'not_applicable') {
+      updates.completedDate = new Date();
+      if (status === 'completed') {
+        updates.progressPercentage = 100;
+      }
+    }
+
+    const updatedJob = await Job.findByIdAndUpdate(
+      jobId,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).populate([
+      { 
+        path: 'structuralElement', 
+        select: 'structureNumber memberType partMarkNo status gridNo level subProject',
+        populate: {
+          path: 'subProject',
+          select: 'name code'
+        }
+      },
+      { path: 'assignedTo', select: 'name email' },
+      { path: 'createdBy', select: 'name email' }
+    ]);
+
+    // Invalidate cache
+    await invalidateCache(`cache:jobs:project:${updatedJob.project}:*`);
+    await invalidateCache(`cache:stats:project:${updatedJob.project}`);
+    if (updatedJob.structuralElement) {
+      await invalidateCache(`cache:structural:jobs:${updatedJob.structuralElement._id || updatedJob.structuralElement}`);
+      await invalidateCache(`cache:structural:summary:${updatedJob.project}:*`);
+      
+      // Update structural element status
+      const elementId = updatedJob.structuralElement._id || updatedJob.structuralElement;
+      updateStructuralElementStatus(elementId).catch(err => 
+        console.error('❌ Failed to update structural element status:', err)
+      );
+    }
+
+    // Trigger progress calculation if job was completed
+    if (status === 'completed') {
+      addProgressJob(updatedJob.project.toString()).catch(err => 
+        console.error('Failed to queue progress job:', err)
+      );
+    }
+
+    console.log('✅ Job status updated successfully');
+    res.json(updatedJob);
+  } catch (error) {
+    console.error('Error updating job status (engineer):', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 module.exports = router;

@@ -390,4 +390,240 @@ router.get('/available-fields', auth, async (req, res) => {
   }
 });
 
+/**
+ * Engineer-specific endpoint
+ * Get grouped structural elements from all subprojects within engineer's assigned projects
+ */
+router.post('/engineer/elements', auth, async (req, res) => {
+  try {
+    console.log('🔧 Engineer elements endpoint called by user:', req.user.id, 'role:', req.user.role);
+    
+    // Only site-engineers can access this endpoint
+    if (req.user.role !== 'site-engineer') {
+      return res.status(403).json({ error: 'Access denied. Site engineers only.' });
+    }
+
+    const {
+      projectId, // Required: The main project assigned to the engineer
+      status,
+      groupBy = 'gridNo',
+      subGroupBy,
+      page = 1,
+      limit = 100,
+      includeElements = false
+    } = req.body;
+
+    if (!projectId) {
+      return res.status(400).json({ error: 'projectId is required' });
+    }
+
+    // Verify engineer has access to this project
+    const Task = require('../shared/models/Task');
+    const hasAccess = await Task.exists({
+      _id: projectId,
+      assignedEngineers: req.user.id
+    });
+
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Not authorized to access this project' });
+    }
+
+    // Get all subprojects within this project
+    const SubProject = require('../shared/models/SubProject');
+    const subProjects = await SubProject.find({
+      project: projectId
+    }).select('_id name code');
+
+    console.log('📦 Found subprojects:', subProjects.length);
+
+    if (subProjects.length === 0) {
+      return res.json({
+        groups: [],
+        totalElements: 0,
+        totalGroups: 0,
+        message: 'No subprojects found in this project'
+      });
+    }
+
+    const subProjectIds = subProjects.map(sp => sp._id);
+
+    // Build match stage for structural elements from all subprojects
+    const matchStage = {
+      subProject: { $in: subProjectIds }
+    };
+
+    // Filter by status if provided
+    if (status) {
+      if (status === 'complete') {
+        matchStage.status = { $in: ['complete', 'completed'] };
+      } else if (status === 'non_clearance') {
+        matchStage.status = 'non clearance';
+      } else {
+        matchStage.status = status;
+      }
+    }
+
+    // Build aggregation pipeline
+    const pipeline = [
+      { $match: matchStage }
+    ];
+
+    // Add lookup for jobs to get job statistics
+    pipeline.push({
+      $lookup: {
+        from: 'jobs',
+        localField: '_id',
+        foreignField: 'structuralElement',
+        as: 'jobs'
+      }
+    });
+
+    // Add computed fields for job statistics
+    pipeline.push({
+      $addFields: {
+        totalJobs: { $size: '$jobs' },
+        pendingJobs: {
+          $size: {
+            $filter: {
+              input: '$jobs',
+              as: 'job',
+              cond: { $eq: ['$$job.status', 'pending'] }
+            }
+          }
+        },
+        completedJobs: {
+          $size: {
+            $filter: {
+              input: '$jobs',
+              as: 'job',
+              cond: { $eq: ['$$job.status', 'completed'] }
+            }
+          }
+        },
+        notApplicableJobs: {
+          $size: {
+            $filter: {
+              input: '$jobs',
+              as: 'job',
+              cond: { $eq: ['$$job.status', 'not_applicable'] }
+            }
+          }
+        },
+        // Get current pending job
+        currentJob: {
+          $arrayElemAt: [
+            {
+              $filter: {
+                input: '$jobs',
+                as: 'job',
+                cond: { $in: ['$$job.status', ['pending', 'in_progress']] }
+              }
+            },
+            0
+          ]
+        }
+      }
+    });
+
+    // Group by primary field
+    const groupStage = {
+      _id: `$${groupBy}`,
+      count: { $sum: 1 },
+      elements: includeElements ? { $push: '$$ROOT' } : { $push: '$_id' },
+      totalSqm: { $sum: { $ifNull: ['$structuralData.surfaceAreaSqm', 0] } },
+      totalJobs: { $sum: '$totalJobs' },
+      pendingJobs: { $sum: '$pendingJobs' },
+      completedJobs: { $sum: '$completedJobs' },
+      notApplicableJobs: { $sum: '$notApplicableJobs' }
+    };
+
+    // Add sub-grouping if specified
+    if (subGroupBy) {
+      pipeline.push({
+        $group: {
+          _id: {
+            primary: `$${groupBy}`,
+            secondary: `$${subGroupBy}`
+          },
+          count: { $sum: 1 },
+          elements: includeElements ? { $push: '$$ROOT' } : { $push: '$_id' },
+          totalSqm: { $sum: { $ifNull: ['$structuralData.surfaceAreaSqm', 0] } },
+          totalJobs: { $sum: '$totalJobs' },
+          pendingJobs: { $sum: '$pendingJobs' },
+          completedJobs: { $sum: '$completedJobs' },
+          notApplicableJobs: { $sum: '$notApplicableJobs' }
+        }
+      });
+
+      // Re-group by primary field with sub-groups
+      pipeline.push({
+        $group: {
+          _id: '$_id.primary',
+          count: { $sum: '$count' },
+          totalSqm: { $sum: '$totalSqm' },
+          totalJobs: { $sum: '$totalJobs' },
+          pendingJobs: { $sum: '$pendingJobs' },
+          completedJobs: { $sum: '$completedJobs' },
+          notApplicableJobs: { $sum: '$notApplicableJobs' },
+          subGroups: {
+            $push: {
+              name: '$_id.secondary',
+              count: '$count',
+              elements: '$elements',
+              totalSqm: '$totalSqm',
+              totalJobs: '$totalJobs',
+              pendingJobs: '$pendingJobs',
+              completedJobs: '$completedJobs',
+              notApplicableJobs: '$notApplicableJobs'
+            }
+          }
+        }
+      });
+    } else {
+      pipeline.push({ $group: groupStage });
+    }
+
+    // Sort groups
+    pipeline.push({ $sort: { _id: 1 } });
+
+    // Execute aggregation
+    const groups = await StructuralElement.aggregate(pipeline);
+
+    // Format response
+    const formattedGroups = groups.map(group => ({
+      name: group._id || 'Unknown',
+      count: group.count,
+      totalSqm: Math.round(group.totalSqm * 100) / 100,
+      totalJobs: group.totalJobs,
+      pendingJobs: group.pendingJobs,
+      completedJobs: group.completedJobs,
+      notApplicableJobs: group.notApplicableJobs,
+      subGroups: group.subGroups || [],
+      elements: includeElements ? group.elements : undefined
+    }));
+
+    // Get total element count
+    const totalElements = await StructuralElement.countDocuments(matchStage);
+
+    console.log(`✅ Found ${formattedGroups.length} groups with ${totalElements} total elements`);
+
+    res.json({
+      groups: formattedGroups,
+      totalElements,
+      totalGroups: formattedGroups.length,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(formattedGroups.length / parseInt(limit)),
+        hasNext: formattedGroups.length > parseInt(page) * parseInt(limit),
+        hasPrev: parseInt(page) > 1
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching engineer elements:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
+

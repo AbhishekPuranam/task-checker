@@ -100,10 +100,20 @@ export default function EngineerDashboard() {
     
     try {
       setLoading(true);
-      const response = await api.get(`/jobs?project=${selectedProject}&limit=10000`);
+      console.log('Fetching jobs for project:', selectedProject);
+      // Use the new engineer-specific endpoint that fetches jobs from all subprojects
+      const response = await api.get(`/jobs/engineer/jobs?page=1&limit=10000`);
       const fetchedJobs = response.data.jobs || [];
+      console.log('Fetched jobs from subprojects:', fetchedJobs.length);
+      console.log('Jobs data:', fetchedJobs);
       setJobs(fetchedJobs);
       calculateStats(fetchedJobs);
+      
+      if (fetchedJobs.length === 0) {
+        toast.info('No jobs found for this project. Jobs are created when structural elements are uploaded via Excel.', {
+          duration: 5000,
+        });
+      }
     } catch (error) {
       console.error('Error fetching jobs:', error);
       toast.error('Failed to fetch jobs');
@@ -187,9 +197,9 @@ export default function EngineerDashboard() {
       setUpdatingJob(jobId);
       toast.loading('Updating job status...', { id: 'status-update' });
       
-      await api.put(`/jobs/${jobId}`, {
-        status: newStatus,
-        progressPercentage: newStatus === 'completed' ? 100 : 0
+      // Use the new engineer-specific status update endpoint
+      await api.patch(`/jobs/engineer/${jobId}/status`, {
+        status: newStatus
       });
 
       toast.success('Job status updated successfully!', { id: 'status-update' });
@@ -588,9 +598,35 @@ export default function EngineerDashboard() {
                 </Box>
               ) : Object.keys(groupedJobs).length === 0 ? (
                 <Box sx={{ p: 4, textAlign: 'center' }}>
-                  <Typography variant="h6" color="text.secondary">
+                  <Build sx={{ fontSize: 80, color: '#b794f6', mb: 2 }} />
+                  <Typography variant="h6" sx={{ color: '#6a11cb', mb: 2 }}>
                     No jobs found for {TABS.find(t => t.id === activeTab)?.label}
                   </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    {jobs.length === 0 
+                      ? "This project doesn't have any jobs yet. Jobs are automatically created when structural elements are uploaded via Excel in the Admin portal."
+                      : `All jobs for this project are in other statuses. Try switching tabs to see them.`
+                    }
+                  </Typography>
+                  {jobs.length === 0 && (
+                    <Box sx={{ 
+                      p: 2, 
+                      bgcolor: '#f8f7ff', 
+                      borderRadius: 2, 
+                      border: '1px solid #e0d4ff',
+                      display: 'inline-block',
+                      textAlign: 'left'
+                    }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#6a11cb' }}>
+                        📝 How to add jobs:
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" component="div">
+                        1. Admin uploads Excel with structural elements<br/>
+                        2. System creates fire proofing jobs automatically<br/>
+                        3. Jobs appear here for site engineers to update
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
               ) : (
                 <Box>
