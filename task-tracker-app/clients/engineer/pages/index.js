@@ -730,7 +730,7 @@ export default function EngineerDashboard() {
               ) : (
                 <Box>
                   {Object.keys(groupMetrics).sort().map(groupKey => {
-                    const metrics = groupMetrics[groupKey];
+                    const metrics = groupMetrics[groupKey] || { count: 0, sqm: 0, subGroups: {} };
                     const group = groupJobs[groupKey]; // May be undefined if not loaded yet
                     const isExpanded = expandedGroups[groupKey] || false;
                     const isLoading = loadingGroups[groupKey] || false;
@@ -748,7 +748,7 @@ export default function EngineerDashboard() {
                               {groupKey}
                             </Typography>
                             <Chip
-                              label={`${metrics.count} jobs (${metrics.sqm.toFixed(2)} SQM)`}
+                              label={`${metrics.count || 0} jobs (${(metrics.sqm || 0).toFixed(2)} SQM)`}
                               size="small"
                               sx={{ bgcolor: TABS.find(t => t.id === activeTab)?.color, color: 'white', fontWeight: 'bold' }}
                             />
@@ -767,7 +767,7 @@ export default function EngineerDashboard() {
                           ) : subGroupBy && Object.keys(metrics.subGroups || {}).length > 0 ? (
                             // Show sub-groups
                             Object.keys(metrics.subGroups).sort().map(subGroupKey => {
-                              const subGroupMetrics = metrics.subGroups[subGroupKey];
+                              const subGroupMetrics = metrics.subGroups[subGroupKey] || { count: 0, sqm: 0 };
                               const subGroupJobsList = group[subGroupKey] || [];
                               if (!Array.isArray(subGroupJobsList)) return null;
 
@@ -778,7 +778,7 @@ export default function EngineerDashboard() {
                                     <Typography variant="subtitle1" fontWeight="600" sx={{ color: '#666' }}>
                                       {getFireProofingLabel(subGroupKey)}
                                     </Typography>
-                                    <Chip label={`${subGroupMetrics.count} jobs (${subGroupMetrics.sqm.toFixed(2)} SQM)`} size="small" />
+                                    <Chip label={`${subGroupMetrics.count || 0} jobs (${(subGroupMetrics.sqm || 0).toFixed(2)} SQM)`} size="small" />
                                   </Box>
                                   <Grid container spacing={2}>
                                     {subGroupJobsList.map(job => (
