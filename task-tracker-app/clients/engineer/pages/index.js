@@ -135,12 +135,19 @@ export default function EngineerDashboard() {
       const metricsData = metricsResponse.data;
       
       console.log('Fetched metrics:', metricsData);
+      console.log('Status breakdown:', metricsData.statusBreakdown);
       
       // Update overall stats from metrics endpoint
       setStats({
         pending: { count: metricsData.statusBreakdown.pending?.count || 0, sqm: metricsData.statusBreakdown.pending?.sqm || 0 },
         completed: { count: metricsData.statusBreakdown.completed?.count || 0, sqm: metricsData.statusBreakdown.completed?.sqm || 0 },
         not_applicable: { count: metricsData.statusBreakdown.not_applicable?.count || 0, sqm: metricsData.statusBreakdown.not_applicable?.sqm || 0 }
+      });
+      
+      console.log('Updated stats:', {
+        pending: metricsData.statusBreakdown.pending?.count || 0,
+        completed: metricsData.statusBreakdown.completed?.count || 0,
+        not_applicable: metricsData.statusBreakdown.not_applicable?.count || 0
       });
       
       // Don't fetch jobs upfront - let accordion expansion handle it
