@@ -638,7 +638,7 @@ export default function EngineerDashboard() {
                         {tab.icon}
                         <span>{tab.label}</span>
                         <Chip
-                          label={stats[tab.id].count}
+                          label={stats[tab.id].elementCount || 0}
                           size="small"
                           sx={{
                             bgcolor: tab.color,
