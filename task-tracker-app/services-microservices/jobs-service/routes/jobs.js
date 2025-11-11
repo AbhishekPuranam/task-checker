@@ -859,6 +859,7 @@ router.put('/:id', auth, async (req, res) => {
     await invalidateCache(`cache:jobs:project:${updatedJob.project}:*`);
     await invalidateCache(`cache:jobs:project:all:*`); // Also invalidate 'all' project cache
     await invalidateCache(`cache:stats:project:${updatedJob.project}`);
+    await invalidateCache(`cache:engineer:jobs:*`); // Invalidate all engineer caches
     
     // Invalidate structural element job cache
     if (updatedJob.structuralElement) {
@@ -1233,6 +1234,7 @@ router.patch('/:id/status', auth, async (req, res) => {
     // Invalidate cache
     await invalidateCache(`cache:jobs:project:${updatedJob.project}:*`);
     await invalidateCache(`cache:stats:project:${updatedJob.project}`);
+    await invalidateCache(`cache:engineer:jobs:*`); // Invalidate all engineer caches
     if (updatedJob.structuralElement) {
       await invalidateCache(`cache:structural:jobs:${updatedJob.structuralElement._id || updatedJob.structuralElement}`);
       await invalidateCache(`cache:structural:summary:${updatedJob.project}:*`);
@@ -1341,6 +1343,7 @@ router.post('/custom', auth, async (req, res) => {
     // Invalidate cache
     await invalidateCache(`cache:jobs:project:${project}:*`);
     await invalidateCache(`cache:stats:project:${project}`);
+    await invalidateCache(`cache:engineer:jobs:*`); // Invalidate all engineer caches
     await invalidateCache(`cache:structural:jobs:${structuralElement}`);
     await invalidateCache(`cache:structural:summary:${project}:*`);
 
@@ -1446,10 +1449,31 @@ router.post('/refresh-element-status/:elementId', auth, async (req, res) => {
 });
 
 /**
+ * Cache key generator for engineer jobs endpoint
+ */
+const engineerJobsCacheKeyGenerator = (req) => {
+  const { page = 1, limit = 10000, status } = req.query;
+  const userId = req.user?.id || 'anon';
+  
+  // Create a deterministic cache key based on user and query params
+  const parts = [
+    'engineer',
+    'jobs',
+    `user:${userId}`,
+    `status:${status || 'all'}`,
+    `page:${page}`,
+    `limit:${limit}`
+  ];
+  
+  return `cache:${parts.join(':')}`;
+};
+
+/**
  * Engineer-specific endpoints
  * Get jobs from all subprojects within the engineer's assigned project
+ * Cached for 2 minutes (120 seconds) to improve performance
  */
-router.get('/engineer/jobs', auth, async (req, res) => {
+router.get('/engineer/jobs', auth, cacheMiddleware(120, engineerJobsCacheKeyGenerator), async (req, res) => {
   try {
     console.log('🔧 Engineer jobs endpoint called by user:', req.user.id, 'role:', req.user.role);
     
@@ -1638,6 +1662,7 @@ router.patch('/engineer/:id/status', auth, async (req, res) => {
     // Invalidate cache
     await invalidateCache(`cache:jobs:project:${updatedJob.project}:*`);
     await invalidateCache(`cache:stats:project:${updatedJob.project}`);
+    await invalidateCache(`cache:engineer:jobs:user:${req.user.id}:*`); // Invalidate engineer cache
     if (updatedJob.structuralElement) {
       await invalidateCache(`cache:structural:jobs:${updatedJob.structuralElement._id || updatedJob.structuralElement}`);
       await invalidateCache(`cache:structural:summary:${updatedJob.project}:*`);
