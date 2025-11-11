@@ -146,13 +146,13 @@ export default function EngineerDashboard() {
     }
   }, [selectedProject, activeTab, groupBy, subGroupBy, searchTerm]);
 
-  // Calculate group metrics (count and sqm per group)
+  // Calculate group metrics (element count and sqm per group)
   const calculateGroupMetrics = (jobsData) => {
     const metrics = {};
     
-    // Track unique structural elements per group to avoid counting SQM multiple times
-    const groupElementSqm = {};
-    const subGroupElementSqm = {};
+    // Track unique structural elements per group
+    const groupElements = {};
+    const subGroupElements = {};
     
     jobsData.forEach(job => {
       const jobStatus = !job.status || job.status === 'in_progress' ? 'pending' : job.status;
@@ -176,34 +176,47 @@ export default function EngineerDashboard() {
       const primaryKey = job.structuralElement?.[groupBy] || job[groupBy] || 'Other';
       
       if (!metrics[primaryKey]) {
-        metrics[primaryKey] = { count: 0, sqm: 0, subGroups: {} };
-        groupElementSqm[primaryKey] = new Set();
-        subGroupElementSqm[primaryKey] = {};
+        metrics[primaryKey] = { count: 0, sqm: 0, qty: 0, subGroups: {} };
+        groupElements[primaryKey] = new Set();
+        subGroupElements[primaryKey] = {};
       }
       
-      metrics[primaryKey].count += 1;
-      
-      // Track unique structural elements for SQM calculation
+      // Track unique structural elements
       const elementId = job.structuralElement?._id?.toString();
-      if (elementId && !groupElementSqm[primaryKey].has(elementId)) {
-        groupElementSqm[primaryKey].add(elementId);
-        metrics[primaryKey].sqm += job.structuralElement?.surfaceAreaSqm || 0;
+      if (elementId) {
+        // Add element to group set
+        if (!groupElements[primaryKey].has(elementId)) {
+          groupElements[primaryKey].add(elementId);
+          metrics[primaryKey].sqm += job.structuralElement?.surfaceAreaSqm || 0;
+          metrics[primaryKey].qty += job.structuralElement?.qty || 0;
+        }
       }
       
       // Track sub-group metrics
       if (subGroupBy) {
         const secondaryKey = job[subGroupBy] || job.structuralElement?.[subGroupBy] || 'Other';
         if (!metrics[primaryKey].subGroups[secondaryKey]) {
-          metrics[primaryKey].subGroups[secondaryKey] = { count: 0, sqm: 0 };
-          subGroupElementSqm[primaryKey][secondaryKey] = new Set();
+          metrics[primaryKey].subGroups[secondaryKey] = { count: 0, sqm: 0, qty: 0 };
+          subGroupElements[primaryKey][secondaryKey] = new Set();
         }
-        metrics[primaryKey].subGroups[secondaryKey].count += 1;
         
-        // Track unique structural elements for sub-group SQM
-        if (elementId && !subGroupElementSqm[primaryKey][secondaryKey].has(elementId)) {
-          subGroupElementSqm[primaryKey][secondaryKey].add(elementId);
+        // Track unique structural elements for sub-group
+        if (elementId && !subGroupElements[primaryKey][secondaryKey].has(elementId)) {
+          subGroupElements[primaryKey][secondaryKey].add(elementId);
           metrics[primaryKey].subGroups[secondaryKey].sqm += job.structuralElement?.surfaceAreaSqm || 0;
+          metrics[primaryKey].subGroups[secondaryKey].qty += job.structuralElement?.qty || 0;
         }
+      }
+    });
+    
+    // Update counts with unique element counts
+    Object.keys(metrics).forEach(primaryKey => {
+      metrics[primaryKey].count = groupElements[primaryKey].size;
+      
+      if (subGroupBy) {
+        Object.keys(metrics[primaryKey].subGroups).forEach(secondaryKey => {
+          metrics[primaryKey].subGroups[secondaryKey].count = subGroupElements[primaryKey][secondaryKey].size;
+        });
       }
     });
     
@@ -615,44 +628,193 @@ export default function EngineerDashboard() {
 
         {selectedProject && (
           <>
-            {/* Tabs */}
-            <Paper elevation={3} sx={{ mb: 3, borderRadius: 3, overflow: 'hidden' }}>
-              <Tabs
-                value={activeTab}
-                onChange={(e, newValue) => setActiveTab(newValue)}
-                variant="fullWidth"
-                sx={{
-                  bgcolor: 'white',
-                  '& .MuiTab-root': {
-                    fontWeight: 600,
-                    fontSize: { xs: '0.875rem', sm: '1rem' },
-                  },
-                }}
-              >
-                {TABS.map(tab => (
-                  <Tab
-                    key={tab.id}
-                    value={tab.id}
-                    label={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {tab.icon}
-                        <span>{tab.label}</span>
-                        <Chip
-                          label={stats[tab.id].elementCount || 0}
-                          size="small"
+            {/* Status Cards */}
+            <Grid container spacing={3} sx={{ mb: 3 }}>
+              {TABS.map(tab => {
+                const getColorScheme = (color) => {
+                  const schemes = {
+                    '#4caf50': { // green
+                      primary: '#4caf50',
+                      light: '#e8f5e9',
+                      lighter: '#f1f8e9',
+                      dark: '#2e7d32',
+                      gradient: 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)'
+                    },
+                    '#2196f3': { // blue
+                      primary: '#2196f3',
+                      light: '#e3f2fd',
+                      lighter: '#bbdefb',
+                      dark: '#1565c0',
+                      gradient: 'linear-gradient(135deg, #2196f3 0%, #42a5f5 100%)'
+                    },
+                    '#ff9800': { // orange
+                      primary: '#ff9800',
+                      light: '#fff3e0',
+                      lighter: '#ffe0b2',
+                      dark: '#e65100',
+                      gradient: 'linear-gradient(135deg, #ff9800 0%, #fb8c00 100%)'
+                    },
+                    '#9e9e9e': { // grey
+                      primary: '#9e9e9e',
+                      light: '#f5f5f5',
+                      lighter: '#eeeeee',
+                      dark: '#616161',
+                      gradient: 'linear-gradient(135deg, #9e9e9e 0%, #bdbdbd 100%)'
+                    }
+                  };
+                  return schemes[color] || schemes['#9e9e9e'];
+                };
+
+                const colors = getColorScheme(tab.color);
+                const isActive = activeTab === tab.id;
+                const count = stats[tab.id].elementCount || 0;
+                const sqm = stats[tab.id].sqm || 0;
+
+                return (
+                  <Grid item xs={12} sm={6} md={3} key={tab.id}>
+                    <Paper
+                      elevation={isActive ? 8 : 2}
+                      onClick={() => setActiveTab(tab.id)}
+                      sx={{
+                        p: 3,
+                        cursor: 'pointer',
+                        borderRadius: 3,
+                        position: 'relative',
+                        overflow: 'hidden',
+                        background: isActive 
+                          ? `linear-gradient(135deg, ${colors.light} 0%, ${colors.lighter} 100%)`
+                          : 'white',
+                        border: isActive ? `3px solid ${colors.primary}` : '1px solid #e0e0e0',
+                        transform: isActive ? 'scale(1.05)' : 'scale(1)',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        '&:hover': {
+                          transform: 'scale(1.05)',
+                          boxShadow: `0 8px 24px ${colors.primary}40`,
+                          borderColor: colors.primary
+                        },
+                        '&::before': isActive ? {
+                          content: '""',
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: '6px',
+                          background: colors.gradient,
+                          animation: 'shimmer 2s ease-in-out infinite',
+                          '@keyframes shimmer': {
+                            '0%, 100%': { opacity: 1 },
+                            '50%': { opacity: 0.6 }
+                          }
+                        } : {}
+                      }}
+                    >
+                      {/* Section Label */}
+                      <Typography 
+                        variant="h6" 
+                        fontWeight="bold" 
+                        sx={{ 
+                          color: isActive ? colors.dark : colors.primary,
+                          mb: 2,
+                          fontSize: '1.1rem',
+                          letterSpacing: '0.5px',
+                          textTransform: 'uppercase'
+                        }}
+                      >
+                        {tab.label}
+                      </Typography>
+                      
+                      {/* Count Metric */}
+                      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 1.5 }}>
+                        <Typography 
+                          variant="h3" 
+                          fontWeight="900"
+                          sx={{ 
+                            color: colors.primary,
+                            lineHeight: 1,
+                            fontSize: '2.5rem',
+                            textShadow: isActive ? `0 2px 8px ${colors.primary}40` : 'none'
+                          }}
+                        >
+                          {count}
+                        </Typography>
+                        <Typography 
+                          variant="body2" 
+                          sx={{ 
+                            color: '#666',
+                            fontWeight: 600
+                          }}
+                        >
+                          Elements
+                        </Typography>
+                      </Box>
+                      
+                      {/* SQM Metric */}
+                      <Box 
+                        sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: 1,
+                          p: 1.5,
+                          background: isActive ? `${colors.primary}15` : `${colors.light}`,
+                          borderRadius: 2,
+                          border: `1px solid ${colors.lighter}`
+                        }}
+                      >
+                        <Box 
+                          sx={{ 
+                            width: 8, 
+                            height: 8, 
+                            borderRadius: '50%',
+                            bgcolor: colors.primary,
+                            boxShadow: `0 0 10px ${colors.primary}60`
+                          }} 
+                        />
+                        <Typography 
+                          variant="h6" 
+                          fontWeight="bold"
+                          sx={{ 
+                            color: colors.dark,
+                            fontSize: '1.2rem'
+                          }}
+                        >
+                          {sqm.toFixed(1)}
+                        </Typography>
+                        <Typography 
+                          variant="body2" 
+                          sx={{ 
+                            color: '#666',
+                            fontWeight: 600
+                          }}
+                        >
+                          SQM
+                        </Typography>
+                      </Box>
+                      
+                      {/* Active Indicator */}
+                      {isActive && (
+                        <Box
                           sx={{
-                            bgcolor: tab.color,
-                            color: 'white',
-                            fontWeight: 'bold',
-                            minWidth: 32,
+                            position: 'absolute',
+                            top: 16,
+                            right: 16,
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            bgcolor: colors.primary,
+                            boxShadow: `0 0 12px ${colors.primary}`,
+                            animation: 'pulse 2s ease-in-out infinite',
+                            '@keyframes pulse': {
+                              '0%, 100%': { transform: 'scale(1)', opacity: 1 },
+                              '50%': { transform: 'scale(1.2)', opacity: 0.8 }
+                            }
                           }}
                         />
-                      </Box>
-                    }
-                  />
-                ))}
-              </Tabs>
-            </Paper>
+                      )}
+                    </Paper>
+                  </Grid>
+                );
+              })}
+            </Grid>
 
             {/* Metrics with Race Track */}
             <Paper elevation={3} sx={{ p: 3, mb: 3, borderRadius: 3, bgcolor: 'white' }}>
@@ -770,23 +932,147 @@ export default function EngineerDashboard() {
                         key={groupKey}
                         expanded={isExpanded}
                         onChange={() => toggleGroup(groupKey)}
-                        sx={{ '&:before': { display: 'none' } }}
+                        sx={{ 
+                          mb: 2,
+                          border: '1px solid #e0e0e0', 
+                          borderRadius: '12px !important',
+                          overflow: 'hidden',
+                          '&:before': { display: 'none' },
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                        }}
                       >
-                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Typography variant="h6" sx={{ fontWeight: 600, color: '#6a11cb' }}>
-                                {groupKey}
-                              </Typography>
-                              <Chip
-                                label={`${metrics.count || 0} jobs`}
-                                size="small"
-                                sx={{ bgcolor: TABS.find(t => t.id === activeTab)?.color, color: 'white', fontWeight: 'bold' }}
-                              />
-                            </Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: TABS.find(t => t.id === activeTab)?.color }}>
-                              {(metrics.sqm || 0).toFixed(2)} SQM
+                        <AccordionSummary 
+                          expandIcon={<ExpandMoreIcon />}
+                          sx={{ 
+                            py: 1.5,
+                            px: 2,
+                            minHeight: '56px !important',
+                            background: 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)',
+                            '&:hover': { background: 'linear-gradient(135deg, #f5f5f5 0%, #eeeeee 100%)' },
+                            '& .MuiAccordionSummary-content': {
+                              margin: '8px 0 !important'
+                            }
+                          }}
+                        >
+                          {/* Compact Group Header with Inline Metrics */}
+                          <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: 2, 
+                            mb: 0,
+                            pb: 0,
+                            borderBottom: 'none',
+                            flexWrap: 'wrap',
+                            width: '100%'
+                          }}>
+                            {/* Group Title */}
+                            <Typography variant="h6" fontWeight="700" sx={{ color: '#333', flex: '1 1 auto', minWidth: '200px' }}>
+                              {groupKey}
                             </Typography>
+                            
+                            {/* Inline Compact Metrics */}
+                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                              {/* Elements Count */}
+                              <Box sx={{ 
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
+                                px: 2,
+                                py: 1,
+                                background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
+                                borderRadius: 2,
+                                border: '1px solid #90caf9'
+                              }}>
+                                <Box sx={{ 
+                                  width: 32, 
+                                  height: 32, 
+                                  borderRadius: 1,
+                                  background: 'linear-gradient(135deg, #2196f3 0%, #1976d2 100%)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '1rem'
+                                }}>
+                                  📊
+                                </Box>
+                                <Box>
+                                  <Typography variant="caption" sx={{ color: '#1976d2', fontWeight: 600, fontSize: '0.65rem', textTransform: 'uppercase', display: 'block', lineHeight: 1 }}>
+                                    Elements
+                                  </Typography>
+                                  <Typography variant="h6" fontWeight="900" sx={{ color: '#1565c0', lineHeight: 1, mt: 0.3 }}>
+                                    {metrics.count || 0}
+                                  </Typography>
+                                </Box>
+                              </Box>
+
+                              {/* Total SQM */}
+                              <Box sx={{ 
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
+                                px: 2,
+                                py: 1,
+                                background: 'linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%)',
+                                borderRadius: 2,
+                                border: '1px solid #ce93d8'
+                              }}>
+                                <Box sx={{ 
+                                  width: 32, 
+                                  height: 32, 
+                                  borderRadius: 1,
+                                  background: 'linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '1rem'
+                                }}>
+                                  📐
+                                </Box>
+                                <Box>
+                                  <Typography variant="caption" sx={{ color: '#7b1fa2', fontWeight: 600, fontSize: '0.65rem', textTransform: 'uppercase', display: 'block', lineHeight: 1 }}>
+                                    Total SQM
+                                  </Typography>
+                                  <Typography variant="h6" fontWeight="900" sx={{ color: '#6a1b9a', lineHeight: 1, mt: 0.3 }}>
+                                    {(metrics.sqm || 0).toFixed(1)}
+                                  </Typography>
+                                </Box>
+                              </Box>
+
+                              {/* Total Qty (if applicable) */}
+                              {metrics.qty > 0 && (
+                                <Box sx={{ 
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 1,
+                                  px: 2,
+                                  py: 1,
+                                  background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
+                                  borderRadius: 2,
+                                  border: '1px solid #ffb74d'
+                                }}>
+                                  <Box sx={{ 
+                                    width: 32, 
+                                    height: 32, 
+                                    borderRadius: 1,
+                                    background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '1rem'
+                                  }}>
+                                    🔢
+                                  </Box>
+                                  <Box>
+                                    <Typography variant="caption" sx={{ color: '#f57c00', fontWeight: 600, fontSize: '0.65rem', textTransform: 'uppercase', display: 'block', lineHeight: 1 }}>
+                                      Total Qty
+                                    </Typography>
+                                    <Typography variant="h6" fontWeight="900" sx={{ color: '#e65100', lineHeight: 1, mt: 0.3 }}>
+                                      {metrics.qty || 0}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              )}
+                            </Box>
                           </Box>
                         </AccordionSummary>
                         <AccordionDetails>
