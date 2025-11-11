@@ -674,10 +674,8 @@ export default function EngineerDashboard() {
                         borderRadius: 3,
                         position: 'relative',
                         overflow: 'hidden',
-                        background: isActive 
-                          ? `linear-gradient(135deg, ${colors.light} 0%, ${colors.lighter} 100%)`
-                          : 'white',
-                        border: isActive ? `3px solid ${colors.primary}` : '1px solid #e0e0e0',
+                        background: `linear-gradient(135deg, ${colors.light} 0%, ${colors.lighter} 100%)`,
+                        border: isActive ? `3px solid ${colors.primary}` : `2px solid ${colors.primary}`,
                         transform: isActive ? 'scale(1.05)' : 'scale(1)',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                         '&:hover': {
@@ -748,9 +746,9 @@ export default function EngineerDashboard() {
                           alignItems: 'center', 
                           gap: 1,
                           p: 1.5,
-                          background: isActive ? `${colors.primary}15` : `${colors.light}`,
+                          background: `${colors.primary}20`,
                           borderRadius: 2,
-                          border: `1px solid ${colors.lighter}`
+                          border: `1px solid ${colors.primary}40`
                         }}
                       >
                         <Box 
