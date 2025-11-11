@@ -60,7 +60,7 @@ export default function EngineerDashboard() {
   const [activeTab, setActiveTab] = useState('pending');
   const [searchTerm, setSearchTerm] = useState('');
   const [groupBy, setGroupBy] = useState('gridNo');
-  const [subGroupBy, setSubGroupBy] = useState('fireProofingType');
+  const [subGroupBy, setSubGroupBy] = useState('fireProofingWorkflow');
   const [expandedGroups, setExpandedGroups] = useState({});
 
   // Stats for metrics
@@ -101,8 +101,8 @@ export default function EngineerDashboard() {
     try {
       setLoading(true);
       console.log('Fetching jobs for project:', selectedProject);
-      // Use the new engineer-specific endpoint that fetches jobs from all subprojects
-      const response = await api.get(`/jobs/engineer/jobs?page=1&limit=10000`);
+      // Fetch all jobs without artificial limit - let backend return actual count
+      const response = await api.get(`/jobs/engineer/jobs?page=1&limit=50000`);
       const fetchedJobs = response.data.jobs || [];
       console.log('Fetched jobs from subprojects:', fetchedJobs.length);
       console.log('Jobs data:', fetchedJobs);
@@ -569,7 +569,11 @@ export default function EngineerDashboard() {
                     >
                       <MenuItem value="gridNo">Grid No</MenuItem>
                       <MenuItem value="level">Level</MenuItem>
-                      <MenuItem value="fireProofingType">Fire Proofing Type</MenuItem>
+                      <MenuItem value="partMarkNo">Part Mark</MenuItem>
+                      <MenuItem value="lengthMm">Length (mm)</MenuItem>
+                      <MenuItem value="surfaceAreaSqm">SQM</MenuItem>
+                      <MenuItem value="fpThicknessMm">FP Thickness</MenuItem>
+                      <MenuItem value="fireProofingWorkflow">FP Workflow</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
@@ -582,8 +586,13 @@ export default function EngineerDashboard() {
                       label="Sub-Group By"
                     >
                       <MenuItem value="">None</MenuItem>
-                      <MenuItem value="fireProofingType">Fire Proofing Type</MenuItem>
-                      <MenuItem value="jobTitle">Job Title</MenuItem>
+                      <MenuItem value="gridNo">Grid No</MenuItem>
+                      <MenuItem value="level">Level</MenuItem>
+                      <MenuItem value="partMarkNo">Part Mark</MenuItem>
+                      <MenuItem value="lengthMm">Length (mm)</MenuItem>
+                      <MenuItem value="surfaceAreaSqm">SQM</MenuItem>
+                      <MenuItem value="fpThicknessMm">FP Thickness</MenuItem>
+                      <MenuItem value="fireProofingWorkflow">FP Workflow</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
@@ -686,11 +695,19 @@ export default function EngineerDashboard() {
                                                 <Typography variant="body2" color="text.secondary">
                                                   Structure: {job.structuralElement?.structureNumber || 'N/A'}
                                                 </Typography>
-                                                {job.structuralElement?.surfaceAreaSqm && (
-                                                  <Typography variant="body2" color="text.secondary">
-                                                    SQM: {job.structuralElement.surfaceAreaSqm.toFixed(2)}
-                                                  </Typography>
-                                                )}
+                                                <Typography variant="body2" color="text.secondary">
+                                                  Level: {job.structuralElement?.level || 'N/A'} | 
+                                                  Grid: {job.structuralElement?.gridNo || 'N/A'} | 
+                                                  Part Mark: {job.structuralElement?.partMarkNo || 'N/A'}
+                                                </Typography>
+                                                <Typography variant="body2" color="text.secondary">
+                                                  Length: {job.structuralElement?.lengthMm ? `${job.structuralElement.lengthMm} mm` : 'N/A'} | 
+                                                  SQM: {job.structuralElement?.surfaceAreaSqm ? job.structuralElement.surfaceAreaSqm.toFixed(2) : 'N/A'} | 
+                                                  FP Thickness: {job.structuralElement?.fpThicknessMm ? `${job.structuralElement.fpThicknessMm} mm` : 'N/A'}
+                                                </Typography>
+                                                <Typography variant="body2" color="text.secondary">
+                                                  FP Workflow: {job.structuralElement?.fireProofingWorkflow || 'N/A'}
+                                                </Typography>
                                               </Box>
                                             </Box>
                                             <Divider sx={{ my: 2 }} />
@@ -746,11 +763,19 @@ export default function EngineerDashboard() {
                                           <Typography variant="body2" color="text.secondary">
                                             Structure: {job.structuralElement?.structureNumber || 'N/A'}
                                           </Typography>
-                                          {job.structuralElement?.surfaceAreaSqm && (
-                                            <Typography variant="body2" color="text.secondary">
-                                              SQM: {job.structuralElement.surfaceAreaSqm.toFixed(2)}
-                                            </Typography>
-                                          )}
+                                          <Typography variant="body2" color="text.secondary">
+                                            Level: {job.structuralElement?.level || 'N/A'} | 
+                                            Grid: {job.structuralElement?.gridNo || 'N/A'} | 
+                                            Part Mark: {job.structuralElement?.partMarkNo || 'N/A'}
+                                          </Typography>
+                                          <Typography variant="body2" color="text.secondary">
+                                            Length: {job.structuralElement?.lengthMm ? `${job.structuralElement.lengthMm} mm` : 'N/A'} | 
+                                            SQM: {job.structuralElement?.surfaceAreaSqm ? job.structuralElement.surfaceAreaSqm.toFixed(2) : 'N/A'} | 
+                                            FP Thickness: {job.structuralElement?.fpThicknessMm ? `${job.structuralElement.fpThicknessMm} mm` : 'N/A'}
+                                          </Typography>
+                                          <Typography variant="body2" color="text.secondary">
+                                            FP Workflow: {job.structuralElement?.fireProofingWorkflow || 'N/A'}
+                                          </Typography>
                                         </Box>
                                       </Box>
                                       <Divider sx={{ my: 2 }} />
