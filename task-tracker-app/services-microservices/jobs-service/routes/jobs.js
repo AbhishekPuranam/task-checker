@@ -859,7 +859,8 @@ router.put('/:id', auth, async (req, res) => {
     await invalidateCache(`cache:jobs:project:${updatedJob.project}:*`);
     await invalidateCache(`cache:jobs:project:all:*`); // Also invalidate 'all' project cache
     await invalidateCache(`cache:stats:project:${updatedJob.project}`);
-    await invalidateCache(`cache:engineer:jobs:*`); // Invalidate all engineer caches
+    await invalidateCache(`cache:engineer:jobs:*`); // Invalidate all engineer job caches
+    await invalidateCache(`cache:engineer:metrics:*`); // Invalidate all engineer metrics caches
     
     // Invalidate structural element job cache
     if (updatedJob.structuralElement) {
@@ -1234,7 +1235,8 @@ router.patch('/:id/status', auth, async (req, res) => {
     // Invalidate cache
     await invalidateCache(`cache:jobs:project:${updatedJob.project}:*`);
     await invalidateCache(`cache:stats:project:${updatedJob.project}`);
-    await invalidateCache(`cache:engineer:jobs:*`); // Invalidate all engineer caches
+    await invalidateCache(`cache:engineer:jobs:*`); // Invalidate all engineer job caches
+    await invalidateCache(`cache:engineer:metrics:*`); // Invalidate all engineer metrics caches
     if (updatedJob.structuralElement) {
       await invalidateCache(`cache:structural:jobs:${updatedJob.structuralElement._id || updatedJob.structuralElement}`);
       await invalidateCache(`cache:structural:summary:${updatedJob.project}:*`);
@@ -1343,7 +1345,8 @@ router.post('/custom', auth, async (req, res) => {
     // Invalidate cache
     await invalidateCache(`cache:jobs:project:${project}:*`);
     await invalidateCache(`cache:stats:project:${project}`);
-    await invalidateCache(`cache:engineer:jobs:*`); // Invalidate all engineer caches
+    await invalidateCache(`cache:engineer:jobs:*`); // Invalidate all engineer job caches
+    await invalidateCache(`cache:engineer:metrics:*`); // Invalidate all engineer metrics caches
     await invalidateCache(`cache:structural:jobs:${structuralElement}`);
     await invalidateCache(`cache:structural:summary:${project}:*`);
 
@@ -1469,6 +1472,174 @@ const engineerJobsCacheKeyGenerator = (req) => {
   return `cache:${parts.join(':')}`;
 };
 
+// Engineer metrics cache key generator
+const engineerMetricsCacheKeyGenerator = (req) => {
+  const userId = req.user?.id || 'anonymous';
+  const { project, status } = req.query;
+  
+  const parts = [
+    'engineer',
+    'metrics',
+    `user:${userId}`,
+    `project:${project || 'all'}`,
+    `status:${status || 'all'}`
+  ];
+  
+  return `cache:${parts.join(':')}`;
+};
+
+/**
+ * Engineer-specific endpoint to get only metrics (counts and SQM)
+ * Much faster than loading all jobs - returns aggregated data only
+ * Cached for 2 minutes (120 seconds) to improve performance
+ */
+router.get('/engineer/metrics', auth, cacheMiddleware(120, engineerMetricsCacheKeyGenerator), async (req, res) => {
+  try {
+    console.log('📊 Engineer metrics endpoint called by user:', req.user.id, 'role:', req.user.role);
+    
+    // Only site-engineers can access this endpoint
+    if (req.user.role !== 'site-engineer') {
+      return res.status(403).json({ message: 'Access denied. Site engineers only.' });
+    }
+
+    const { status, project } = req.query;
+
+    // Get all projects assigned to this engineer
+    const assignedProjects = await Task.find({
+      assignedEngineers: req.user.id
+    }).select('_id title');
+
+    if (assignedProjects.length === 0) {
+      return res.json({
+        totalCount: 0,
+        totalSqm: 0,
+        statusBreakdown: {
+          pending: { count: 0, sqm: 0 },
+          completed: { count: 0, sqm: 0 },
+          not_applicable: { count: 0, sqm: 0 }
+        }
+      });
+    }
+
+    let projectIds = assignedProjects.map(p => p._id);
+    
+    // Filter by specific project if provided
+    if (project) {
+      const mongoose = require('mongoose');
+      // Convert to ObjectId
+      const projectObjectId = new mongoose.Types.ObjectId(project);
+      
+      // Verify engineer has access to this project
+      if (!projectIds.some(pid => pid.toString() === project)) {
+        return res.status(403).json({ message: 'Access denied to this project' });
+      }
+      projectIds = [projectObjectId];
+      console.log('📋 Filtering metrics for specific project:', project);
+    } else {
+      console.log('📋 Getting metrics for all assigned projects:', projectIds.map(id => id.toString()));
+    }
+
+    // Get all subprojects within these projects
+    const SubProject = require('../shared/models/SubProject');
+    const subProjects = await SubProject.find({
+      project: { $in: projectIds }
+    }).select('_id');
+
+    const subProjectIds = subProjects.map(sp => sp._id);
+
+    // Get all structural elements from these subprojects
+    const structuralElements = await StructuralElement.find({
+      subProject: { $in: subProjectIds }
+    }).select('_id surfaceAreaSqm');
+
+    console.log('🏗️ Found structural elements for metrics:', structuralElements.length);
+
+    if (structuralElements.length === 0) {
+      return res.json({
+        totalCount: 0,
+        totalSqm: 0,
+        statusBreakdown: {
+          pending: { count: 0, sqm: 0 },
+          completed: { count: 0, sqm: 0 },
+          not_applicable: { count: 0, sqm: 0 }
+        }
+      });
+    }
+
+    const elementIds = structuralElements.map(el => el._id);
+
+    // Create a map of element IDs to SQM values for fast lookup
+    const elementSqmMap = {};
+    structuralElements.forEach(el => {
+      elementSqmMap[el._id.toString()] = el.surfaceAreaSqm || 0;
+    });
+
+    // Build filter for jobs
+    const filter = {
+      structuralElement: { $in: elementIds }
+    };
+
+    // Add status filter if provided
+    if (status) {
+      filter.status = status;
+    }
+
+    // Use aggregation to get counts and sum SQM by status
+    const metrics = await Job.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: { $ifNull: ['$status', 'pending'] }, // Treat null/in_progress as pending
+          count: { $sum: 1 },
+          elementIds: { $push: '$structuralElement' }
+        }
+      }
+    ]);
+
+    // Calculate SQM for each status
+    const statusBreakdown = {
+      pending: { count: 0, sqm: 0 },
+      in_progress: { count: 0, sqm: 0 },
+      completed: { count: 0, sqm: 0 },
+      not_applicable: { count: 0, sqm: 0 }
+    };
+
+    metrics.forEach(metric => {
+      const statusKey = metric._id || 'pending';
+      const sqmTotal = metric.elementIds.reduce((sum, elementId) => {
+        return sum + (elementSqmMap[elementId.toString()] || 0);
+      }, 0);
+
+      if (statusBreakdown[statusKey]) {
+        statusBreakdown[statusKey] = {
+          count: metric.count,
+          sqm: parseFloat(sqmTotal.toFixed(2))
+        };
+      }
+    });
+
+    // Combine pending and in_progress
+    statusBreakdown.pending.count += statusBreakdown.in_progress.count;
+    statusBreakdown.pending.sqm += statusBreakdown.in_progress.sqm;
+    delete statusBreakdown.in_progress;
+
+    const totalCount = Object.values(statusBreakdown).reduce((sum, s) => sum + s.count, 0);
+    const totalSqm = parseFloat(Object.values(statusBreakdown).reduce((sum, s) => sum + s.sqm, 0).toFixed(2));
+
+    console.log(`✅ Metrics calculated: ${totalCount} jobs, ${totalSqm} SQM`);
+
+    res.json({
+      totalCount,
+      totalSqm,
+      statusBreakdown
+    });
+
+  } catch (error) {
+    console.error('Error fetching engineer metrics:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 /**
  * Engineer-specific endpoints
  * Get jobs from all subprojects within the engineer's assigned project
@@ -1508,11 +1679,15 @@ router.get('/engineer/jobs', auth, cacheMiddleware(120, engineerJobsCacheKeyGene
     
     // Filter by specific project if provided
     if (project) {
+      const mongoose = require('mongoose');
+      // Convert to ObjectId
+      const projectObjectId = new mongoose.Types.ObjectId(project);
+      
       // Verify engineer has access to this project
       if (!projectIds.some(pid => pid.toString() === project)) {
         return res.status(403).json({ message: 'Access denied to this project' });
       }
-      projectIds = [project];
+      projectIds = [projectObjectId];
       console.log('📋 Filtering for specific project:', project);
     } else {
       console.log('📋 Engineer assigned to projects:', projectIds.map(id => id.toString()));

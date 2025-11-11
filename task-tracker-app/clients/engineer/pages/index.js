@@ -112,13 +112,24 @@ export default function EngineerDashboard() {
       setLoading(true);
       console.log('Fetching metrics for project:', selectedProject);
       
-      // Fetch jobs for the selected project only
+      // Fetch lightweight metrics from dedicated endpoint
+      const metricsResponse = await api.get(`/jobs/engineer/metrics?project=${selectedProject}`);
+      const metricsData = metricsResponse.data;
+      
+      console.log('Fetched metrics:', metricsData);
+      
+      // Update overall stats from metrics endpoint
+      setStats({
+        pending: metricsData.statusBreakdown.pending || { count: 0, sqm: 0 },
+        completed: metricsData.statusBreakdown.completed || { count: 0, sqm: 0 },
+        not_applicable: metricsData.statusBreakdown.not_applicable || { count: 0, sqm: 0 }
+      });
+      
+      // For grouped view, we still need to fetch jobs to group them
+      // But this is much faster than before since we show metrics immediately
       const response = await api.get(`/jobs/engineer/jobs?page=1&limit=50000&project=${selectedProject}`);
       const fetchedJobs = response.data.jobs || [];
       console.log('Fetched jobs count:', fetchedJobs.length);
-      
-      // Calculate overall stats
-      calculateStats(fetchedJobs);
       
       // Calculate group metrics without storing actual jobs
       const metrics = calculateGroupMetrics(fetchedJobs);
