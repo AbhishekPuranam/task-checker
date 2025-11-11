@@ -70,6 +70,7 @@ export default function EngineerDashboard() {
   const [groupMetrics, setGroupMetrics] = useState({}); // Store count/metrics per group
   const [groupJobs, setGroupJobs] = useState({}); // Store actual jobs per group (lazy loaded)
   const [loadingGroups, setLoadingGroups] = useState({}); // Track loading state per group
+  const [allJobsCache, setAllJobsCache] = useState({}); // Cache all jobs per status to avoid refetching
 
   // Stats for metrics
   const [stats, setStats] = useState({
@@ -93,6 +94,8 @@ export default function EngineerDashboard() {
     setExpandedGroups({});
     setGroupJobs({});
     setGroupMetrics({});
+    // Note: Don't clear allJobsCache here - it persists across group/subgroup changes
+    // Only clear when activeTab changes (which triggers fetchMetrics)
   }, [activeTab, groupBy, subGroupBy, searchTerm]);
 
   const fetchProjects = async () => {
@@ -131,11 +134,11 @@ export default function EngineerDashboard() {
         not_applicable: { count: metricsData.statusBreakdown.not_applicable?.count || 0, sqm: metricsData.statusBreakdown.not_applicable?.sqm || 0 }
       });
       
-      // For grouped view, we still need to fetch jobs to group them
-      // But this is much faster than before since we show metrics immediately
-      const response = await api.get(`/jobs/engineer/jobs?page=1&limit=50000&project=${selectedProject}`);
+      // Fetch only a small sample of jobs to calculate group metrics structure
+      // Don't load all jobs - let accordion expansion handle that
+      const response = await api.get(`/jobs/engineer/jobs?page=1&limit=1000&project=${selectedProject}`);
       const fetchedJobs = response.data.jobs || [];
-      console.log('Fetched jobs count:', fetchedJobs.length);
+      console.log('Fetched sample jobs for grouping:', fetchedJobs.length);
       
       // Calculate group metrics without storing actual jobs
       const metrics = calculateGroupMetrics(fetchedJobs);
@@ -242,19 +245,45 @@ export default function EngineerDashboard() {
     return metrics;
   };
 
-  // Fetch jobs for a specific group (lazy loading)
+  // Fetch jobs for a specific group (lazy loading with caching)
   const fetchGroupJobs = useCallback(async (groupKey) => {
-    if (groupJobs[groupKey]) return; // Already loaded
+    if (groupJobs[groupKey]) return; // Already loaded for this group
     
     try {
       setLoadingGroups(prev => ({ ...prev, [groupKey]: true }));
       console.log('Fetching jobs for group:', groupKey);
       
-      // Fetch all jobs and filter client-side (since we're using cache)
-      const response = await api.get(`/jobs/engineer/jobs?page=1&limit=50000&project=${selectedProject}`);
-      const fetchedJobs = response.data.jobs || [];
+      // Check if we already have all jobs cached for this status
+      let fetchedJobs = allJobsCache[activeTab];
       
-      // Filter jobs for this specific group
+      if (!fetchedJobs) {
+        // Get the total count for the current status from stats
+        const totalJobsForStatus = stats[activeTab]?.count || 0;
+        
+        if (totalJobsForStatus === 0) {
+          setGroupJobs(prev => ({ ...prev, [groupKey]: { jobs: [] } }));
+          setLoadingGroups(prev => ({ ...prev, [groupKey]: false }));
+          return;
+        }
+        
+        // Fetch all jobs for this status once
+        const limit = Math.min(totalJobsForStatus + 100, 200000);
+        
+        console.log(`Fetching ${limit} jobs for status ${activeTab} (total expected: ${totalJobsForStatus})`);
+        
+        const statusParam = activeTab === 'pending' ? '' : activeTab;
+        const response = await api.get(`/jobs/engineer/jobs?page=1&limit=${limit}&project=${selectedProject}${statusParam ? `&status=${statusParam}` : ''}`);
+        fetchedJobs = response.data.jobs || [];
+        
+        console.log(`Fetched ${fetchedJobs.length} jobs from API for status ${activeTab}`);
+        
+        // Cache the fetched jobs for this status
+        setAllJobsCache(prev => ({ ...prev, [activeTab]: fetchedJobs }));
+      } else {
+        console.log(`Using cached ${fetchedJobs.length} jobs for status ${activeTab}`);
+      }
+      
+      // Filter jobs for this specific group from cached data
       const filteredJobs = fetchedJobs.filter(job => {
         const jobStatus = !job.status || job.status === 'in_progress' ? 'pending' : job.status;
         if (jobStatus !== activeTab) return false;
@@ -301,7 +330,7 @@ export default function EngineerDashboard() {
     } finally {
       setLoadingGroups(prev => ({ ...prev, [groupKey]: false }));
     }
-  }, [activeTab, groupBy, subGroupBy, searchTerm]);
+  }, [activeTab, groupBy, subGroupBy, searchTerm, selectedProject, groupJobs, allJobsCache, stats]);
 
   const fetchJobs = useCallback(async () => {
     // Deprecated - now using fetchMetrics and fetchGroupJobs
@@ -340,12 +369,13 @@ export default function EngineerDashboard() {
 
       toast.success('Job status updated successfully!', { id: 'status-update' });
       
-      // Refresh metrics and clear the specific group so it reloads
+      // Refresh metrics and clear caches to force reload
       await fetchMetrics();
       
-      // Clear loaded jobs for affected groups to force reload
+      // Clear all caches since status changed
       setGroupJobs({});
       setExpandedGroups({});
+      setAllJobsCache({}); // Clear jobs cache to refetch with new status
       
     } catch (error) {
       console.error('Error updating job status:', error);
@@ -395,11 +425,11 @@ export default function EngineerDashboard() {
           📊 Progress Tracker
         </Typography>
         
-        {/* Elements Race Track */}
+        {/* Jobs Race Track */}
         <Box sx={{ mb: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
             <Typography variant="body2" fontWeight="600" sx={{ color: '#666' }}>
-              Elements Progress
+              Jobs Progress
             </Typography>
             <Typography variant="body2" fontWeight="600" sx={{ color: '#6a11cb' }}>
               {stats.completed.count} / {total} ({completedPercentage.toFixed(1)}%)
