@@ -142,31 +142,10 @@ export default function EngineerDashboard() {
         not_applicable: { count: metricsData.statusBreakdown.not_applicable?.count || 0, sqm: metricsData.statusBreakdown.not_applicable?.sqm || 0 }
       });
       
-      // Fetch ALL jobs for current status to get accurate group metrics
-      // This is necessary for correct job counts per group
-      const totalJobsForStatus = metricsData.statusBreakdown[activeTab]?.count || 0;
-      const limit = Math.min(totalJobsForStatus + 100, 200000);
+      // Don't fetch jobs upfront - let accordion expansion handle it
+      // This avoids timeout issues with large datasets
+      console.log('Metrics loaded. Jobs will be fetched on accordion expansion.');
       
-      console.log(`Fetching ${limit} jobs for status ${activeTab} to calculate group metrics`);
-      
-      const statusParam = activeTab === 'pending' ? '' : activeTab;
-      const response = await api.get(`/jobs/engineer/jobs?page=1&limit=${limit}&project=${selectedProject}${statusParam ? `&status=${statusParam}` : ''}`);
-      const fetchedJobs = response.data.jobs || [];
-      console.log('Fetched jobs for grouping:', fetchedJobs.length);
-      
-      // Cache the fetched jobs for this status to avoid refetching when accordions expand
-      setAllJobsCache(prev => ({ ...prev, [activeTab]: fetchedJobs }));
-      
-      // Calculate group metrics without storing actual jobs
-      const metrics = calculateGroupMetrics(fetchedJobs);
-      setGroupMetrics(metrics);
-      
-      if (fetchedJobs.length === 0) {
-        toast('No jobs found for this project.', { 
-          duration: 3000,
-          icon: 'ℹ️'
-        });
-      }
     } catch (error) {
       console.error('Error fetching metrics:', error);
       toast.error('Failed to fetch metrics');
@@ -277,7 +256,8 @@ export default function EngineerDashboard() {
       let fetchedJobs = allJobsCache[activeTab];
       
       if (!fetchedJobs) {
-        // Get the total count for the current status from stats
+        // Fetch jobs in smaller batches to avoid timeout
+        // We'll fetch iteratively until we have all jobs for this status
         const totalJobsForStatus = stats[activeTab]?.count || 0;
         
         if (totalJobsForStatus === 0) {
@@ -286,19 +266,48 @@ export default function EngineerDashboard() {
           return;
         }
         
-        // Fetch all jobs for this status once
-        const limit = Math.min(totalJobsForStatus + 100, 200000);
+        // Fetch in batches of 10000 to avoid timeout
+        const batchSize = 10000;
+        const totalBatches = Math.ceil(totalJobsForStatus / batchSize);
+        fetchedJobs = [];
         
-        console.log(`Fetching ${limit} jobs for status ${activeTab} (total expected: ${totalJobsForStatus})`);
+        console.log(`Fetching ${totalJobsForStatus} jobs in ${totalBatches} batches`);
         
         const statusParam = activeTab === 'pending' ? '' : activeTab;
-        const response = await api.get(`/jobs/engineer/jobs?page=1&limit=${limit}&project=${selectedProject}${statusParam ? `&status=${statusParam}` : ''}`);
+        
+        // Fetch first batch
+        const response = await api.get(`/jobs/engineer/jobs?page=1&limit=${batchSize}&project=${selectedProject}${statusParam ? `&status=${statusParam}` : ''}`);
         fetchedJobs = response.data.jobs || [];
         
-        console.log(`Fetched ${fetchedJobs.length} jobs from API for status ${activeTab}`);
+        console.log(`Fetched batch 1/${totalBatches}: ${fetchedJobs.length} jobs`);
         
-        // Cache the fetched jobs for this status
-        setAllJobsCache(prev => ({ ...prev, [activeTab]: fetchedJobs }));
+        // If there are more jobs, continue fetching in background
+        if (fetchedJobs.length >= batchSize && totalBatches > 1) {
+          // Use the first batch immediately
+          setAllJobsCache(prev => ({ ...prev, [activeTab]: fetchedJobs }));
+          
+          // Continue fetching remaining batches in background
+          (async () => {
+            let allJobs = [...fetchedJobs];
+            for (let i = 2; i <= totalBatches; i++) {
+              try {
+                const batchResponse = await api.get(`/jobs/engineer/jobs?page=${i}&limit=${batchSize}&project=${selectedProject}${statusParam ? `&status=${statusParam}` : ''}`);
+                const batchJobs = batchResponse.data.jobs || [];
+                allJobs = [...allJobs, ...batchJobs];
+                console.log(`Fetched batch ${i}/${totalBatches}: ${batchJobs.length} jobs (total: ${allJobs.length})`);
+                
+                // Update cache with accumulated jobs
+                setAllJobsCache(prev => ({ ...prev, [activeTab]: allJobs }));
+              } catch (error) {
+                console.error(`Error fetching batch ${i}:`, error);
+                break;
+              }
+            }
+          })();
+        } else {
+          // All jobs fetched in first batch
+          setAllJobsCache(prev => ({ ...prev, [activeTab]: fetchedJobs }));
+        }
       } else {
         console.log(`Using cached ${fetchedJobs.length} jobs for status ${activeTab}`);
       }
@@ -1021,24 +1030,29 @@ export default function EngineerDashboard() {
                             }
                           }}
                         >
-                          {/* Compact Group Header with Inline Metrics */}
-                          <Box sx={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: 2, 
-                            mb: 0,
-                            pb: 0,
-                            borderBottom: 'none',
-                            flexWrap: 'wrap',
-                            width: '100%'
-                          }}>
-                            {/* Group Title */}
-                            <Typography variant="h6" fontWeight="700" sx={{ color: '#333', flex: '1 1 auto', minWidth: '200px' }}>
-                              {groupKey}
-                            </Typography>
-                            
-                            {/* Inline Compact Metrics */}
-                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                          {/* Simple Group Header - Metrics will be shown inside after expansion */}
+                          <Typography variant="h6" fontWeight="700" sx={{ color: '#333' }}>
+                            {groupKey}
+                          </Typography>
+                        </AccordionSummary>
+                        <AccordionDetails
+                          sx={{
+                            p: 3,
+                            background: 'linear-gradient(135deg, #fafafa 0%, #ffffff 100%)',
+                            borderTop: '2px solid #f0f0f0'
+                          }}
+                        >
+                          {/* Display metrics inside accordion when expanded and jobs are loaded */}
+                          {!isLoading && group && (
+                            <Box sx={{ 
+                              display: 'flex', 
+                              gap: 2, 
+                              mb: 3, 
+                              p: 2, 
+                              bgcolor: '#f8f9fa', 
+                              borderRadius: 2,
+                              flexWrap: 'wrap'
+                            }}>
                               {/* Jobs Count */}
                               <Box sx={{ 
                                 display: 'flex',
@@ -1173,15 +1187,8 @@ export default function EngineerDashboard() {
                                 </Box>
                               )}
                             </Box>
-                          </Box>
-                        </AccordionSummary>
-                        <AccordionDetails
-                          sx={{
-                            p: 3,
-                            background: 'linear-gradient(135deg, #fafafa 0%, #ffffff 100%)',
-                            borderTop: '2px solid #f0f0f0'
-                          }}
-                        >
+                          )}
+
                           {isLoading ? (
                             <Box sx={{ p: 4, textAlign: 'center' }}>
                               <CircularProgress size={30} />
