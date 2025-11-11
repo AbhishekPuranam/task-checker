@@ -1565,11 +1565,14 @@ router.get('/engineer/metrics', auth, cacheMiddleware(120, engineerMetricsCacheK
       return res.json({
         totalCount: 0,
         totalSqm: 0,
+        totalElements: 0,
         statusBreakdown: {
           pending: { count: 0, sqm: 0 },
           completed: { count: 0, sqm: 0 },
           not_applicable: { count: 0, sqm: 0 }
-        }
+        },
+        message: 'No data available for this project. Please ensure subprojects and structural elements are created.',
+        hasData: false
       });
     }
 

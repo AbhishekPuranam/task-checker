@@ -145,7 +145,10 @@ export default function EngineerDashboard() {
       setGroupMetrics(metrics);
       
       if (fetchedJobs.length === 0) {
-        toast.info('No jobs found for this project.', { duration: 3000 });
+        toast('No jobs found for this project.', { 
+          duration: 3000,
+          icon: 'ℹ️'
+        });
       }
     } catch (error) {
       console.error('Error fetching metrics:', error);
@@ -627,6 +630,13 @@ export default function EngineerDashboard() {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             🏗️ Site Engineer Portal
           </Typography>
+          <Button
+            color="inherit"
+            onClick={() => window.open('https://projects.sapcindia.com/admin/projects', '_blank')}
+            sx={{ mr: 2, textTransform: 'none' }}
+          >
+            📋 Admin Projects
+          </Button>
           <Typography variant="body1" sx={{ mr: 2 }}>
             {user?.name}
           </Typography>

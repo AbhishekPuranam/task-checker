@@ -97,6 +97,16 @@ const Navbar = () => {
             </Button>
           )}
 
+          {user?.role === 'admin' && (
+            <Button
+              color="inherit"
+              startIcon={<Dashboard />}
+              onClick={() => window.open('https://projects.sapcindia.com/engineer', '_blank')}
+            >
+              Engineer Portal
+            </Button>
+          )}
+
           {user?.role === 'engineer' && (
             <Button
               color="inherit"
