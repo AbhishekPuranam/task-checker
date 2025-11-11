@@ -1744,7 +1744,7 @@ router.get('/engineer/jobs', auth, cacheMiddleware(120, engineerJobsCacheKeyGene
     const jobs = await Job.find(filter)
       .populate({
         path: 'structuralElement',
-        select: 'structureNumber memberType partMarkNo gridNo level drawingNo fireProofingWorkflow subProject',
+        select: 'structureNumber memberType partMarkNo gridNo level drawingNo fireProofingWorkflow surfaceAreaSqm subProject',
         populate: {
           path: 'subProject',
           select: 'name code'
