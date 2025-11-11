@@ -1497,17 +1497,24 @@ router.get('/engineer/metrics', auth, cacheMiddleware(120, engineerMetricsCacheK
   try {
     console.log('📊 Engineer metrics endpoint called by user:', req.user.id, 'role:', req.user.role);
     
-    // Only site-engineers can access this endpoint
-    if (req.user.role !== 'site-engineer') {
-      return res.status(403).json({ message: 'Access denied. Site engineers only.' });
+    // Allow site-engineers and admins to access this endpoint
+    if (req.user.role !== 'site-engineer' && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Site engineers and admins only.' });
     }
 
     const { status, project } = req.query;
 
-    // Get all projects assigned to this engineer
-    const assignedProjects = await Task.find({
-      assignedEngineers: req.user.id
-    }).select('_id title');
+    // Get all projects assigned to this engineer (or all projects for admin)
+    let assignedProjects;
+    if (req.user.role === 'admin') {
+      // Admin can see all projects
+      assignedProjects = await Task.find({}).select('_id title');
+    } else {
+      // Engineer sees only assigned projects
+      assignedProjects = await Task.find({
+        assignedEngineers: req.user.id
+      }).select('_id title');
+    }
 
     if (assignedProjects.length === 0) {
       return res.json({
@@ -1529,8 +1536,8 @@ router.get('/engineer/metrics', auth, cacheMiddleware(120, engineerMetricsCacheK
       // Convert to ObjectId
       const projectObjectId = new mongoose.Types.ObjectId(project);
       
-      // Verify engineer has access to this project
-      if (!projectIds.some(pid => pid.toString() === project)) {
+      // Verify engineer has access to this project (admins have access to all)
+      if (req.user.role !== 'admin' && !projectIds.some(pid => pid.toString() === project)) {
         return res.status(403).json({ message: 'Access denied to this project' });
       }
       projectIds = [projectObjectId];
@@ -1662,17 +1669,24 @@ router.get('/engineer/jobs', auth, cacheMiddleware(120, engineerJobsCacheKeyGene
   try {
     console.log('🔧 Engineer jobs endpoint called by user:', req.user.id, 'role:', req.user.role);
     
-    // Only site-engineers can access this endpoint
-    if (req.user.role !== 'site-engineer') {
-      return res.status(403).json({ message: 'Access denied. Site engineers only.' });
+    // Allow site-engineers and admins to access this endpoint
+    if (req.user.role !== 'site-engineer' && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Site engineers and admins only.' });
     }
 
     const { page = 1, limit = 10000, status, project } = req.query;
 
-    // Get all projects assigned to this engineer
-    const assignedProjects = await Task.find({
-      assignedEngineers: req.user.id
-    }).select('_id title');
+    // Get all projects assigned to this engineer (or all projects for admin)
+    let assignedProjects;
+    if (req.user.role === 'admin') {
+      // Admin can see all projects
+      assignedProjects = await Task.find({}).select('_id title');
+    } else {
+      // Engineer sees only assigned projects
+      assignedProjects = await Task.find({
+        assignedEngineers: req.user.id
+      }).select('_id title');
+    }
 
     if (assignedProjects.length === 0) {
       return res.json({
@@ -1696,14 +1710,14 @@ router.get('/engineer/jobs', auth, cacheMiddleware(120, engineerJobsCacheKeyGene
       // Convert to ObjectId
       const projectObjectId = new mongoose.Types.ObjectId(project);
       
-      // Verify engineer has access to this project
-      if (!projectIds.some(pid => pid.toString() === project)) {
+      // Verify engineer has access to this project (admins have access to all)
+      if (req.user.role !== 'admin' && !projectIds.some(pid => pid.toString() === project)) {
         return res.status(403).json({ message: 'Access denied to this project' });
       }
       projectIds = [projectObjectId];
       console.log('📋 Filtering for specific project:', project);
     } else {
-      console.log('📋 Engineer assigned to projects:', projectIds.map(id => id.toString()));
+      console.log('📋 User assigned to projects:', projectIds.map(id => id.toString()));
     }
 
     // Get all subprojects within these projects
@@ -1800,20 +1814,20 @@ router.patch('/engineer/:id/status', auth, async (req, res) => {
     
     console.log('🔧 Engineer status update for job:', jobId, 'new status:', status);
     
-    // Only site-engineers can access this endpoint
-    if (req.user.role !== 'site-engineer') {
-      return res.status(403).json({ message: 'Access denied. Site engineers only.' });
+    // Allow site-engineers and admins to access this endpoint
+    if (req.user.role !== 'site-engineer' && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Site engineers and admins only.' });
     }
 
     if (!status) {
       return res.status(400).json({ message: 'Status is required' });
     }
     
-    // Site engineers can only set these statuses
+    // Site engineers and admins can only set these statuses
     const allowedStatuses = ['pending', 'completed', 'not_applicable'];
     if (!allowedStatuses.includes(status)) {
       return res.status(400).json({ 
-        message: `Invalid status. Site engineers can only set: ${allowedStatuses.join(', ')}` 
+        message: `Invalid status. Allowed statuses: ${allowedStatuses.join(', ')}` 
       });
     }
 
@@ -1823,14 +1837,16 @@ router.patch('/engineer/:id/status', auth, async (req, res) => {
       return res.status(404).json({ message: 'Job not found' });
     }
 
-    // Verify the engineer has access to this job's project
-    const hasAccess = await Task.exists({
-      _id: job.project,
-      assignedEngineers: req.user.id
-    });
+    // Verify the engineer has access to this job's project (admins have access to all)
+    if (req.user.role !== 'admin') {
+      const hasAccess = await Task.exists({
+        _id: job.project,
+        assignedEngineers: req.user.id
+      });
 
-    if (!hasAccess) {
-      return res.status(403).json({ message: 'Not authorized to update jobs for this project' });
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Not authorized to update jobs for this project' });
+      }
     }
 
     // Update status and related fields
