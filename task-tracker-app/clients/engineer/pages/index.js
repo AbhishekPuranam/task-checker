@@ -52,7 +52,6 @@ const TABS = [
 
 export default function EngineerDashboard() {
   const { user, logout } = useAuth();
-  const [jobs, setJobs] = useState([]);
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState('');
   const [loading, setLoading] = useState(true);
@@ -62,6 +61,9 @@ export default function EngineerDashboard() {
   const [groupBy, setGroupBy] = useState('gridNo');
   const [subGroupBy, setSubGroupBy] = useState('fireProofingWorkflow');
   const [expandedGroups, setExpandedGroups] = useState({});
+  const [groupMetrics, setGroupMetrics] = useState({}); // Store count/metrics per group
+  const [groupJobs, setGroupJobs] = useState({}); // Store actual jobs per group (lazy loaded)
+  const [loadingGroups, setLoadingGroups] = useState({}); // Track loading state per group
 
   // Stats for metrics
   const [stats, setStats] = useState({
@@ -76,9 +78,16 @@ export default function EngineerDashboard() {
 
   useEffect(() => {
     if (selectedProject) {
-      fetchJobs();
+      fetchMetrics(); // Only fetch metrics initially, not all jobs
     }
-  }, [selectedProject]);
+  }, [selectedProject, activeTab, groupBy, subGroupBy]);
+
+  // Reset expanded groups when filters change
+  useEffect(() => {
+    setExpandedGroups({});
+    setGroupJobs({});
+    setGroupMetrics({});
+  }, [activeTab, groupBy, subGroupBy, searchTerm]);
 
   const fetchProjects = async () => {
     try {
@@ -95,32 +104,148 @@ export default function EngineerDashboard() {
     }
   };
 
-  const fetchJobs = useCallback(async () => {
+  // Fetch only metrics and counts (fast, from cache)
+  const fetchMetrics = useCallback(async () => {
     if (!selectedProject) return;
     
     try {
       setLoading(true);
-      console.log('Fetching jobs for project:', selectedProject);
-      // Fetch all jobs without artificial limit - let backend return actual count
+      console.log('Fetching metrics for project:', selectedProject);
+      
+      // Fetch all jobs but only to calculate metrics and group counts
       const response = await api.get(`/jobs/engineer/jobs?page=1&limit=50000`);
       const fetchedJobs = response.data.jobs || [];
-      console.log('Fetched jobs from subprojects:', fetchedJobs.length);
-      console.log('Jobs data:', fetchedJobs);
-      setJobs(fetchedJobs);
+      console.log('Fetched jobs count:', fetchedJobs.length);
+      
+      // Calculate overall stats
       calculateStats(fetchedJobs);
       
+      // Calculate group metrics without storing actual jobs
+      const metrics = calculateGroupMetrics(fetchedJobs);
+      setGroupMetrics(metrics);
+      
       if (fetchedJobs.length === 0) {
-        toast.info('No jobs found for this project. Jobs are created when structural elements are uploaded via Excel.', {
-          duration: 5000,
-        });
+        toast.info('No jobs found for this project.', { duration: 3000 });
       }
     } catch (error) {
-      console.error('Error fetching jobs:', error);
-      toast.error('Failed to fetch jobs');
+      console.error('Error fetching metrics:', error);
+      toast.error('Failed to fetch metrics');
     } finally {
       setLoading(false);
     }
-  }, [selectedProject]);
+  }, [selectedProject, activeTab, groupBy, subGroupBy, searchTerm]);
+
+  // Calculate group metrics (count and sqm per group)
+  const calculateGroupMetrics = (jobsData) => {
+    const metrics = {};
+    
+    jobsData.forEach(job => {
+      const jobStatus = !job.status || job.status === 'in_progress' ? 'pending' : job.status;
+      
+      // Filter by active tab
+      if (jobStatus !== activeTab) return;
+      
+      // Filter by search term
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const matches = 
+          job.jobTitle?.toLowerCase().includes(searchLower) ||
+          job.structuralElement?.structureNumber?.toLowerCase().includes(searchLower) ||
+          job.structuralElement?.gridNo?.toLowerCase().includes(searchLower) ||
+          job.structuralElement?.partMarkNo?.toLowerCase().includes(searchLower) ||
+          job.structuralElement?.level?.toLowerCase().includes(searchLower);
+        
+        if (!matches) return;
+      }
+      
+      const primaryKey = job.structuralElement?.[groupBy] || job[groupBy] || 'Other';
+      
+      if (!metrics[primaryKey]) {
+        metrics[primaryKey] = { count: 0, sqm: 0, subGroups: {} };
+      }
+      
+      metrics[primaryKey].count += 1;
+      metrics[primaryKey].sqm += job.structuralElement?.surfaceAreaSqm || 0;
+      
+      // Track sub-group metrics
+      if (subGroupBy) {
+        const secondaryKey = job[subGroupBy] || job.structuralElement?.[subGroupBy] || 'Other';
+        if (!metrics[primaryKey].subGroups[secondaryKey]) {
+          metrics[primaryKey].subGroups[secondaryKey] = { count: 0, sqm: 0 };
+        }
+        metrics[primaryKey].subGroups[secondaryKey].count += 1;
+        metrics[primaryKey].subGroups[secondaryKey].sqm += job.structuralElement?.surfaceAreaSqm || 0;
+      }
+    });
+    
+    return metrics;
+  };
+
+  // Fetch jobs for a specific group (lazy loading)
+  const fetchGroupJobs = useCallback(async (groupKey) => {
+    if (groupJobs[groupKey]) return; // Already loaded
+    
+    try {
+      setLoadingGroups(prev => ({ ...prev, [groupKey]: true }));
+      console.log('Fetching jobs for group:', groupKey);
+      
+      // Fetch all jobs and filter client-side (since we're using cache)
+      const response = await api.get(`/jobs/engineer/jobs?page=1&limit=50000`);
+      const fetchedJobs = response.data.jobs || [];
+      
+      // Filter jobs for this specific group
+      const filteredJobs = fetchedJobs.filter(job => {
+        const jobStatus = !job.status || job.status === 'in_progress' ? 'pending' : job.status;
+        if (jobStatus !== activeTab) return false;
+        
+        if (searchTerm) {
+          const searchLower = searchTerm.toLowerCase();
+          const matches = 
+            job.jobTitle?.toLowerCase().includes(searchLower) ||
+            job.structuralElement?.structureNumber?.toLowerCase().includes(searchLower) ||
+            job.structuralElement?.gridNo?.toLowerCase().includes(searchLower) ||
+            job.structuralElement?.partMarkNo?.toLowerCase().includes(searchLower) ||
+            job.structuralElement?.level?.toLowerCase().includes(searchLower);
+          
+          if (!matches) return false;
+        }
+        
+        const primaryKey = job.structuralElement?.[groupBy] || job[groupBy] || 'Other';
+        return primaryKey === groupKey;
+      });
+      
+      // Group by sub-group if needed
+      let groupedData;
+      if (subGroupBy) {
+        groupedData = {};
+        filteredJobs.forEach(job => {
+          const secondaryKey = job[subGroupBy] || job.structuralElement?.[subGroupBy] || 'Other';
+          if (!groupedData[secondaryKey]) {
+            groupedData[secondaryKey] = [];
+          }
+          groupedData[secondaryKey].push(job);
+        });
+      } else {
+        groupedData = { jobs: filteredJobs };
+      }
+      
+      setGroupJobs(prev => ({
+        ...prev,
+        [groupKey]: groupedData
+      }));
+      
+    } catch (error) {
+      console.error('Error fetching group jobs:', error);
+      toast.error('Failed to load jobs for this group');
+    } finally {
+      setLoadingGroups(prev => ({ ...prev, [groupKey]: false }));
+    }
+  }, [activeTab, groupBy, subGroupBy, searchTerm]);
+
+  const fetchJobs = useCallback(async () => {
+    // Deprecated - now using fetchMetrics and fetchGroupJobs
+    await fetchMetrics();
+  }, [fetchMetrics]);
 
   const calculateStats = (jobsData) => {
     const newStats = {
@@ -142,56 +267,6 @@ export default function EngineerDashboard() {
     setStats(newStats);
   };
 
-  // Filter and group jobs
-  const groupedJobs = useMemo(() => {
-    // Filter by active tab
-    let filtered = jobs.filter(job => {
-      const jobStatus = !job.status || job.status === 'in_progress' ? 'pending' : job.status;
-      if (jobStatus !== activeTab) return false;
-
-      // Filter by search term
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        const matches = 
-          job.jobTitle?.toLowerCase().includes(searchLower) ||
-          job.structuralElement?.structureNumber?.toLowerCase().includes(searchLower) ||
-          job.structuralElement?.gridNo?.toLowerCase().includes(searchLower) ||
-          job.structuralElement?.partMarkNo?.toLowerCase().includes(searchLower) ||
-          job.structuralElement?.level?.toLowerCase().includes(searchLower);
-        
-        if (!matches) return false;
-      }
-
-      return true;
-    });
-
-    // Group by primary grouping
-    const grouped = {};
-    filtered.forEach(job => {
-      const primaryKey = job.structuralElement?.[groupBy] || job[groupBy] || 'Other';
-      
-      if (!grouped[primaryKey]) {
-        grouped[primaryKey] = {};
-      }
-
-      // Sub-group if specified
-      if (subGroupBy) {
-        const secondaryKey = job[subGroupBy] || job.structuralElement?.[subGroupBy] || 'Other';
-        if (!grouped[primaryKey][secondaryKey]) {
-          grouped[primaryKey][secondaryKey] = [];
-        }
-        grouped[primaryKey][secondaryKey].push(job);
-      } else {
-        if (!grouped[primaryKey].jobs) {
-          grouped[primaryKey].jobs = [];
-        }
-        grouped[primaryKey].jobs.push(job);
-      }
-    });
-
-    return grouped;
-  }, [jobs, activeTab, searchTerm, groupBy, subGroupBy]);
-
   const handleStatusUpdate = useCallback(async (jobId, newStatus) => {
     try {
       setUpdatingJob(jobId);
@@ -203,20 +278,34 @@ export default function EngineerDashboard() {
       });
 
       toast.success('Job status updated successfully!', { id: 'status-update' });
-      await fetchJobs();
+      
+      // Refresh metrics and clear the specific group so it reloads
+      await fetchMetrics();
+      
+      // Clear loaded jobs for affected groups to force reload
+      setGroupJobs({});
+      setExpandedGroups({});
+      
     } catch (error) {
       console.error('Error updating job status:', error);
       toast.error('Failed to update job status', { id: 'status-update' });
     } finally {
       setUpdatingJob(null);
     }
-  }, [fetchJobs]);
+  }, [fetchMetrics]);
 
-  const toggleGroup = (groupKey) => {
+  const toggleGroup = async (groupKey) => {
+    const isExpanding = !expandedGroups[groupKey];
+    
     setExpandedGroups(prev => ({
       ...prev,
-      [groupKey]: !prev[groupKey]
+      [groupKey]: isExpanding
     }));
+    
+    // Load jobs when expanding for the first time
+    if (isExpanding && !groupJobs[groupKey]) {
+      await fetchGroupJobs(groupKey);
+    }
   };
 
   const getFireProofingLabel = (type) => {
@@ -604,20 +693,21 @@ export default function EngineerDashboard() {
               {loading ? (
                 <Box sx={{ p: 4, textAlign: 'center' }}>
                   <CircularProgress />
+                  <Typography sx={{ mt: 2, color: '#666' }}>Loading metrics...</Typography>
                 </Box>
-              ) : Object.keys(groupedJobs).length === 0 ? (
+              ) : Object.keys(groupMetrics).length === 0 ? (
                 <Box sx={{ p: 4, textAlign: 'center' }}>
                   <Build sx={{ fontSize: 80, color: '#b794f6', mb: 2 }} />
                   <Typography variant="h6" sx={{ color: '#6a11cb', mb: 2 }}>
                     No jobs found for {TABS.find(t => t.id === activeTab)?.label}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                    {jobs.length === 0 
+                    {Object.values(stats).reduce((sum, s) => sum + s.count, 0) === 0
                       ? "This project doesn't have any jobs yet. Jobs are automatically created when structural elements are uploaded via Excel in the Admin portal."
                       : `All jobs for this project are in other statuses. Try switching tabs to see them.`
                     }
                   </Typography>
-                  {jobs.length === 0 && (
+                  {Object.values(stats).reduce((sum, s) => sum + s.count, 0) === 0 && (
                     <Box sx={{ 
                       p: 2, 
                       bgcolor: '#f8f7ff', 
@@ -639,18 +729,16 @@ export default function EngineerDashboard() {
                 </Box>
               ) : (
                 <Box>
-                  {Object.keys(groupedJobs).sort().map(groupKey => {
-                    const group = groupedJobs[groupKey];
-                    const hasSubGroups = subGroupBy && typeof group === 'object' && !Array.isArray(group) && !group.jobs;
-                    const groupJobs = hasSubGroups ? [] : (group.jobs || Object.values(group).flat());
-                    const groupCount = hasSubGroups 
-                      ? Object.values(group).reduce((sum, jobs) => sum + (Array.isArray(jobs) ? jobs.length : 0), 0)
-                      : groupJobs.length;
+                  {Object.keys(groupMetrics).sort().map(groupKey => {
+                    const metrics = groupMetrics[groupKey];
+                    const group = groupJobs[groupKey]; // May be undefined if not loaded yet
+                    const isExpanded = expandedGroups[groupKey] || false;
+                    const isLoading = loadingGroups[groupKey] || false;
 
                     return (
                       <Accordion
                         key={groupKey}
-                        expanded={expandedGroups[groupKey] || false}
+                        expanded={isExpanded}
                         onChange={() => toggleGroup(groupKey)}
                         sx={{ '&:before': { display: 'none' } }}
                       >
@@ -660,18 +748,28 @@ export default function EngineerDashboard() {
                               {groupKey}
                             </Typography>
                             <Chip
-                              label={`${groupCount} jobs`}
+                              label={`${metrics.count} jobs (${metrics.sqm.toFixed(2)} SQM)`}
                               size="small"
                               sx={{ bgcolor: TABS.find(t => t.id === activeTab)?.color, color: 'white', fontWeight: 'bold' }}
                             />
                           </Box>
                         </AccordionSummary>
                         <AccordionDetails>
-                          {hasSubGroups ? (
+                          {isLoading ? (
+                            <Box sx={{ p: 4, textAlign: 'center' }}>
+                              <CircularProgress size={30} />
+                              <Typography sx={{ mt: 2, color: '#666' }}>Loading jobs...</Typography>
+                            </Box>
+                          ) : !group ? (
+                            <Box sx={{ p: 2, textAlign: 'center' }}>
+                              <Typography color="text.secondary">Expand to load jobs</Typography>
+                            </Box>
+                          ) : subGroupBy && Object.keys(metrics.subGroups || {}).length > 0 ? (
                             // Show sub-groups
-                            Object.keys(group).sort().map(subGroupKey => {
-                              const subGroupJobs = group[subGroupKey];
-                              if (!Array.isArray(subGroupJobs)) return null;
+                            Object.keys(metrics.subGroups).sort().map(subGroupKey => {
+                              const subGroupMetrics = metrics.subGroups[subGroupKey];
+                              const subGroupJobsList = group[subGroupKey] || [];
+                              if (!Array.isArray(subGroupJobsList)) return null;
 
                               return (
                                 <Box key={subGroupKey} sx={{ mb: 3 }}>
@@ -680,10 +778,10 @@ export default function EngineerDashboard() {
                                     <Typography variant="subtitle1" fontWeight="600" sx={{ color: '#666' }}>
                                       {getFireProofingLabel(subGroupKey)}
                                     </Typography>
-                                    <Chip label={`${subGroupJobs.length} jobs`} size="small" />
+                                    <Chip label={`${subGroupMetrics.count} jobs (${subGroupMetrics.sqm.toFixed(2)} SQM)`} size="small" />
                                   </Box>
                                   <Grid container spacing={2}>
-                                    {subGroupJobs.map(job => (
+                                    {subGroupJobsList.map(job => (
                                       <Grid item xs={12} key={job._id}>
                                         <Card variant="outlined" sx={{ '&:hover': { boxShadow: 3 } }}>
                                           <CardContent>
@@ -749,9 +847,9 @@ export default function EngineerDashboard() {
                               );
                             })
                           ) : (
-                            // Show jobs directly
+                            // Show jobs directly (no sub-grouping)
                             <Grid container spacing={2}>
-                              {groupJobs.map(job => (
+                              {(group.jobs || []).map(job => (
                                 <Grid item xs={12} key={job._id}>
                                   <Card variant="outlined" sx={{ '&:hover': { boxShadow: 3 } }}>
                                     <CardContent>
