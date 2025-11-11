@@ -112,8 +112,8 @@ export default function EngineerDashboard() {
       setLoading(true);
       console.log('Fetching metrics for project:', selectedProject);
       
-      // Fetch all jobs but only to calculate metrics and group counts
-      const response = await api.get(`/jobs/engineer/jobs?page=1&limit=50000`);
+      // Fetch jobs for the selected project only
+      const response = await api.get(`/jobs/engineer/jobs?page=1&limit=50000&project=${selectedProject}`);
       const fetchedJobs = response.data.jobs || [];
       console.log('Fetched jobs count:', fetchedJobs.length);
       
@@ -190,7 +190,7 @@ export default function EngineerDashboard() {
       console.log('Fetching jobs for group:', groupKey);
       
       // Fetch all jobs and filter client-side (since we're using cache)
-      const response = await api.get(`/jobs/engineer/jobs?page=1&limit=50000`);
+      const response = await api.get(`/jobs/engineer/jobs?page=1&limit=50000&project=${selectedProject}`);
       const fetchedJobs = response.data.jobs || [];
       
       // Filter jobs for this specific group

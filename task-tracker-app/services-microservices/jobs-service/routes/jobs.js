@@ -1452,7 +1452,7 @@ router.post('/refresh-element-status/:elementId', auth, async (req, res) => {
  * Cache key generator for engineer jobs endpoint
  */
 const engineerJobsCacheKeyGenerator = (req) => {
-  const { page = 1, limit = 10000, status } = req.query;
+  const { page = 1, limit = 10000, status, project } = req.query;
   const userId = req.user?.id || 'anon';
   
   // Create a deterministic cache key based on user and query params
@@ -1460,6 +1460,7 @@ const engineerJobsCacheKeyGenerator = (req) => {
     'engineer',
     'jobs',
     `user:${userId}`,
+    `project:${project || 'all'}`,
     `status:${status || 'all'}`,
     `page:${page}`,
     `limit:${limit}`
@@ -1482,7 +1483,7 @@ router.get('/engineer/jobs', auth, cacheMiddleware(120, engineerJobsCacheKeyGene
       return res.status(403).json({ message: 'Access denied. Site engineers only.' });
     }
 
-    const { page = 1, limit = 10000, status } = req.query;
+    const { page = 1, limit = 10000, status, project } = req.query;
 
     // Get all projects assigned to this engineer
     const assignedProjects = await Task.find({
@@ -1503,8 +1504,19 @@ router.get('/engineer/jobs', auth, cacheMiddleware(120, engineerJobsCacheKeyGene
       });
     }
 
-    const projectIds = assignedProjects.map(p => p._id);
-    console.log('📋 Engineer assigned to projects:', projectIds.map(id => id.toString()));
+    let projectIds = assignedProjects.map(p => p._id);
+    
+    // Filter by specific project if provided
+    if (project) {
+      // Verify engineer has access to this project
+      if (!projectIds.some(pid => pid.toString() === project)) {
+        return res.status(403).json({ message: 'Access denied to this project' });
+      }
+      projectIds = [project];
+      console.log('📋 Filtering for specific project:', project);
+    } else {
+      console.log('📋 Engineer assigned to projects:', projectIds.map(id => id.toString()));
+    }
 
     // Get all subprojects within these projects
     const SubProject = require('../shared/models/SubProject');
