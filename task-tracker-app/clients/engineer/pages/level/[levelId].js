@@ -5,7 +5,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TablePagination, TextField, Select, MenuItem, FormControl, InputLabel,
   Chip, CircularProgress, Button, Drawer, List, ListItem, ListItemButton, ListItemText,
-  IconButton, Divider
+  IconButton, Divider, InputAdornment
 } from '@mui/material';
 import {
   HourglassEmpty, CheckCircle, Cancel, Search, Refresh, AccountCircle,
@@ -29,13 +29,6 @@ export default function LevelDetailPage() {
   const [loading, setLoading] = useState(false);
   const [updatingJob, setUpdatingJob] = useState(null);
   
-  // Level metrics
-  const [levelStats, setLevelStats] = useState({
-    pending: { count: 0, sqm: 0 },
-    completed: { count: 0, sqm: 0 },
-    not_applicable: { count: 0, sqm: 0 },
-  });
-  
   // Table data
   const [jobs, setJobs] = useState([]);
   const [totalJobs, setTotalJobs] = useState(0);
@@ -53,12 +46,8 @@ export default function LevelDetailPage() {
   const [jobTitles, setJobTitles] = useState([]);
   const [grids, setGrids] = useState([]);
   
-  // Filtered stats
-  const [filteredStats, setFilteredStats] = useState({
-    totalJobs: 0,
-    totalSqm: 0,
-    totalElements: 0
-  });
+  // Level search
+  const [levelSearch, setLevelSearch] = useState('');
 
   useEffect(() => {
     fetchProjects();
@@ -76,7 +65,6 @@ export default function LevelDetailPage() {
 
   useEffect(() => {
     if (projectId && levelId) {
-      fetchLevelMetrics();
       fetchFilterOptions();
       fetchJobs();
     }
@@ -98,31 +86,6 @@ export default function LevelDetailPage() {
       setLevels(response.data.levels || []);
     } catch (error) {
       console.error('Error fetching levels:', error);
-    }
-  };
-
-  const fetchLevelMetrics = async () => {
-    try {
-      const response = await api.get(`/jobs/engineer/metrics?project=${projectId}`);
-      const data = response.data;
-      
-      // For now, using overall metrics - TODO: filter by level
-      setLevelStats({
-        pending: { 
-          count: data.statusBreakdown.pending?.count || 0, 
-          sqm: data.statusBreakdown.pending?.sqm || 0
-        },
-        completed: { 
-          count: data.statusBreakdown.completed?.count || 0, 
-          sqm: data.statusBreakdown.completed?.sqm || 0
-        },
-        not_applicable: { 
-          count: data.statusBreakdown.not_applicable?.count || 0, 
-          sqm: data.statusBreakdown.not_applicable?.sqm || 0
-        }
-      });
-    } catch (error) {
-      console.error('Error fetching metrics:', error);
     }
   };
 
@@ -161,15 +124,6 @@ export default function LevelDetailPage() {
       const jobsData = response.data.jobs || [];
       setJobs(jobsData);
       setTotalJobs(response.data.pagination?.totalJobs || 0);
-      
-      const totalSqm = jobsData.reduce((sum, job) => sum + (job.structuralElement?.surfaceAreaSqm || 0), 0);
-      const uniqueElements = new Set(jobsData.map(job => job.structuralElement?._id)).size;
-      
-      setFilteredStats({
-        totalJobs: response.data.pagination?.totalJobs || 0,
-        totalSqm: totalSqm,
-        totalElements: uniqueElements
-      });
     } catch (error) {
       console.error('Error fetching jobs:', error);
       toast.error('Failed to fetch jobs');
@@ -183,7 +137,6 @@ export default function LevelDetailPage() {
       setUpdatingJob(jobId);
       await api.patch(`/jobs/engineer/${jobId}/status`, { status: newStatus });
       toast.success('Status updated successfully!');
-      fetchLevelMetrics();
       fetchJobs();
     } catch (error) {
       console.error('Error updating status:', error);
@@ -199,6 +152,10 @@ export default function LevelDetailPage() {
     setSearchTerm('');
     setPage(0);
   };
+
+  const filteredLevels = levels.filter(level => 
+    level.level.toLowerCase().includes(levelSearch.toLowerCase())
+  );
 
   const getStatusColor = (status) => {
     const colors = {
@@ -276,12 +233,44 @@ export default function LevelDetailPage() {
           <Divider sx={{ bgcolor: 'rgba(255,255,255,0.1)', my: 2 }} />
 
           <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', mb: 1, display: 'block' }}>
-            LEVELS ({levels.length})
+            LEVELS ({filteredLevels.length})
           </Typography>
+          
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Search levels..."
+            value={levelSearch}
+            onChange={(e) => setLevelSearch(e.target.value)}
+            sx={{
+              mb: 1,
+              '& .MuiOutlinedInput-root': {
+                color: 'white',
+                '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
+                '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.4)' },
+                '&.Mui-focused fieldset': { borderColor: 'white' },
+              },
+              '& .MuiInputBase-input::placeholder': { color: 'rgba(255,255,255,0.5)' }
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search sx={{ color: 'rgba(255,255,255,0.5)' }} />
+                </InputAdornment>
+              ),
+            }}
+          />
         </Box>
 
         <List sx={{ overflow: 'auto', flex: 1 }}>
-          {levels.map((level) => (
+          {filteredLevels.length === 0 ? (
+            <Box sx={{ p: 3, textAlign: 'center' }}>
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                No levels found
+              </Typography>
+            </Box>
+          ) : (
+            filteredLevels.map((level) => (
             <ListItem key={level.level} disablePadding>
               <ListItemButton
                 selected={decodeURIComponent(levelId) === level.level}
@@ -301,7 +290,8 @@ export default function LevelDetailPage() {
                 />
               </ListItemButton>
             </ListItem>
-          ))}
+            ))
+          )}
         </List>
 
         <Box sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
@@ -336,140 +326,6 @@ export default function LevelDetailPage() {
             Jobs and elements for this level
           </Typography>
         </Paper>
-
-        {/* Metrics Cards */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} md={4}>
-            <Card
-              onClick={() => setStatusFilter('pending')}
-              sx={{
-                cursor: 'pointer',
-                background: statusFilter === 'pending' ? 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)' : '#fff',
-                border: statusFilter === 'pending' ? '3px solid #f59e0b' : '2px solid #e0e0e0',
-                transition: 'all 0.3s',
-                '&:hover': { transform: 'scale(1.02)' }
-              }}
-            >
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <HourglassEmpty sx={{ fontSize: 40, color: '#f59e0b', mr: 2 }} />
-                  <Box>
-                    <Typography variant="h4" fontWeight="bold" color="#f59e0b">
-                      {levelStats.pending.count}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Pending Jobs
-                    </Typography>
-                  </Box>
-                </Box>
-                <Typography variant="body2" color="text.secondary">
-                  {levelStats.pending.sqm.toFixed(2)} SQM
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={4}>
-            <Card
-              onClick={() => setStatusFilter('completed')}
-              sx={{
-                cursor: 'pointer',
-                background: statusFilter === 'completed' ? 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)' : '#fff',
-                border: statusFilter === 'completed' ? '3px solid #10b981' : '2px solid #e0e0e0',
-                transition: 'all 0.3s',
-                '&:hover': { transform: 'scale(1.02)' }
-              }}
-            >
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <CheckCircle sx={{ fontSize: 40, color: '#10b981', mr: 2 }} />
-                  <Box>
-                    <Typography variant="h4" fontWeight="bold" color="#10b981">
-                      {levelStats.completed.count}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Completed Jobs
-                    </Typography>
-                  </Box>
-                </Box>
-                <Typography variant="body2" color="text.secondary">
-                  {levelStats.completed.sqm.toFixed(2)} SQM
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={4}>
-            <Card
-              onClick={() => setStatusFilter('not_applicable')}
-              sx={{
-                cursor: 'pointer',
-                background: statusFilter === 'not_applicable' ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' : '#fff',
-                border: statusFilter === 'not_applicable' ? '3px solid #ef4444' : '2px solid #e0e0e0',
-                transition: 'all 0.3s',
-                '&:hover': { transform: 'scale(1.02)' }
-              }}
-            >
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <Cancel sx={{ fontSize: 40, color: '#ef4444', mr: 2 }} />
-                  <Box>
-                    <Typography variant="h4" fontWeight="bold" color="#ef4444">
-                      {levelStats.not_applicable.count}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Non Clearance
-                    </Typography>
-                  </Box>
-                </Box>
-                <Typography variant="body2" color="text.secondary">
-                  {levelStats.not_applicable.sqm.toFixed(2)} SQM
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-
-        {/* Filtered Results Metrics */}
-        {(jobTitleFilter || gridFilter || searchTerm || statusFilter) && (
-          <Paper elevation={3} sx={{ p: 2, mb: 3, bgcolor: '#e3f2fd', borderRadius: 2 }}>
-            <Typography variant="h6" gutterBottom sx={{ color: '#1976d2', fontWeight: 'bold' }}>
-              📊 Filtered Results
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={4}>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h5" fontWeight="bold" color="primary">
-                    {filteredStats.totalJobs}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Jobs Shown
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h5" fontWeight="bold" color="primary">
-                    {filteredStats.totalSqm.toFixed(2)}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Total SQM
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h5" fontWeight="bold" color="primary">
-                    {filteredStats.totalElements}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Unique Elements
-                  </Typography>
-                </Box>
-              </Grid>
-            </Grid>
-          </Paper>
-        )}
 
         {/* Filters */}
         <Paper elevation={3} sx={{ p: 3, mb: 2, borderRadius: 2 }}>
