@@ -150,25 +150,43 @@ export default function EngineerDashboard() {
         not_applicable: metricsData.statusBreakdown.not_applicable?.count || 0
       });
       
-      // Fetch a small sample of jobs to calculate groups (just for accordion headers)
-      // Full job data will be loaded when accordion expands
+      // Fetch unique group values from backend (very fast - no job data, just distinct values)
       const statusForCurrentTab = activeTab === 'pending' ? '' : activeTab;
-      const sampleSize = 1000; // Small sample to determine groups quickly
       
       try {
-        const sampleResponse = await api.get(`/jobs/engineer/jobs?page=1&limit=${sampleSize}&project=${selectedProject}${statusForCurrentTab ? `&status=${statusForCurrentTab}` : ''}`);
-        const sampleJobs = sampleResponse.data.jobs || [];
+        const groupsResponse = await api.get(`/jobs/engineer/groups?project=${selectedProject}${statusForCurrentTab ? `&status=${statusForCurrentTab}` : ''}&groupBy=${groupBy}${subGroupBy ? `&subGroupBy=${subGroupBy}` : ''}`);
+        const groupsData = groupsResponse.data;
         
-        if (sampleJobs.length > 0) {
-          const metrics = calculateGroupMetrics(sampleJobs);
-          setGroupMetrics(metrics);
-          console.log(`Calculated groups from ${sampleJobs.length} sample jobs`);
-        } else {
-          setGroupMetrics({});
-          console.log('No jobs in sample - no groups to display');
-        }
+        console.log(`📂 Fetched ${groupsData.groups.length} unique groups for ${groupBy}`);
+        
+        // Build groupMetrics structure with just group names (no data yet)
+        const metrics = {};
+        groupsData.groups.forEach(groupName => {
+          metrics[groupName] = {
+            count: 0,
+            jobCount: 0,
+            sqm: 0,
+            qty: 0,
+            subGroups: {}
+          };
+          
+          // Add subgroups if they exist
+          if (subGroupBy && groupsData.subGroups[groupName]) {
+            groupsData.subGroups[groupName].forEach(subGroupName => {
+              metrics[groupName].subGroups[subGroupName] = {
+                count: 0,
+                jobCount: 0,
+                sqm: 0,
+                qty: 0
+              };
+            });
+          }
+        });
+        
+        setGroupMetrics(metrics);
+        console.log('Group structure created. Job data will be fetched on accordion expansion.');
       } catch (error) {
-        console.error('Error fetching sample jobs:', error);
+        console.error('Error fetching groups:', error);
         setGroupMetrics({});
       }
       

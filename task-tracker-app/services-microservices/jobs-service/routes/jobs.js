@@ -1488,6 +1488,227 @@ const engineerMetricsCacheKeyGenerator = (req) => {
   return `cache:${parts.join(':')}`;
 };
 
+const engineerGroupsCacheKeyGenerator = (req) => {
+  const userId = req.user?.id || 'anonymous';
+  const { project, status, groupBy, subGroupBy } = req.query;
+  
+  const parts = [
+    'engineer',
+    'groups',
+    `user:${userId}`,
+    `project:${project || 'all'}`,
+    `status:${status || 'all'}`,
+    `groupBy:${groupBy || 'none'}`,
+    `subGroupBy:${subGroupBy || 'none'}`
+  ];
+  
+  return `cache:${parts.join(':')}`;
+};
+
+/**
+ * Engineer-specific endpoint to get unique group values for accordion headers
+ * Returns distinct values for groupBy fields without fetching all jobs
+ * Very fast - uses aggregation to get unique values only
+ */
+router.get('/engineer/groups', auth, cacheMiddleware(300, engineerGroupsCacheKeyGenerator), async (req, res) => {
+  try {
+    console.log('📂 Engineer groups endpoint called by user:', req.user.id);
+    
+    // Allow site-engineers and admins to access this endpoint
+    if (req.user.role !== 'site-engineer' && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Site engineers and admins only.' });
+    }
+
+    const { project, status, groupBy, subGroupBy } = req.query;
+
+    if (!project) {
+      return res.status(400).json({ message: 'Project ID is required' });
+    }
+
+    if (!groupBy) {
+      return res.status(400).json({ message: 'groupBy parameter is required' });
+    }
+
+    // Verify access to project
+    const mongoose = require('mongoose');
+    const projectObjectId = new mongoose.Types.ObjectId(project);
+    
+    if (req.user.role !== 'admin') {
+      const hasAccess = await Task.exists({
+        _id: projectObjectId,
+        assignedEngineers: req.user.id
+      });
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Access denied to this project' });
+      }
+    }
+
+    // Get all subprojects within this project
+    const SubProject = require('../shared/models/SubProject');
+    const subProjects = await SubProject.find({
+      project: projectObjectId
+    }).select('_id');
+
+    const subProjectIds = subProjects.map(sp => sp._id);
+
+    // Get all structural elements from these subprojects
+    const structuralElements = await StructuralElement.find({
+      subProject: { $in: subProjectIds }
+    }).select('_id');
+
+    if (structuralElements.length === 0) {
+      return res.json({ groups: [], subGroups: {} });
+    }
+
+    const elementIds = structuralElements.map(el => el._id);
+
+    // Build filter for jobs
+    const filter = {
+      structuralElement: { $in: elementIds }
+    };
+
+    // Add status filter
+    if (status && status !== 'pending') {
+      filter.status = status;
+    } else if (!status || status === 'pending') {
+      filter.$or = [
+        { status: { $exists: false } },
+        { status: null },
+        { status: 'pending' },
+        { status: 'in_progress' }
+      ];
+    }
+
+    // Determine the field path for groupBy
+    const groupByFieldMap = {
+      'fireProofingType': 'fireProofingType',
+      'level': 'structuralElement.level',
+      'gridNo': 'structuralElement.gridNo',
+      'memberType': 'structuralElement.memberType'
+    };
+
+    const groupByField = groupByFieldMap[groupBy] || groupBy;
+
+    // Get distinct values for primary groupBy
+    const pipeline = [
+      { $match: filter },
+      {
+        $lookup: {
+          from: 'structuralelements',
+          localField: 'structuralElement',
+          foreignField: '_id',
+          as: 'elementData'
+        }
+      },
+      { $unwind: { path: '$elementData', preserveNullAndEmptyArrays: true } }
+    ];
+
+    // Add grouping stage
+    if (groupByField.startsWith('structuralElement.')) {
+      const field = groupByField.replace('structuralElement.', '');
+      pipeline.push({
+        $group: {
+          _id: `$elementData.${field}`,
+          count: { $sum: 1 }
+        }
+      });
+    } else {
+      pipeline.push({
+        $group: {
+          _id: `$${groupByField}`,
+          count: { $sum: 1 }
+        }
+      });
+    }
+
+    pipeline.push({ $sort: { _id: 1 } });
+
+    const groupResults = await Job.aggregate(pipeline);
+    const groups = groupResults
+      .map(g => g._id || 'Other')
+      .filter(g => g !== null);
+
+    // Get subgroups if subGroupBy is specified
+    let subGroups = {};
+    if (subGroupBy) {
+      const subGroupByFieldMap = {
+        'fireProofingType': 'fireProofingType',
+        'level': 'structuralElement.level',
+        'gridNo': 'structuralElement.gridNo',
+        'memberType': 'structuralElement.memberType'
+      };
+      
+      const subGroupByField = subGroupByFieldMap[subGroupBy] || subGroupBy;
+      
+      // For each group, get its subgroups
+      for (const group of groups) {
+        const subPipeline = [
+          { $match: filter },
+          {
+            $lookup: {
+              from: 'structuralelements',
+              localField: 'structuralElement',
+              foreignField: '_id',
+              as: 'elementData'
+            }
+          },
+          { $unwind: { path: '$elementData', preserveNullAndEmptyArrays: true } }
+        ];
+
+        // Add filter for this specific group
+        if (groupByField.startsWith('structuralElement.')) {
+          const field = groupByField.replace('structuralElement.', '');
+          subPipeline.push({
+            $match: { [`elementData.${field}`]: group === 'Other' ? null : group }
+          });
+        } else {
+          subPipeline.push({
+            $match: { [groupByField]: group === 'Other' ? null : group }
+          });
+        }
+
+        // Add subgroup aggregation
+        if (subGroupByField.startsWith('structuralElement.')) {
+          const field = subGroupByField.replace('structuralElement.', '');
+          subPipeline.push({
+            $group: {
+              _id: `$elementData.${field}`,
+              count: { $sum: 1 }
+            }
+          });
+        } else {
+          subPipeline.push({
+            $group: {
+              _id: `$${subGroupByField}`,
+              count: { $sum: 1 }
+            }
+          });
+        }
+
+        subPipeline.push({ $sort: { _id: 1 } });
+
+        const subGroupResults = await Job.aggregate(subPipeline);
+        subGroups[group] = subGroupResults
+          .map(sg => sg._id || 'Other')
+          .filter(sg => sg !== null);
+      }
+    }
+
+    console.log(`✅ Found ${groups.length} groups for ${groupBy}`);
+    
+    res.json({
+      groups,
+      subGroups,
+      groupBy,
+      subGroupBy: subGroupBy || null
+    });
+
+  } catch (error) {
+    console.error('Error fetching engineer groups:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 /**
  * Engineer-specific endpoint to get only metrics (counts and SQM)
  * Much faster than loading all jobs - returns aggregated data only
@@ -1883,6 +2104,7 @@ router.patch('/engineer/:id/status', auth, async (req, res) => {
     await invalidateCache(`cache:stats:project:${updatedJob.project}`);
     await invalidateCache(`cache:engineer:jobs:user:${req.user.id}:*`); // Invalidate engineer jobs cache
     await invalidateCache(`cache:engineer:metrics:*:project:${updatedJob.project}:*`); // Invalidate engineer metrics cache
+    await invalidateCache(`cache:engineer:groups:*:project:${updatedJob.project}:*`); // Invalidate engineer groups cache
     if (updatedJob.structuralElement) {
       await invalidateCache(`cache:structural:jobs:${updatedJob.structuralElement._id || updatedJob.structuralElement}`);
       await invalidateCache(`cache:structural:summary:${updatedJob.project}:*`);
