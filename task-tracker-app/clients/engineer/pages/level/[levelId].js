@@ -290,7 +290,7 @@ export default function LevelDetailPage() {
       }));
       
       // Calculate metrics for this group
-      const groupMetricsData = calculateGroupMetrics(filteredJobs);
+      const groupMetricsData = calculateGroupMetrics(fetchedJobs);
       setGroupMetrics(prev => ({
         ...prev,
         [groupKey]: groupMetricsData[groupKey] || { count: 0, jobCount: 0, sqm: 0, qty: 0, subGroups: {} }
