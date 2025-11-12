@@ -289,6 +289,13 @@ export default function LevelDetailPage() {
         [groupKey]: groupedData
       }));
       
+      // Calculate metrics for this group
+      const groupMetricsData = calculateGroupMetrics(filteredJobs);
+      setGroupMetrics(prev => ({
+        ...prev,
+        [groupKey]: groupMetricsData[groupKey] || { count: 0, jobCount: 0, sqm: 0, qty: 0, subGroups: {} }
+      }));
+      
     } catch (error) {
       console.error('Error fetching group jobs:', error);
       toast.error('Failed to load jobs for this group');
@@ -636,9 +643,30 @@ export default function LevelDetailPage() {
                             }
                           }}
                         >
-                          <Typography variant="h6" fontWeight="700" sx={{ color: '#333' }}>
-                            {groupKey}
-                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+                            <Typography variant="h6" fontWeight="700" sx={{ color: '#333', flexGrow: 1 }}>
+                              {groupKey}
+                            </Typography>
+                            {metrics.jobCount > 0 && (
+                              <Box sx={{ display: 'flex', gap: 1 }}>
+                                <Chip 
+                                  label={`${metrics.jobCount} Jobs`} 
+                                  size="small" 
+                                  sx={{ bgcolor: '#e3f2fd', color: '#1976d2', fontWeight: 'bold' }}
+                                />
+                                <Chip 
+                                  label={`${metrics.count} Elements`} 
+                                  size="small" 
+                                  sx={{ bgcolor: '#f3e5f5', color: '#7b1fa2', fontWeight: 'bold' }}
+                                />
+                                <Chip 
+                                  label={`${metrics.sqm.toFixed(2)} SQM`} 
+                                  size="small" 
+                                  sx={{ bgcolor: '#fff3e0', color: '#e65100', fontWeight: 'bold' }}
+                                />
+                              </Box>
+                            )}
+                          </Box>
                         </AccordionSummary>
                         <AccordionDetails
                           sx={{
