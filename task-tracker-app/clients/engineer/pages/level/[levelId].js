@@ -221,13 +221,16 @@ export default function LevelDetailPage() {
   };
 
   const fetchGroupJobs = useCallback(async (groupKey) => {
-    if (groupJobs[groupKey]) return;
-    
     try {
       setLoadingGroups(prev => ({ ...prev, [groupKey]: true }));
       console.log('Fetching jobs for group:', groupKey);
       
-      let fetchedJobs = allJobsCache[activeTab];
+      // Check cache using the functional setState to get current value
+      let fetchedJobs;
+      setAllJobsCache(currentCache => {
+        fetchedJobs = currentCache[activeTab];
+        return currentCache;
+      });
       
       if (!fetchedJobs) {
         let allFetchedJobs = [];
@@ -258,6 +261,8 @@ export default function LevelDetailPage() {
         console.log(`Total jobs fetched for ${activeTab || 'all'}: ${allFetchedJobs.length}`);
         setAllJobsCache(prev => ({ ...prev, [activeTab]: allFetchedJobs }));
         fetchedJobs = allFetchedJobs;
+      } else {
+        console.log(`Using cached jobs for ${activeTab || 'all'}: ${fetchedJobs.length} jobs`);
       }
       
       const filteredJobs = fetchedJobs.filter(job => {
@@ -276,6 +281,8 @@ export default function LevelDetailPage() {
         const primaryKey = job.structuralElement?.[groupBy] || job[groupBy] || 'Other';
         return primaryKey === groupKey;
       });
+      
+      console.log(`Filtered ${filteredJobs.length} jobs for group: ${groupKey}`);
       
       let groupedData;
       if (subGroupBy) {
@@ -302,7 +309,7 @@ export default function LevelDetailPage() {
     } finally {
       setLoadingGroups(prev => ({ ...prev, [groupKey]: false }));
     }
-  }, [activeTab, groupBy, subGroupBy, searchTerm, projectId, levelId, groupJobs, allJobsCache]);
+  }, [activeTab, groupBy, subGroupBy, searchTerm, projectId, levelId]);
 
   const toggleGroup = (groupKey) => {
     const isExpanded = expandedGroups[groupKey] || false;
@@ -312,7 +319,8 @@ export default function LevelDetailPage() {
       [groupKey]: !isExpanded
     }));
     
-    if (!isExpanded && !groupJobs[groupKey]) {
+    // Always fetch when expanding to ensure we have data
+    if (!isExpanded) {
       fetchGroupJobs(groupKey);
     }
   };
