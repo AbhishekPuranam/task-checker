@@ -225,76 +225,55 @@ export default function LevelDetailPage() {
       setLoadingGroups(prev => ({ ...prev, [groupKey]: true }));
       console.log('Fetching jobs for group:', groupKey);
       
-      // Check cache using the functional setState to get current value
-      let fetchedJobs;
-      setAllJobsCache(currentCache => {
-        fetchedJobs = currentCache[activeTab];
-        return currentCache;
-      });
+      // Fetch jobs filtered by the group key directly from API
+      let allFetchedJobs = [];
+      let currentPage = 1;
+      const pageSize = 500;
+      let hasMore = true;
       
-      if (!fetchedJobs) {
-        let allFetchedJobs = [];
-        let currentPage = 1;
-        const pageSize = 500;
-        let hasMore = true;
+      while (hasMore) {
+        const statusParam = activeTab ? `&status=${activeTab}` : '';
+        // Add filter for the groupBy field value
+        const groupFilterParam = `&${groupBy}=${encodeURIComponent(groupKey)}`;
+        const response = await api.get(`/jobs/engineer/jobs?project=${projectId}&level=${decodeURIComponent(levelId)}${statusParam}${groupFilterParam}&page=${currentPage}&limit=${pageSize}`);
+        const jobs = response.data.jobs || [];
+        allFetchedJobs = allFetchedJobs.concat(jobs);
         
-        while (hasMore) {
-          const statusParam = activeTab ? `&status=${activeTab}` : '';
-          const response = await api.get(`/jobs/engineer/jobs?project=${projectId}&level=${decodeURIComponent(levelId)}${statusParam}&page=${currentPage}&limit=${pageSize}`);
-          const jobs = response.data.jobs || [];
-          allFetchedJobs = allFetchedJobs.concat(jobs);
-          
-          console.log(`Fetched page ${currentPage}: ${jobs.length} jobs`);
-          
-          if (jobs.length < pageSize) {
-            hasMore = false;
-          } else {
-            currentPage++;
-          }
-          
-          if (currentPage > 20) {
-            console.warn('Reached maximum page limit');
-            hasMore = false;
-          }
+        console.log(`Fetched page ${currentPage}: ${jobs.length} jobs for ${groupKey}`);
+        
+        if (jobs.length < pageSize) {
+          hasMore = false;
+        } else {
+          currentPage++;
         }
         
-        console.log(`Total jobs fetched for ${activeTab || 'all'}: ${allFetchedJobs.length}`);
-        setAllJobsCache(prev => ({ ...prev, [activeTab]: allFetchedJobs }));
-        fetchedJobs = allFetchedJobs;
-      } else {
-        console.log(`Using cached jobs for ${activeTab || 'all'}: ${fetchedJobs.length} jobs`);
+        if (currentPage > 20) {
+          console.warn('Reached maximum page limit');
+          hasMore = false;
+        }
       }
       
-      const filteredJobs = fetchedJobs.filter(job => {
-        if (searchTerm) {
-          const searchLower = searchTerm.toLowerCase();
-          const matches = 
-            job.jobTitle?.toLowerCase().includes(searchLower) ||
+      console.log(`Total jobs fetched for ${groupKey}: ${allFetchedJobs.length}`);
+      
+      // Apply search filter if needed
+      let fetchedJobs = allFetchedJobs;
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        fetchedJobs = allFetchedJobs.filter(job => {
+          return job.jobTitle?.toLowerCase().includes(searchLower) ||
             job.structuralElement?.structureNumber?.toLowerCase().includes(searchLower) ||
             job.structuralElement?.gridNo?.toLowerCase().includes(searchLower) ||
             job.structuralElement?.partMarkNo?.toLowerCase().includes(searchLower) ||
             job.structuralElement?.level?.toLowerCase().includes(searchLower);
-          
-          if (!matches) return false;
-        }
-        
-        const primaryKey = job.structuralElement?.[groupBy] || job[groupBy] || 'Other';
-        const matches = primaryKey === groupKey;
-        
-        // Debug logging for first few jobs
-        if (fetchedJobs.indexOf(job) < 3) {
-          console.log(`Job ${job._id}: gridNo="${job.structuralElement?.gridNo}" vs groupKey="${groupKey}" -> ${matches}`);
-        }
-        
-        return matches;
-      });
+        });
+      }
       
-      console.log(`Filtered ${filteredJobs.length} jobs for group: ${groupKey}`);
+      console.log(`After search filter: ${fetchedJobs.length} jobs`);
       
       let groupedData;
       if (subGroupBy) {
         groupedData = {};
-        filteredJobs.forEach(job => {
+        fetchedJobs.forEach(job => {
           const secondaryKey = job[subGroupBy] || job.structuralElement?.[subGroupBy] || 'Other';
           if (!groupedData[secondaryKey]) {
             groupedData[secondaryKey] = [];
@@ -302,7 +281,7 @@ export default function LevelDetailPage() {
           groupedData[secondaryKey].push(job);
         });
       } else {
-        groupedData = { jobs: filteredJobs };
+        groupedData = { jobs: fetchedJobs };
       }
       
       setGroupJobs(prev => ({

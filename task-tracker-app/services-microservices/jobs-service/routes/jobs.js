@@ -1636,7 +1636,7 @@ router.get('/engineer/groups', auth, cacheMiddleware(300, engineerGroupsCacheKey
       return res.status(403).json({ message: 'Access denied. Site engineers and admins only.' });
     }
 
-    const { project, status, groupBy, subGroupBy } = req.query;
+    const { project, status, groupBy, subGroupBy, level } = req.query;
 
     if (!project) {
       return res.status(400).json({ message: 'Project ID is required' });
@@ -1645,6 +1645,8 @@ router.get('/engineer/groups', auth, cacheMiddleware(300, engineerGroupsCacheKey
     if (!groupBy) {
       return res.status(400).json({ message: 'groupBy parameter is required' });
     }
+
+    console.log('📂 Query params:', { project, status, groupBy, subGroupBy, level });
 
     // Verify access to project
     const mongoose = require('mongoose');
@@ -1672,6 +1674,17 @@ router.get('/engineer/groups', auth, cacheMiddleware(300, engineerGroupsCacheKey
       return res.json({ groups: [], subGroups: {} });
     }
 
+    // Build base match for structural elements
+    const structuralElementMatch = {
+      subProject: { $in: subProjectIds }
+    };
+
+    // Add level filter if provided
+    if (level) {
+      structuralElementMatch.level = level;
+      console.log('🔍 Filtering by level:', level);
+    }
+
     // Get unique values directly from structural elements (much faster than querying jobs)
     // Only query the specific field we need for groupBy
     const fieldMap = {
@@ -1679,7 +1692,12 @@ router.get('/engineer/groups', auth, cacheMiddleware(300, engineerGroupsCacheKey
       'jobTitle': null, // This comes from jobs, handle separately
       'level': 'level',
       'gridNo': 'gridNo',
-      'memberType': 'memberType'
+      'memberType': 'memberType',
+      'partMarkNo': 'partMarkNo',
+      'lengthMm': 'lengthMm',
+      'surfaceAreaSqm': 'surfaceAreaSqm',
+      'fpThicknessMm': 'fireproofingThickness',
+      'fireProofingWorkflow': 'fireProofingWorkflow'
     };
 
     const structuralField = fieldMap[groupBy];
@@ -1688,16 +1706,12 @@ router.get('/engineer/groups', auth, cacheMiddleware(300, engineerGroupsCacheKey
     
     if (structuralField) {
       // Query structural elements for unique values (very fast)
-      const uniqueValues = await StructuralElement.distinct(structuralField, {
-        subProject: { $in: subProjectIds }
-      });
+      const uniqueValues = await StructuralElement.distinct(structuralField, structuralElementMatch);
       groups = uniqueValues.filter(v => v != null).sort();
       console.log(`✅ Found ${groups.length} unique ${groupBy} values from structural elements`);
     } else if (groupBy === 'fireProofingType' || groupBy === 'jobTitle') {
       // For fireProofingType or jobTitle, we need to query jobs (but use distinct which is faster)
-      const structuralElements = await StructuralElement.find({
-        subProject: { $in: subProjectIds }
-      }).select('_id');
+      const structuralElements = await StructuralElement.find(structuralElementMatch).select('_id');
       
       const elementIds = structuralElements.map(el => el._id);
       
@@ -1736,7 +1750,12 @@ router.get('/engineer/groups', auth, cacheMiddleware(300, engineerGroupsCacheKey
         'jobTitle': null,
         'level': 'level',
         'gridNo': 'gridNo',
-        'memberType': 'memberType'
+        'memberType': 'memberType',
+        'partMarkNo': 'partMarkNo',
+        'lengthMm': 'lengthMm',
+        'surfaceAreaSqm': 'surfaceAreaSqm',
+        'fpThicknessMm': 'fireproofingThickness',
+        'fireProofingWorkflow': 'fireProofingWorkflow'
       };
       
       const subStructuralField = subFieldMap[subGroupBy];
@@ -1744,7 +1763,7 @@ router.get('/engineer/groups', auth, cacheMiddleware(300, engineerGroupsCacheKey
       if (subStructuralField && structuralField) {
         // Both from structural elements - use aggregation on elements (fast)
         const pipeline = [
-          { $match: { subProject: { $in: subProjectIds } } },
+          { $match: structuralElementMatch },
           {
             $group: {
               _id: {
@@ -1783,7 +1802,7 @@ router.get('/engineer/groups', auth, cacheMiddleware(300, engineerGroupsCacheKey
       }
     }
 
-    console.log(`✅ Returning ${groups.length} groups for ${groupBy}`);
+    console.log(`✅ Returning ${groups.length} groups for ${groupBy}${level ? ` (level: ${level})` : ''}`);
     
     res.json({
       groups,
