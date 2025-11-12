@@ -1926,9 +1926,24 @@ router.get('/engineer/jobs', auth, cacheMiddleware(120, engineerJobsCacheKeyGene
 
     // Get all structural elements from these subprojects
     const subProjectIds = subProjects.map(sp => sp._id);
-    const structuralElements = await StructuralElement.find({
+    
+    // Build filter for structural elements based on query params
+    const { jobTitle, gridNo, level, search } = req.query;
+    const elementFilter = {
       subProject: { $in: subProjectIds }
-    }).select('_id');
+    };
+    
+    // Add filters for structural element fields
+    if (gridNo) {
+      elementFilter.gridNo = gridNo;
+      console.log('🔍 Filtering by gridNo:', gridNo);
+    }
+    if (level) {
+      elementFilter.level = level;
+      console.log('🔍 Filtering by level:', level);
+    }
+    
+    const structuralElements = await StructuralElement.find(elementFilter).select('_id');
 
     console.log('🏗️ Found structural elements:', structuralElements.length);
 
@@ -1956,6 +1971,22 @@ router.get('/engineer/jobs', auth, cacheMiddleware(120, engineerJobsCacheKeyGene
     // Add status filter if provided
     if (status) {
       filter.status = status;
+      console.log('🔍 Filtering by status:', status);
+    }
+    
+    // Add jobTitle filter if provided
+    if (jobTitle) {
+      filter.jobTitle = jobTitle;
+      console.log('🔍 Filtering by jobTitle:', jobTitle);
+    }
+    
+    // Add search filter if provided (searches across multiple fields)
+    if (search) {
+      filter.$or = [
+        { jobTitle: { $regex: search, $options: 'i' } },
+        { jobDescription: { $regex: search, $options: 'i' } }
+      ];
+      console.log('🔍 Searching for:', search);
     }
 
     // Get jobs with pagination
