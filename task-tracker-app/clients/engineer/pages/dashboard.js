@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Container, Paper, Typography, Box, AppBar, Toolbar, Button,
   Grid, Card, CardContent, CircularProgress, Chip, Divider, Select, MenuItem, FormControl,
-  TextField, InputAdornment
+  TextField, InputAdornment, FormControlLabel, Checkbox
 } from '@mui/material';
 import {
   AccountCircle, LogoutOutlined, Dashboard as DashboardIcon,
@@ -93,6 +93,7 @@ export default function EngineerDashboard() {
   const [loading, setLoading] = useState(false);
   const [levels, setLevels] = useState([]);
   const [levelSearch, setLevelSearch] = useState('');
+  const [showOnlyNonClearance, setShowOnlyNonClearance] = useState(false);
   
   // Metrics
   const [stats, setStats] = useState({
@@ -199,9 +200,11 @@ export default function EngineerDashboard() {
     });
   };
 
-  const filteredLevels = levels.filter(level => 
-    level.level.toLowerCase().includes(levelSearch.toLowerCase())
-  );
+  const filteredLevels = levels.filter(level => {
+    const matchesSearch = level.level.toLowerCase().includes(levelSearch.toLowerCase());
+    const matchesNonClearance = !showOnlyNonClearance || level.nonClearanceJobs > 0;
+    return matchesSearch && matchesNonClearance;
+  });
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f5' }}>
@@ -300,33 +303,33 @@ export default function EngineerDashboard() {
         {/* Status Cards */}
         <Grid container spacing={3} sx={{ mb: 3 }}>
           <Grid item xs={12} md={4}>
-            <Card sx={{ background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)', border: '2px solid #f59e0b', height: '100%' }}>
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <HourglassEmpty sx={{ fontSize: 50, color: '#f59e0b', mr: 2 }} />
+            <Card sx={{ background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)', border: '3px solid #f59e0b', height: '100%' }}>
+              <CardContent sx={{ p: 4 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                  <HourglassEmpty sx={{ fontSize: 60, color: '#f59e0b', mr: 3 }} />
                   <Box>
-                    <Typography variant="h3" fontWeight="bold" color="#f59e0b">
+                    <Typography variant="h2" fontWeight="bold" color="#f59e0b">
                       {stats.pending.count}
                     </Typography>
-                    <Typography variant="h6" color="text.secondary" fontWeight="medium">
+                    <Typography variant="h5" color="text.secondary" fontWeight="medium">
                       Pending Jobs
                     </Typography>
                   </Box>
                 </Box>
                 <Divider sx={{ my: 2 }} />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body1" fontWeight="medium" color="text.secondary">
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
+                  <Typography variant="h6" fontWeight="medium" color="text.secondary">
                     SQM
                   </Typography>
-                  <Typography variant="h6" fontWeight="bold" color="#f59e0b">
+                  <Typography variant="h5" fontWeight="bold" color="#f59e0b">
                     {stats.pending.sqm.toFixed(2)}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body1" fontWeight="medium" color="text.secondary">
+                  <Typography variant="h6" fontWeight="medium" color="text.secondary">
                     Elements
                   </Typography>
-                  <Typography variant="h6" fontWeight="bold" color="#f59e0b">
+                  <Typography variant="h5" fontWeight="bold" color="#f59e0b">
                     {stats.pending.elements}
                   </Typography>
                 </Box>
@@ -335,33 +338,33 @@ export default function EngineerDashboard() {
           </Grid>
 
           <Grid item xs={12} md={4}>
-            <Card sx={{ background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)', border: '2px solid #10b981', height: '100%' }}>
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <CheckCircle sx={{ fontSize: 50, color: '#10b981', mr: 2 }} />
+            <Card sx={{ background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)', border: '3px solid #10b981', height: '100%' }}>
+              <CardContent sx={{ p: 4 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                  <CheckCircle sx={{ fontSize: 60, color: '#10b981', mr: 3 }} />
                   <Box>
-                    <Typography variant="h3" fontWeight="bold" color="#10b981">
+                    <Typography variant="h2" fontWeight="bold" color="#10b981">
                       {stats.completed.count}
                     </Typography>
-                    <Typography variant="h6" color="text.secondary" fontWeight="medium">
+                    <Typography variant="h5" color="text.secondary" fontWeight="medium">
                       Completed Jobs
                     </Typography>
                   </Box>
                 </Box>
                 <Divider sx={{ my: 2 }} />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body1" fontWeight="medium" color="text.secondary">
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
+                  <Typography variant="h6" fontWeight="medium" color="text.secondary">
                     SQM
                   </Typography>
-                  <Typography variant="h6" fontWeight="bold" color="#10b981">
+                  <Typography variant="h5" fontWeight="bold" color="#10b981">
                     {stats.completed.sqm.toFixed(2)}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body1" fontWeight="medium" color="text.secondary">
+                  <Typography variant="h6" fontWeight="medium" color="text.secondary">
                     Elements
                   </Typography>
-                  <Typography variant="h6" fontWeight="bold" color="#10b981">
+                  <Typography variant="h5" fontWeight="bold" color="#10b981">
                     {stats.completed.elements}
                   </Typography>
                 </Box>
@@ -370,33 +373,33 @@ export default function EngineerDashboard() {
           </Grid>
 
           <Grid item xs={12} md={4}>
-            <Card sx={{ background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)', border: '2px solid #ef4444', height: '100%' }}>
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Cancel sx={{ fontSize: 50, color: '#ef4444', mr: 2 }} />
+            <Card sx={{ background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)', border: '3px solid #ef4444', height: '100%' }}>
+              <CardContent sx={{ p: 4 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                  <Cancel sx={{ fontSize: 60, color: '#ef4444', mr: 3 }} />
                   <Box>
-                    <Typography variant="h3" fontWeight="bold" color="#ef4444">
+                    <Typography variant="h2" fontWeight="bold" color="#ef4444">
                       {stats.not_applicable.count}
                     </Typography>
-                    <Typography variant="h6" color="text.secondary" fontWeight="medium">
+                    <Typography variant="h5" color="text.secondary" fontWeight="medium">
                       Non Clearance
                     </Typography>
                   </Box>
                 </Box>
                 <Divider sx={{ my: 2 }} />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body1" fontWeight="medium" color="text.secondary">
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
+                  <Typography variant="h6" fontWeight="medium" color="text.secondary">
                     SQM
                   </Typography>
-                  <Typography variant="h6" fontWeight="bold" color="#ef4444">
+                  <Typography variant="h5" fontWeight="bold" color="#ef4444">
                     {stats.not_applicable.sqm.toFixed(2)}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body1" fontWeight="medium" color="text.secondary">
+                  <Typography variant="h6" fontWeight="medium" color="text.secondary">
                     Elements
                   </Typography>
-                  <Typography variant="h6" fontWeight="bold" color="#ef4444">
+                  <Typography variant="h5" fontWeight="bold" color="#ef4444">
                     {stats.not_applicable.elements}
                   </Typography>
                 </Box>
@@ -445,9 +448,42 @@ export default function EngineerDashboard() {
 
         {/* Building Levels Section */}
         <Box sx={{ mb: 3 }}>
-          <Typography variant="h5" fontWeight="bold" gutterBottom sx={{ mb: 2 }}>
-            🏢 Building Levels ({filteredLevels.length})
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h5" fontWeight="bold">
+              🏢 Building Levels ({filteredLevels.length})
+            </Typography>
+            
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={showOnlyNonClearance}
+                  onChange={(e) => setShowOnlyNonClearance(e.target.checked)}
+                  sx={{
+                    color: '#ef4444',
+                    '&.Mui-checked': {
+                      color: '#ef4444',
+                    },
+                  }}
+                />
+              }
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body1" fontWeight="medium">
+                    Show Only Non-Clearance Levels
+                  </Typography>
+                  <Chip 
+                    label={levels.filter(l => l.nonClearanceJobs > 0).length}
+                    size="small"
+                    sx={{ 
+                      bgcolor: '#ef4444', 
+                      color: 'white',
+                      fontWeight: 'bold'
+                    }}
+                  />
+                </Box>
+              }
+            />
+          </Box>
           
           {/* Search Bar for Levels */}
           <TextField
