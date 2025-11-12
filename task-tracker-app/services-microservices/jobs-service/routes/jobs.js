@@ -1510,6 +1510,119 @@ const engineerGroupsCacheKeyGenerator = (req) => {
 };
 
 /**
+ * Engineer-specific endpoint to get all levels for a project with job counts
+ * Returns list of levels with job statistics
+ */
+router.get('/engineer/levels', auth, cacheMiddleware(300, engineerGroupsCacheKeyGenerator), async (req, res) => {
+  try {
+    console.log('📊 Engineer levels endpoint called by user:', req.user.id);
+    
+    // Allow site-engineers and admins to access this endpoint
+    if (req.user.role !== 'site-engineer' && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Site engineers and admins only.' });
+    }
+
+    const { project } = req.query;
+
+    if (!project) {
+      return res.status(400).json({ message: 'Project ID is required' });
+    }
+
+    // Verify access to project
+    const mongoose = require('mongoose');
+    const projectObjectId = new mongoose.Types.ObjectId(project);
+    
+    if (req.user.role !== 'admin') {
+      const hasAccess = await Task.exists({
+        _id: projectObjectId,
+        assignedEngineers: req.user.id
+      });
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Access denied to this project' });
+      }
+    }
+
+    // Get all subprojects within this project
+    const SubProject = require('../shared/models/SubProject');
+    const subProjects = await SubProject.find({
+      project: projectObjectId
+    }).select('_id');
+
+    const subProjectIds = subProjects.map(sp => sp._id);
+
+    // Get all structural elements with levels
+    const StructuralElement = require('../shared/models/StructuralElement');
+    const elements = await StructuralElement.find({
+      subProject: { $in: subProjectIds }
+    }).select('_id level');
+
+    // Group by level and count elements
+    const levelMap = {};
+    elements.forEach(el => {
+      const level = el.level || 'Unknown';
+      if (!levelMap[level]) {
+        levelMap[level] = {
+          level: level,
+          elementIds: []
+        };
+      }
+      levelMap[level].elementIds.push(el._id);
+    });
+
+    // Get job counts for each level
+    const Job = require('../shared/models/Job');
+    const levels = await Promise.all(
+      Object.keys(levelMap).map(async (levelKey) => {
+        const elementIds = levelMap[levelKey].elementIds;
+        
+        const [totalJobs, pendingJobs, completedJobs, nonClearanceJobs] = await Promise.all([
+          Job.countDocuments({ structuralElement: { $in: elementIds } }),
+          Job.countDocuments({ structuralElement: { $in: elementIds }, status: 'pending' }),
+          Job.countDocuments({ structuralElement: { $in: elementIds }, status: 'completed' }),
+          Job.countDocuments({ structuralElement: { $in: elementIds }, status: 'not_applicable' })
+        ]);
+
+        return {
+          level: levelKey,
+          elementCount: elementIds.length,
+          totalJobs,
+          pendingJobs,
+          completedJobs,
+          nonClearanceJobs
+        };
+      })
+    );
+
+    // Sort levels
+    const sortedLevels = levels.sort((a, b) => {
+      // Custom sort logic for levels (Basement, Ground, Levels, Terrace)
+      const aLevel = a.level;
+      const bLevel = b.level;
+      
+      if (aLevel.includes('Basement') && !bLevel.includes('Basement')) return -1;
+      if (!aLevel.includes('Basement') && bLevel.includes('Basement')) return 1;
+      if (aLevel.includes('Ground') && !bLevel.includes('Ground')) return 1;
+      if (!aLevel.includes('Ground') && bLevel.includes('Ground')) return -1;
+      if (aLevel.includes('Terrace')) return 1;
+      if (bLevel.includes('Terrace')) return -1;
+      
+      return aLevel.localeCompare(bLevel);
+    });
+
+    console.log(`✅ Returning ${sortedLevels.length} levels`);
+
+    res.json({
+      levels: sortedLevels,
+      totalLevels: sortedLevels.length
+    });
+
+  } catch (error) {
+    console.error('Error fetching engineer levels:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+/**
  * Engineer-specific endpoint to get unique group values for accordion headers
  * Returns distinct values for groupBy fields without fetching all jobs
  * Very fast - uses aggregation to get unique values only
