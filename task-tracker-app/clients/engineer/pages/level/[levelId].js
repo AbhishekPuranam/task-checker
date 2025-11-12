@@ -19,7 +19,6 @@ import toast from 'react-hot-toast';
 const DRAWER_WIDTH = 280;
 
 const TABS = [
-  { id: '', label: 'All', color: '#3b82f6' },
   { id: 'pending', label: 'Pending', color: '#f59e0b' },
   { id: 'completed', label: 'Completed', color: '#10b981' },
   { id: 'not_applicable', label: 'Non Clearance', color: '#ef4444' }
@@ -533,9 +532,39 @@ export default function LevelDetailPage() {
             }}
           >
             {TABS.map(tab => (
-              <Tab key={tab.id} label={tab.label} value={tab.id} />
+              <Tab
+                key={tab.id}
+                label={tab.label}
+                value={tab.id}
+                sx={{
+                  color: tab.color,
+                  '&.Mui-selected': {
+                    color: tab.color,
+                    fontWeight: 'bold',
+                    borderBottom: `3px solid ${tab.color}`
+                  }
+                }}
+              />
             ))}
           </Tabs>
+          {/* Metrics summary below tabs */}
+          <Box sx={{ display: 'flex', gap: 3, px: 3, py: 2, alignItems: 'center' }}>
+            {(() => {
+              // Aggregate metrics for current tab
+              let totalElements = 0;
+              let totalSqm = 0;
+              Object.values(groupMetrics).forEach(m => {
+                totalElements += m.count || 0;
+                totalSqm += m.sqm || 0;
+              });
+              return (
+                <>
+                  <Chip label={`Total Elements: ${totalElements}`} sx={{ bgcolor: '#f3e5f5', color: '#7b1fa2', fontWeight: 'bold', fontSize: 16 }} />
+                  <Chip label={`Total SQM: ${totalSqm.toFixed(2)}`} sx={{ bgcolor: '#fff3e0', color: '#e65100', fontWeight: 'bold', fontSize: 16 }} />
+                </>
+              );
+            })()}
+          </Box>
         </Paper>
 
         {/* Search and Grouping Controls */}
