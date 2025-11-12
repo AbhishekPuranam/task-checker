@@ -9,7 +9,7 @@ import {
   AccountCircle, LogoutOutlined, Build, CheckCircle, HourglassEmpty,
   Cancel, Search, Refresh
 } from '@mui/icons-material';
-import { useAuth } from '../utils/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
