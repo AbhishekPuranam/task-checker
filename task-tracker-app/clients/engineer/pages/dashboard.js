@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Container, Paper, Typography, Box, AppBar, Toolbar, Button, IconButton,
   Grid, Card, CardContent, List, ListItem, ListItemButton, ListItemText,
-  Drawer, CircularProgress, Chip, Divider
+  Drawer, CircularProgress, Chip, Divider, Select, MenuItem, FormControl
 } from '@mui/material';
 import {
   AccountCircle, LogoutOutlined, Dashboard as DashboardIcon,
@@ -101,6 +101,16 @@ export default function EngineerDashboard() {
     router.push(`/level/${encodeURIComponent(level.level)}?project=${selectedProject}`);
   };
 
+  const handleProjectChange = (projectId) => {
+    setSelectedProject(projectId);
+    setLevels([]);
+    setStats({
+      pending: { count: 0, sqm: 0, elements: 0 },
+      completed: { count: 0, sqm: 0, elements: 0 },
+      not_applicable: { count: 0, sqm: 0, elements: 0 },
+    });
+  };
+
   const getStatusColor = (status) => {
     const colors = {
       pending: '#f59e0b',
@@ -136,9 +146,25 @@ export default function EngineerDashboard() {
           <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', mb: 1, display: 'block' }}>
             PROJECT
           </Typography>
-          <Typography variant="body2" sx={{ mb: 2, fontWeight: 'bold' }}>
-            {projects.find(p => p._id === selectedProject)?.title || 'Select Project'}
-          </Typography>
+          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+            <Select
+              value={selectedProject}
+              onChange={(e) => handleProjectChange(e.target.value)}
+              sx={{
+                color: 'white',
+                '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.2)' },
+                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.4)' },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
+                '.MuiSvgIcon-root': { color: 'white' }
+              }}
+            >
+              {projects.map((project) => (
+                <MenuItem key={project._id} value={project._id}>
+                  {project.title}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
           <Divider sx={{ bgcolor: 'rgba(255,255,255,0.1)', my: 2 }} />
 
