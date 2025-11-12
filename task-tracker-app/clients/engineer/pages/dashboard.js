@@ -259,18 +259,197 @@ export default function EngineerDashboard() {
 
       {/* Main Content */}
       <Container maxWidth="xl" sx={{ mt: 3, mb: 3 }}>
-        {/* Header */}
+        {/* Header with Project Selector */}
         <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h4" fontWeight="bold" gutterBottom>
-            📊 Dashboard
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Project overview and completion progress
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+            <Box>
+              <Typography variant="h4" fontWeight="bold" gutterBottom>
+                📊 Dashboard
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Project overview and completion progress
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                PROJECT
+              </Typography>
+              <FormControl size="medium" sx={{ minWidth: 300 }}>
+                <Select
+                  value={selectedProject}
+                  onChange={(e) => handleProjectChange(e.target.value)}
+                  displayEmpty
+                  sx={{
+                    bgcolor: 'white',
+                    '& .MuiOutlinedInput-notchedOutline': { borderColor: '#e5e7eb' },
+                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#9ca3af' },
+                  }}
+                >
+                  <MenuItem value="" disabled>Select Project</MenuItem>
+                  {projects.map((project) => (
+                    <MenuItem key={project._id} value={project._id}>
+                      {project.title}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+          </Box>
         </Paper>
+        
+        {/* Status Cards */}
+        <Grid container spacing={3} sx={{ mb: 3 }}>
+          <Grid item xs={12} md={4}>
+            <Card sx={{ background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)', border: '2px solid #f59e0b', height: '100%' }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <HourglassEmpty sx={{ fontSize: 50, color: '#f59e0b', mr: 2 }} />
+                  <Box>
+                    <Typography variant="h3" fontWeight="bold" color="#f59e0b">
+                      {stats.pending.count}
+                    </Typography>
+                    <Typography variant="h6" color="text.secondary" fontWeight="medium">
+                      Pending Jobs
+                    </Typography>
+                  </Box>
+                </Box>
+                <Divider sx={{ my: 2 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body1" fontWeight="medium" color="text.secondary">
+                    SQM
+                  </Typography>
+                  <Typography variant="h6" fontWeight="bold" color="#f59e0b">
+                    {stats.pending.sqm.toFixed(2)}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body1" fontWeight="medium" color="text.secondary">
+                    Elements
+                  </Typography>
+                  <Typography variant="h6" fontWeight="bold" color="#f59e0b">
+                    {stats.pending.elements}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
 
-        {/* Search Bar for Levels */}
+          <Grid item xs={12} md={4}>
+            <Card sx={{ background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)', border: '2px solid #10b981', height: '100%' }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <CheckCircle sx={{ fontSize: 50, color: '#10b981', mr: 2 }} />
+                  <Box>
+                    <Typography variant="h3" fontWeight="bold" color="#10b981">
+                      {stats.completed.count}
+                    </Typography>
+                    <Typography variant="h6" color="text.secondary" fontWeight="medium">
+                      Completed Jobs
+                    </Typography>
+                  </Box>
+                </Box>
+                <Divider sx={{ my: 2 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body1" fontWeight="medium" color="text.secondary">
+                    SQM
+                  </Typography>
+                  <Typography variant="h6" fontWeight="bold" color="#10b981">
+                    {stats.completed.sqm.toFixed(2)}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body1" fontWeight="medium" color="text.secondary">
+                    Elements
+                  </Typography>
+                  <Typography variant="h6" fontWeight="bold" color="#10b981">
+                    {stats.completed.elements}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <Card sx={{ background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)', border: '2px solid #ef4444', height: '100%' }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Cancel sx={{ fontSize: 50, color: '#ef4444', mr: 2 }} />
+                  <Box>
+                    <Typography variant="h3" fontWeight="bold" color="#ef4444">
+                      {stats.not_applicable.count}
+                    </Typography>
+                    <Typography variant="h6" color="text.secondary" fontWeight="medium">
+                      Non Clearance
+                    </Typography>
+                  </Box>
+                </Box>
+                <Divider sx={{ my: 2 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body1" fontWeight="medium" color="text.secondary">
+                    SQM
+                  </Typography>
+                  <Typography variant="h6" fontWeight="bold" color="#ef4444">
+                    {stats.not_applicable.sqm.toFixed(2)}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body1" fontWeight="medium" color="text.secondary">
+                    Elements
+                  </Typography>
+                  <Typography variant="h6" fontWeight="bold" color="#ef4444">
+                    {stats.not_applicable.elements}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
+        {/* Completion Gauges */}
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          {/* Jobs Progress */}
+          <Grid item xs={12} md={4}>
+            <SemiCircleGauge
+              value={stats.completed.count}
+              total={stats.totalJobs}
+              label="Jobs Completion"
+              color="#10b981"
+              icon={CheckCircle}
+            />
+          </Grid>
+
+          {/* Elements Progress */}
+          <Grid item xs={12} md={4}>
+            <SemiCircleGauge
+              value={stats.completed.elements}
+              total={stats.totalElements}
+              label="Elements Completion"
+              color="#3b82f6"
+              icon={Layers}
+            />
+          </Grid>
+
+          {/* SQM Progress */}
+          <Grid item xs={12} md={4}>
+            <SemiCircleGauge
+              value={parseFloat(stats.completed.sqm.toFixed(2))}
+              total={parseFloat(stats.totalSqm.toFixed(2))}
+              label="SQM Completion"
+              color="#f59e0b"
+              icon={Cancel}
+            />
+          </Grid>
+        </Grid>
+
+        <Divider sx={{ my: 4 }} />
+
+        {/* Building Levels Section */}
         <Box sx={{ mb: 3 }}>
+          <Typography variant="h5" fontWeight="bold" gutterBottom sx={{ mb: 2 }}>
+            🏢 Building Levels ({filteredLevels.length})
+          </Typography>
+          
+          {/* Search Bar for Levels */}
           <TextField
             fullWidth
             placeholder="Search levels..."
@@ -286,6 +465,7 @@ export default function EngineerDashboard() {
             sx={{
               bgcolor: 'white',
               borderRadius: 1,
+              mb: 3,
               '& .MuiOutlinedInput-root': {
                 '& fieldset': { borderColor: '#e5e7eb' },
                 '&:hover fieldset': { borderColor: '#9ca3af' },
@@ -293,11 +473,6 @@ export default function EngineerDashboard() {
             }}
           />
         </Box>
-
-        {/* Building Floors - Bento Box Grid */}
-        <Typography variant="h5" fontWeight="bold" gutterBottom sx={{ mb: 2 }}>
-          🏢 Building Levels ({filteredLevels.length})
-        </Typography>
         
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
@@ -461,110 +636,6 @@ export default function EngineerDashboard() {
             ))}
           </Grid>
         )}
-
-        <Divider sx={{ my: 4 }} />
-
-        {/* Status Cards */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} md={4}>
-            <Card sx={{ background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)', border: '2px solid #f59e0b' }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <HourglassEmpty sx={{ fontSize: 40, color: '#f59e0b', mr: 2 }} />
-                  <Box>
-                    <Typography variant="h4" fontWeight="bold" color="#f59e0b">
-                      {stats.pending.count}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Pending Jobs
-                    </Typography>
-                  </Box>
-                </Box>
-                <Typography variant="body2" color="text.secondary">
-                  {stats.pending.sqm.toFixed(2)} SQM | {stats.pending.elements} Elements
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={4}>
-            <Card sx={{ background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)', border: '2px solid #10b981' }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <CheckCircle sx={{ fontSize: 40, color: '#10b981', mr: 2 }} />
-                  <Box>
-                    <Typography variant="h4" fontWeight="bold" color="#10b981">
-                      {stats.completed.count}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Completed Jobs
-                    </Typography>
-                  </Box>
-                </Box>
-                <Typography variant="body2" color="text.secondary">
-                  {stats.completed.sqm.toFixed(2)} SQM | {stats.completed.elements} Elements
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={4}>
-            <Card sx={{ background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)', border: '2px solid #ef4444' }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <Cancel sx={{ fontSize: 40, color: '#ef4444', mr: 2 }} />
-                  <Box>
-                    <Typography variant="h4" fontWeight="bold" color="#ef4444">
-                      {stats.not_applicable.count}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Non Clearance
-                    </Typography>
-                  </Box>
-                </Box>
-                <Typography variant="body2" color="text.secondary">
-                  {stats.not_applicable.sqm.toFixed(2)} SQM | {stats.not_applicable.elements} Elements
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-
-        {/* Completion Gauges */}
-        <Grid container spacing={3}>
-          {/* Jobs Progress */}
-          <Grid item xs={12} md={4}>
-            <SemiCircleGauge
-              value={stats.completed.count}
-              total={stats.totalJobs}
-              label="Jobs Completion"
-              color="#10b981"
-              icon={CheckCircle}
-            />
-          </Grid>
-
-          {/* Elements Progress */}
-          <Grid item xs={12} md={4}>
-            <SemiCircleGauge
-              value={stats.completed.elements}
-              total={stats.totalElements}
-              label="Elements Completion"
-              color="#3b82f6"
-              icon={Layers}
-            />
-          </Grid>
-
-          {/* SQM Progress */}
-          <Grid item xs={12} md={4}>
-            <SemiCircleGauge
-              value={parseFloat(stats.completed.sqm.toFixed(2))}
-              total={parseFloat(stats.totalSqm.toFixed(2))}
-              label="SQM Completion"
-              color="#f59e0b"
-              icon={Cancel}
-            />
-          </Grid>
-        </Grid>
       </Container>
     </Box>
   );
