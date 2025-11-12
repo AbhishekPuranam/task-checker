@@ -29,6 +29,9 @@ export default function EngineerDashboard() {
   
   // Metrics
   const [stats, setStats] = useState({
+    pending: { count: 0, sqm: 0, elements: 0 },
+    completed: { count: 0, sqm: 0, elements: 0 },
+    not_applicable: { count: 0, sqm: 0, elements: 0 },
     totalJobs: 0,
     completedJobs: 0,
     totalElements: 0,
@@ -68,6 +71,21 @@ export default function EngineerDashboard() {
       const data = response.data;
       
       setStats({
+        pending: { 
+          count: data.statusBreakdown.pending?.count || 0, 
+          sqm: data.statusBreakdown.pending?.sqm || 0,
+          elements: data.statusBreakdown.pending?.elementCount || 0
+        },
+        completed: { 
+          count: data.statusBreakdown.completed?.count || 0, 
+          sqm: data.statusBreakdown.completed?.sqm || 0,
+          elements: data.statusBreakdown.completed?.elementCount || 0
+        },
+        not_applicable: { 
+          count: data.statusBreakdown.not_applicable?.count || 0, 
+          sqm: data.statusBreakdown.not_applicable?.sqm || 0,
+          elements: data.statusBreakdown.not_applicable?.elementCount || 0
+        },
         totalJobs: data.totalJobs || 0,
         completedJobs: data.statusBreakdown.completed?.count || 0,
         totalElements: data.totalElements || 0,
@@ -102,6 +120,9 @@ export default function EngineerDashboard() {
     setLevels([]);
     setLevelSearch('');
     setStats({
+      pending: { count: 0, sqm: 0, elements: 0 },
+      completed: { count: 0, sqm: 0, elements: 0 },
+      not_applicable: { count: 0, sqm: 0, elements: 0 },
       totalJobs: 0,
       completedJobs: 0,
       totalElements: 0,
@@ -212,13 +233,13 @@ export default function EngineerDashboard() {
                     primary={level.level}
                     secondary={
                       <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-                        <Chip label={level.pendingJobs} size="small" sx={{ bgcolor: '#f59e0b', color: 'white', fontSize: '0.7rem', height: 20 }} />
-                        <Chip label={level.completedJobs} size="small" sx={{ bgcolor: '#10b981', color: 'white', fontSize: '0.7rem', height: 20 }} />
-                        <Chip label={level.nonClearanceJobs} size="small" sx={{ bgcolor: '#ef4444', color: 'white', fontSize: '0.7rem', height: 20 }} />
+                        <Chip label={level.pendingJobs} size="small" sx={{ bgcolor: '#f59e0b', color: 'white', fontSize: '0.85rem', height: 24 }} />
+                        <Chip label={level.completedJobs} size="small" sx={{ bgcolor: '#10b981', color: 'white', fontSize: '0.85rem', height: 24 }} />
+                        <Chip label={level.nonClearanceJobs} size="small" sx={{ bgcolor: '#ef4444', color: 'white', fontSize: '0.85rem', height: 24 }} />
                       </Box>
                     }
                     secondaryTypographyProps={{ component: 'div' }}
-                    sx={{ '& .MuiListItemText-primary': { color: 'white', fontSize: '0.9rem' } }}
+                    sx={{ '& .MuiListItemText-primary': { color: 'white', fontSize: '1.1rem', fontWeight: 500 } }}
                   />
                 </ListItemButton>
               </ListItem>
@@ -255,9 +276,75 @@ export default function EngineerDashboard() {
             📊 Dashboard
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Project completion progress
+            Project overview and completion progress
           </Typography>
         </Paper>
+
+        {/* Status Cards */}
+        <Grid container spacing={3} sx={{ mb: 3 }}>
+          <Grid item xs={12} md={4}>
+            <Card sx={{ background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)', border: '2px solid #f59e0b' }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <HourglassEmpty sx={{ fontSize: 40, color: '#f59e0b', mr: 2 }} />
+                  <Box>
+                    <Typography variant="h4" fontWeight="bold" color="#f59e0b">
+                      {stats.pending.count}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Pending Jobs
+                    </Typography>
+                  </Box>
+                </Box>
+                <Typography variant="body2" color="text.secondary">
+                  {stats.pending.sqm.toFixed(2)} SQM | {stats.pending.elements} Elements
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <Card sx={{ background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)', border: '2px solid #10b981' }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <CheckCircle sx={{ fontSize: 40, color: '#10b981', mr: 2 }} />
+                  <Box>
+                    <Typography variant="h4" fontWeight="bold" color="#10b981">
+                      {stats.completed.count}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Completed Jobs
+                    </Typography>
+                  </Box>
+                </Box>
+                <Typography variant="body2" color="text.secondary">
+                  {stats.completed.sqm.toFixed(2)} SQM | {stats.completed.elements} Elements
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <Card sx={{ background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)', border: '2px solid #ef4444' }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <Cancel sx={{ fontSize: 40, color: '#ef4444', mr: 2 }} />
+                  <Box>
+                    <Typography variant="h4" fontWeight="bold" color="#ef4444">
+                      {stats.not_applicable.count}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Non Clearance
+                    </Typography>
+                  </Box>
+                </Box>
+                <Typography variant="body2" color="text.secondary">
+                  {stats.not_applicable.sqm.toFixed(2)} SQM | {stats.not_applicable.elements} Elements
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
 
         {/* Race Track Progress Bars */}
         <Grid container spacing={3}>
@@ -273,17 +360,17 @@ export default function EngineerDashboard() {
                         Jobs Completion
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {stats.completedJobs} of {stats.totalJobs} jobs completed
+                        {stats.completed.count} of {stats.totalJobs} jobs completed
                       </Typography>
                     </Box>
                   </Box>
                   <Typography variant="h4" fontWeight="bold" color="#10b981">
-                    {stats.totalJobs > 0 ? ((stats.completedJobs / stats.totalJobs) * 100).toFixed(1) : 0}%
+                    {stats.totalJobs > 0 ? ((stats.completed.count / stats.totalJobs) * 100).toFixed(1) : 0}%
                   </Typography>
                 </Box>
                 <LinearProgress
                   variant="determinate"
-                  value={stats.totalJobs > 0 ? (stats.completedJobs / stats.totalJobs) * 100 : 0}
+                  value={stats.totalJobs > 0 ? (stats.completed.count / stats.totalJobs) * 100 : 0}
                   sx={{
                     height: 20,
                     borderRadius: 10,
@@ -310,12 +397,12 @@ export default function EngineerDashboard() {
                         Elements Completion
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {stats.completedElements} of {stats.totalElements} elements completed
+                        {stats.completed.elements} of {stats.totalElements} elements completed
                       </Typography>
                     </Box>
                   </Box>
                   <Typography variant="h4" fontWeight="bold" color="#3b82f6">
-                    {stats.totalElements > 0 ? ((stats.completedElements / stats.totalElements) * 100).toFixed(1) : 0}%
+                    {stats.totalElements > 0 ? ((stats.completed.elements / stats.totalElements) * 100).toFixed(1) : 0}%
                   </Typography>
                 </Box>
                 <LinearProgress
@@ -347,17 +434,17 @@ export default function EngineerDashboard() {
                         SQM Completion
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {stats.completedSqm.toFixed(2)} of {stats.totalSqm.toFixed(2)} SQM completed
+                        {stats.completed.sqm.toFixed(2)} of {stats.totalSqm.toFixed(2)} SQM completed
                       </Typography>
                     </Box>
                   </Box>
                   <Typography variant="h4" fontWeight="bold" color="#f59e0b">
-                    {stats.totalSqm > 0 ? ((stats.completedSqm / stats.totalSqm) * 100).toFixed(1) : 0}%
+                    {stats.totalSqm > 0 ? ((stats.completed.sqm / stats.totalSqm) * 100).toFixed(1) : 0}%
                   </Typography>
                 </Box>
                 <LinearProgress
                   variant="determinate"
-                  value={stats.totalSqm > 0 ? (stats.completedSqm / stats.totalSqm) * 100 : 0}
+                  value={stats.totalSqm > 0 ? (stats.completed.sqm / stats.totalSqm) * 100 : 0}
                   sx={{
                     height: 20,
                     borderRadius: 10,
