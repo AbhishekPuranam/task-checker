@@ -279,7 +279,14 @@ export default function LevelDetailPage() {
         }
         
         const primaryKey = job.structuralElement?.[groupBy] || job[groupBy] || 'Other';
-        return primaryKey === groupKey;
+        const matches = primaryKey === groupKey;
+        
+        // Debug logging for first few jobs
+        if (fetchedJobs.indexOf(job) < 3) {
+          console.log(`Job ${job._id}: gridNo="${job.structuralElement?.gridNo}" vs groupKey="${groupKey}" -> ${matches}`);
+        }
+        
+        return matches;
       });
       
       console.log(`Filtered ${filteredJobs.length} jobs for group: ${groupKey}`);
