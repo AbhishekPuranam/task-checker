@@ -36,7 +36,7 @@ export default function EngineerJobsTable() {
   const [rowsPerPage, setRowsPerPage] = useState(50);
   
   // Filters
-  const [statusFilter, setStatusFilter] = useState('pending');
+  const [statusFilter, setStatusFilter] = useState('');
   const [jobTitleFilter, setJobTitleFilter] = useState('');
   const [gridFilter, setGridFilter] = useState('');
   const [levelFilter, setLevelFilter] = useState('');
@@ -61,10 +61,11 @@ export default function EngineerJobsTable() {
 
   const fetchProjects = async () => {
     try {
-      const response = await api.get('/projects/engineer');
-      setProjects(response.data || []);
-      if (response.data && response.data.length > 0) {
-        setSelectedProject(response.data[0]._id);
+      const response = await api.get('/projects');
+      const tasks = response.data.tasks || [];
+      setProjects(tasks);
+      if (tasks.length > 0) {
+        setSelectedProject(tasks[0]._id);
       }
     } catch (error) {
       console.error('Error fetching projects:', error);
@@ -98,16 +99,18 @@ export default function EngineerJobsTable() {
 
   const fetchFilterOptions = async () => {
     try {
+      const statusParam = statusFilter ? `&status=${statusFilter}` : '';
+      
       // Fetch unique job titles
-      const jobTitlesResponse = await api.get(`/jobs/engineer/groups?project=${selectedProject}&groupBy=jobTitle&status=${statusFilter}`);
+      const jobTitlesResponse = await api.get(`/jobs/engineer/groups?project=${selectedProject}&groupBy=jobTitle${statusParam}`);
       setJobTitles(jobTitlesResponse.data.groups || []);
       
       // Fetch unique grids
-      const gridsResponse = await api.get(`/jobs/engineer/groups?project=${selectedProject}&groupBy=gridNo&status=${statusFilter}`);
+      const gridsResponse = await api.get(`/jobs/engineer/groups?project=${selectedProject}&groupBy=gridNo${statusParam}`);
       setGrids(gridsResponse.data.groups || []);
       
       // Fetch unique levels
-      const levelsResponse = await api.get(`/jobs/engineer/groups?project=${selectedProject}&groupBy=level&status=${statusFilter}`);
+      const levelsResponse = await api.get(`/jobs/engineer/groups?project=${selectedProject}&groupBy=level${statusParam}`);
       setLevels(levelsResponse.data.groups || []);
     } catch (error) {
       console.error('Error fetching filter options:', error);
@@ -121,10 +124,10 @@ export default function EngineerJobsTable() {
       const params = new URLSearchParams({
         project: selectedProject,
         page: page + 1,
-        limit: rowsPerPage,
-        status: statusFilter === 'pending' ? '' : statusFilter
+        limit: rowsPerPage
       });
       
+      if (statusFilter) params.append('status', statusFilter);
       if (jobTitleFilter) params.append('jobTitle', jobTitleFilter);
       if (gridFilter) params.append('gridNo', gridFilter);
       if (levelFilter) params.append('level', levelFilter);
@@ -133,7 +136,7 @@ export default function EngineerJobsTable() {
       const response = await api.get(`/jobs/engineer/jobs?${params.toString()}`);
       
       setJobs(response.data.jobs || []);
-      setTotalJobs(response.data.total || 0);
+      setTotalJobs(response.data.pagination?.totalJobs || 0);
     } catch (error) {
       console.error('Error fetching jobs:', error);
       toast.error('Failed to fetch jobs');
