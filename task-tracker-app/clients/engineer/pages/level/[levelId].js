@@ -37,8 +37,8 @@ export default function LevelDetailPage() {
   const [updatingJob, setUpdatingJob] = useState(null);
   
   // Grouping state
-  const [activeTab, setActiveTab] = useState('');
-  const [groupBy, setGroupBy] = useState('gridNo');
+  const [activeTab, setActiveTab] = useState('pending');
+  const [groupBy, setGroupBy] = useState('jobTitle');
   const [subGroupBy, setSubGroupBy] = useState('');
   const [expandedGroups, setExpandedGroups] = useState({});
   const [groupMetrics, setGroupMetrics] = useState({});
@@ -594,6 +594,7 @@ export default function LevelDetailPage() {
                   onChange={(e) => setGroupBy(e.target.value)}
                   label="Group By"
                 >
+                  <MenuItem value="jobTitle">Job Title</MenuItem>
                   <MenuItem value="gridNo">Grid No</MenuItem>
                   <MenuItem value="partMarkNo">Part Mark</MenuItem>
                   <MenuItem value="lengthMm">Length (mm)</MenuItem>
@@ -613,6 +614,7 @@ export default function LevelDetailPage() {
                   label="Sub-Group By"
                 >
                   <MenuItem value="">None</MenuItem>
+                  <MenuItem value="jobTitle">Job Title</MenuItem>
                   <MenuItem value="gridNo">Grid No</MenuItem>
                   <MenuItem value="partMarkNo">Part Mark</MenuItem>
                   <MenuItem value="lengthMm">Length (mm)</MenuItem>
