@@ -1,21 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import {
   Container, Paper, Typography, Box, Grid, Card, CardContent,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TablePagination, TextField, Select, MenuItem, FormControl, InputLabel,
   Chip, CircularProgress, Button, Drawer, List, ListItem, ListItemButton, ListItemText,
-  IconButton, Divider, InputAdornment
+  IconButton, Divider, InputAdornment, Accordion, AccordionSummary, AccordionDetails, Tabs, Tab
 } from '@mui/material';
 import {
   HourglassEmpty, CheckCircle, Cancel, Search, Refresh, AccountCircle,
-  LogoutOutlined, Dashboard as DashboardIcon, ArrowBack
+  LogoutOutlined, Dashboard as DashboardIcon, ArrowBack, ExpandMore as ExpandMoreIcon,
+  LocalFireDepartment
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 
 const DRAWER_WIDTH = 280;
+
+const TABS = [
+  { id: '', label: 'All', color: '#3b82f6' },
+  { id: 'pending', label: 'Pending', color: '#f59e0b' },
+  { id: 'completed', label: 'Completed', color: '#10b981' },
+  { id: 'not_applicable', label: 'Non Clearance', color: '#ef4444' }
+];
 
 export default function LevelDetailPage() {
   const { user, logout } = useAuth();
@@ -29,22 +37,18 @@ export default function LevelDetailPage() {
   const [loading, setLoading] = useState(false);
   const [updatingJob, setUpdatingJob] = useState(null);
   
-  // Table data
-  const [jobs, setJobs] = useState([]);
-  const [totalJobs, setTotalJobs] = useState(0);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(50);
+  // Grouping state
+  const [activeTab, setActiveTab] = useState('');
+  const [groupBy, setGroupBy] = useState('gridNo');
+  const [subGroupBy, setSubGroupBy] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState({});
+  const [groupMetrics, setGroupMetrics] = useState({});
+  const [groupJobs, setGroupJobs] = useState({});
+  const [loadingGroups, setLoadingGroups] = useState({});
+  const [allJobsCache, setAllJobsCache] = useState({});
   
   // Filters
-  const [statusFilter, setStatusFilter] = useState('');
-  const [jobTitleFilter, setJobTitleFilter] = useState('');
-  const [gridFilter, setGridFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  
-  // Filter options
-  const [jobTitles, setJobTitles] = useState([]);
-  const [grids, setGrids] = useState([]);
   
   // Level search
   const [levelSearch, setLevelSearch] = useState('');
@@ -57,18 +61,16 @@ export default function LevelDetailPage() {
   }, [projectId]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+    setExpandedGroups({});
+    setGroupJobs({});
+    setGroupMetrics({});
+  }, [activeTab, groupBy, subGroupBy, searchTerm]);
 
   useEffect(() => {
     if (projectId && levelId) {
-      fetchFilterOptions();
-      fetchJobs();
+      fetchMetrics();
     }
-  }, [projectId, levelId, statusFilter, page, rowsPerPage, jobTitleFilter, gridFilter, debouncedSearchTerm]);
+  }, [projectId, levelId, activeTab, groupBy, subGroupBy, searchTerm]);
 
   const fetchProjects = async () => {
     try {
@@ -89,46 +91,229 @@ export default function LevelDetailPage() {
     }
   };
 
-  const fetchFilterOptions = async () => {
-    try {
-      const statusParam = statusFilter ? `&status=${statusFilter}` : '';
-      
-      const jobTitlesResponse = await api.get(`/jobs/engineer/groups?project=${projectId}&groupBy=jobTitle${statusParam}`);
-      setJobTitles(jobTitlesResponse.data.groups || []);
-      
-      const gridsResponse = await api.get(`/jobs/engineer/groups?project=${projectId}&groupBy=gridNo${statusParam}`);
-      setGrids(gridsResponse.data.groups || []);
-    } catch (error) {
-      console.error('Error fetching filter options:', error);
-    }
-  };
-
-  const fetchJobs = async () => {
+  const fetchMetrics = useCallback(async () => {
+    if (!projectId || !levelId) return;
+    
     try {
       setLoading(true);
       
-      const params = new URLSearchParams({
-        project: projectId,
-        page: page + 1,
-        limit: rowsPerPage,
-        level: decodeURIComponent(levelId)
-      });
+      const statusForCurrentTab = activeTab || '';
       
-      if (statusFilter) params.append('status', statusFilter);
-      if (jobTitleFilter) params.append('jobTitle', jobTitleFilter);
-      if (gridFilter) params.append('gridNo', gridFilter);
-      if (debouncedSearchTerm) params.append('search', debouncedSearchTerm);
+      try {
+        const groupsResponse = await api.get(`/jobs/engineer/groups?project=${projectId}&level=${decodeURIComponent(levelId)}${statusForCurrentTab ? `&status=${statusForCurrentTab}` : ''}&groupBy=${groupBy}${subGroupBy ? `&subGroupBy=${subGroupBy}` : ''}`);
+        const groupsData = groupsResponse.data;
+        
+        console.log(`📂 Fetched ${groupsData.groups.length} unique groups for ${groupBy}`);
+        
+        const metrics = {};
+        groupsData.groups.forEach(groupName => {
+          metrics[groupName] = {
+            count: 0,
+            jobCount: 0,
+            sqm: 0,
+            qty: 0,
+            subGroups: {}
+          };
+          
+          if (subGroupBy && groupsData.subGroups[groupName]) {
+            groupsData.subGroups[groupName].forEach(subGroupName => {
+              metrics[groupName].subGroups[subGroupName] = {
+                count: 0,
+                jobCount: 0,
+                sqm: 0,
+                qty: 0
+              };
+            });
+          }
+        });
+        
+        setGroupMetrics(metrics);
+        console.log('Group structure created. Job data will be fetched on accordion expansion.');
+      } catch (error) {
+        console.error('Error fetching groups:', error);
+        setGroupMetrics({});
+      }
       
-      const response = await api.get(`/jobs/engineer/jobs?${params.toString()}`);
-      
-      const jobsData = response.data.jobs || [];
-      setJobs(jobsData);
-      setTotalJobs(response.data.pagination?.totalJobs || 0);
     } catch (error) {
-      console.error('Error fetching jobs:', error);
-      toast.error('Failed to fetch jobs');
+      console.error('Error fetching metrics:', error);
+      toast.error('Failed to fetch metrics');
     } finally {
       setLoading(false);
+    }
+  }, [projectId, levelId, activeTab, groupBy, subGroupBy, searchTerm]);
+
+  const calculateGroupMetrics = (jobsData) => {
+    const metrics = {};
+    const groupElements = {};
+    const subGroupElements = {};
+    const groupJobCounts = {};
+    const subGroupJobCounts = {};
+    
+    jobsData.forEach(job => {
+      const jobStatus = !job.status || job.status === 'in_progress' ? 'pending' : job.status;
+      
+      if (activeTab && jobStatus !== activeTab) return;
+      
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const matches = 
+          job.jobTitle?.toLowerCase().includes(searchLower) ||
+          job.structuralElement?.structureNumber?.toLowerCase().includes(searchLower) ||
+          job.structuralElement?.gridNo?.toLowerCase().includes(searchLower) ||
+          job.structuralElement?.partMarkNo?.toLowerCase().includes(searchLower) ||
+          job.structuralElement?.level?.toLowerCase().includes(searchLower);
+        
+        if (!matches) return;
+      }
+      
+      const primaryKey = job.structuralElement?.[groupBy] || job[groupBy] || 'Other';
+      
+      if (!metrics[primaryKey]) {
+        metrics[primaryKey] = { count: 0, jobCount: 0, sqm: 0, qty: 0, subGroups: {} };
+        groupElements[primaryKey] = new Set();
+        groupJobCounts[primaryKey] = 0;
+        subGroupElements[primaryKey] = {};
+        subGroupJobCounts[primaryKey] = {};
+      }
+      
+      groupJobCounts[primaryKey]++;
+      
+      const elementId = job.structuralElement?._id?.toString();
+      if (elementId) {
+        if (!groupElements[primaryKey].has(elementId)) {
+          groupElements[primaryKey].add(elementId);
+          metrics[primaryKey].sqm += job.structuralElement?.surfaceAreaSqm || 0;
+          metrics[primaryKey].qty += job.structuralElement?.qty || 0;
+        }
+      }
+      
+      if (subGroupBy) {
+        const secondaryKey = job[subGroupBy] || job.structuralElement?.[subGroupBy] || 'Other';
+        if (!metrics[primaryKey].subGroups[secondaryKey]) {
+          metrics[primaryKey].subGroups[secondaryKey] = { count: 0, jobCount: 0, sqm: 0, qty: 0 };
+          subGroupElements[primaryKey][secondaryKey] = new Set();
+          subGroupJobCounts[primaryKey][secondaryKey] = 0;
+        }
+        
+        subGroupJobCounts[primaryKey][secondaryKey]++;
+        
+        if (elementId && !subGroupElements[primaryKey][secondaryKey].has(elementId)) {
+          subGroupElements[primaryKey][secondaryKey].add(elementId);
+          metrics[primaryKey].subGroups[secondaryKey].sqm += job.structuralElement?.surfaceAreaSqm || 0;
+          metrics[primaryKey].subGroups[secondaryKey].qty += job.structuralElement?.qty || 0;
+        }
+      }
+    });
+    
+    Object.keys(metrics).forEach(primaryKey => {
+      metrics[primaryKey].count = groupElements[primaryKey].size;
+      metrics[primaryKey].jobCount = groupJobCounts[primaryKey];
+      
+      if (subGroupBy) {
+        Object.keys(metrics[primaryKey].subGroups).forEach(secondaryKey => {
+          metrics[primaryKey].subGroups[secondaryKey].count = subGroupElements[primaryKey][secondaryKey].size;
+          metrics[primaryKey].subGroups[secondaryKey].jobCount = subGroupJobCounts[primaryKey][secondaryKey];
+        });
+      }
+    });
+    
+    return metrics;
+  };
+
+  const fetchGroupJobs = useCallback(async (groupKey) => {
+    if (groupJobs[groupKey]) return;
+    
+    try {
+      setLoadingGroups(prev => ({ ...prev, [groupKey]: true }));
+      console.log('Fetching jobs for group:', groupKey);
+      
+      let fetchedJobs = allJobsCache[activeTab];
+      
+      if (!fetchedJobs) {
+        let allFetchedJobs = [];
+        let currentPage = 1;
+        const pageSize = 500;
+        let hasMore = true;
+        
+        while (hasMore) {
+          const statusParam = activeTab ? `&status=${activeTab}` : '';
+          const response = await api.get(`/jobs/engineer/jobs?project=${projectId}&level=${decodeURIComponent(levelId)}${statusParam}&page=${currentPage}&limit=${pageSize}`);
+          const jobs = response.data.jobs || [];
+          allFetchedJobs = allFetchedJobs.concat(jobs);
+          
+          console.log(`Fetched page ${currentPage}: ${jobs.length} jobs`);
+          
+          if (jobs.length < pageSize) {
+            hasMore = false;
+          } else {
+            currentPage++;
+          }
+          
+          if (currentPage > 20) {
+            console.warn('Reached maximum page limit');
+            hasMore = false;
+          }
+        }
+        
+        console.log(`Total jobs fetched for ${activeTab || 'all'}: ${allFetchedJobs.length}`);
+        setAllJobsCache(prev => ({ ...prev, [activeTab]: allFetchedJobs }));
+        fetchedJobs = allFetchedJobs;
+      }
+      
+      const filteredJobs = fetchedJobs.filter(job => {
+        if (searchTerm) {
+          const searchLower = searchTerm.toLowerCase();
+          const matches = 
+            job.jobTitle?.toLowerCase().includes(searchLower) ||
+            job.structuralElement?.structureNumber?.toLowerCase().includes(searchLower) ||
+            job.structuralElement?.gridNo?.toLowerCase().includes(searchLower) ||
+            job.structuralElement?.partMarkNo?.toLowerCase().includes(searchLower) ||
+            job.structuralElement?.level?.toLowerCase().includes(searchLower);
+          
+          if (!matches) return false;
+        }
+        
+        const primaryKey = job.structuralElement?.[groupBy] || job[groupBy] || 'Other';
+        return primaryKey === groupKey;
+      });
+      
+      let groupedData;
+      if (subGroupBy) {
+        groupedData = {};
+        filteredJobs.forEach(job => {
+          const secondaryKey = job[subGroupBy] || job.structuralElement?.[subGroupBy] || 'Other';
+          if (!groupedData[secondaryKey]) {
+            groupedData[secondaryKey] = [];
+          }
+          groupedData[secondaryKey].push(job);
+        });
+      } else {
+        groupedData = { jobs: filteredJobs };
+      }
+      
+      setGroupJobs(prev => ({
+        ...prev,
+        [groupKey]: groupedData
+      }));
+      
+    } catch (error) {
+      console.error('Error fetching group jobs:', error);
+      toast.error('Failed to load jobs for this group');
+    } finally {
+      setLoadingGroups(prev => ({ ...prev, [groupKey]: false }));
+    }
+  }, [activeTab, groupBy, subGroupBy, searchTerm, projectId, levelId, groupJobs, allJobsCache]);
+
+  const toggleGroup = (groupKey) => {
+    const isExpanded = expandedGroups[groupKey] || false;
+    
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupKey]: !isExpanded
+    }));
+    
+    if (!isExpanded && !groupJobs[groupKey]) {
+      fetchGroupJobs(groupKey);
     }
   };
 
@@ -137,7 +322,10 @@ export default function LevelDetailPage() {
       setUpdatingJob(jobId);
       await api.patch(`/jobs/engineer/${jobId}/status`, { status: newStatus });
       toast.success('Status updated successfully!');
-      fetchJobs();
+      
+      setAllJobsCache({});
+      setGroupJobs({});
+      fetchMetrics();
     } catch (error) {
       console.error('Error updating status:', error);
       toast.error('Failed to update status');
@@ -146,11 +334,14 @@ export default function LevelDetailPage() {
     }
   };
 
-  const clearFilters = () => {
-    setJobTitleFilter('');
-    setGridFilter('');
-    setSearchTerm('');
-    setPage(0);
+  const getFireProofingLabel = (workflow) => {
+    const labels = {
+      'spray': '🔴 Spray',
+      'wrap': '🟡 Wrap',
+      'intumescent': '🔵 Intumescent',
+      'board': '🟢 Board'
+    };
+    return labels[workflow] || workflow;
   };
 
   const filteredLevels = levels.filter(level => 
@@ -280,13 +471,13 @@ export default function LevelDetailPage() {
                   primary={level.level}
                   secondary={
                     <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-                      <Chip label={level.pendingJobs} size="small" sx={{ bgcolor: '#f59e0b', color: 'white', fontSize: '0.7rem', height: 20 }} />
-                      <Chip label={level.completedJobs} size="small" sx={{ bgcolor: '#10b981', color: 'white', fontSize: '0.7rem', height: 20 }} />
-                      <Chip label={level.nonClearanceJobs} size="small" sx={{ bgcolor: '#ef4444', color: 'white', fontSize: '0.7rem', height: 20 }} />
+                      <Chip label={level.pendingJobs} size="small" sx={{ bgcolor: '#f59e0b', color: 'white', fontSize: '0.85rem', height: 24 }} />
+                      <Chip label={level.completedJobs} size="small" sx={{ bgcolor: '#10b981', color: 'white', fontSize: '0.85rem', height: 24 }} />
+                      <Chip label={level.nonClearanceJobs} size="small" sx={{ bgcolor: '#ef4444', color: 'white', fontSize: '0.85rem', height: 24 }} />
                     </Box>
                   }
                   secondaryTypographyProps={{ component: 'div' }}
-                  sx={{ '& .MuiListItemText-primary': { color: 'white', fontSize: '0.9rem' } }}
+                  sx={{ '& .MuiListItemText-primary': { color: 'white', fontSize: '1.1rem', fontWeight: 500 } }}
                 />
               </ListItemButton>
             </ListItem>
@@ -327,215 +518,394 @@ export default function LevelDetailPage() {
           </Typography>
         </Paper>
 
-        {/* Filters */}
+        {/* Tabs */}
+        <Paper elevation={3} sx={{ mb: 2, borderRadius: 2 }}>
+          <Tabs
+            value={activeTab}
+            onChange={(e, newValue) => setActiveTab(newValue)}
+            sx={{
+              '& .MuiTab-root': { textTransform: 'none', fontWeight: 600 },
+              borderBottom: '1px solid #e0e0e0'
+            }}
+          >
+            {TABS.map(tab => (
+              <Tab key={tab.id} label={tab.label} value={tab.id} />
+            ))}
+          </Tabs>
+        </Paper>
+
+        {/* Search and Grouping Controls */}
         <Paper elevation={3} sx={{ p: 3, mb: 2, borderRadius: 2 }}>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Job Title</InputLabel>
-                <Select
-                  value={jobTitleFilter}
-                  onChange={(e) => {
-                    setJobTitleFilter(e.target.value);
-                    setPage(0);
-                  }}
-                  label="Job Title"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  {jobTitles.map((title) => (
-                    <MenuItem key={title} value={title}>{title}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Grid</InputLabel>
-                <Select
-                  value={gridFilter}
-                  onChange={(e) => {
-                    setGridFilter(e.target.value);
-                    setPage(0);
-                  }}
-                  label="Grid"
-                >
-                  <MenuItem value="">All</MenuItem>
-                  {grids.map((grid) => (
-                    <MenuItem key={grid} value={grid}>{grid}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12} md={4}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                size="small"
-                placeholder="Search..."
+                placeholder="Search jobs..."
                 value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setPage(0);
-                }}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 InputProps={{
-                  startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search />
+                    </InputAdornment>
+                  )
                 }}
               />
             </Grid>
 
-            <Grid item xs={12} md={2}>
-              <Button
-                fullWidth
-                variant="outlined"
-                onClick={clearFilters}
-                startIcon={<Refresh />}
-              >
-                Clear
-              </Button>
+            <Grid item xs={12} md={3}>
+              <FormControl fullWidth>
+                <InputLabel>Group By</InputLabel>
+                <Select
+                  value={groupBy}
+                  onChange={(e) => setGroupBy(e.target.value)}
+                  label="Group By"
+                >
+                  <MenuItem value="gridNo">Grid No</MenuItem>
+                  <MenuItem value="partMarkNo">Part Mark</MenuItem>
+                  <MenuItem value="lengthMm">Length (mm)</MenuItem>
+                  <MenuItem value="surfaceAreaSqm">SQM</MenuItem>
+                  <MenuItem value="fpThicknessMm">FP Thickness</MenuItem>
+                  <MenuItem value="fireProofingWorkflow">FP Workflow</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12} md={3}>
+              <FormControl fullWidth>
+                <InputLabel>Sub-Group By</InputLabel>
+                <Select
+                  value={subGroupBy}
+                  onChange={(e) => setSubGroupBy(e.target.value)}
+                  label="Sub-Group By"
+                >
+                  <MenuItem value="">None</MenuItem>
+                  <MenuItem value="gridNo">Grid No</MenuItem>
+                  <MenuItem value="partMarkNo">Part Mark</MenuItem>
+                  <MenuItem value="lengthMm">Length (mm)</MenuItem>
+                  <MenuItem value="surfaceAreaSqm">SQM</MenuItem>
+                  <MenuItem value="fpThicknessMm">FP Thickness</MenuItem>
+                  <MenuItem value="fireProofingWorkflow">FP Workflow</MenuItem>
+                </Select>
+              </FormControl>
             </Grid>
           </Grid>
         </Paper>
 
-        {/* Jobs Table */}
-        <Paper elevation={3} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-          <TableContainer sx={{ maxHeight: 600 }}>
-            <Table stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Job Title</TableCell>
-                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Grid</TableCell>
-                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Part Mark</TableCell>
-                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Length</TableCell>
-                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>SQM</TableCell>
-                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Qty</TableCell>
-                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>FP Thickness</TableCell>
-                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>FP Workflow</TableCell>
-                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Status</TableCell>
-                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold', textAlign: 'center' }}>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
-                      <CircularProgress />
-                      <Typography sx={{ mt: 2 }}>Loading jobs...</Typography>
-                    </TableCell>
-                  </TableRow>
-                ) : jobs.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
-                      <Typography color="text.secondary">No jobs found</Typography>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  jobs.map((job) => (
-                    <TableRow
-                      key={job._id}
-                      sx={{
-                        '&:hover': { bgcolor: 'action.hover' },
-                        '&:nth-of-type(odd)': { bgcolor: 'grey.50' }
-                      }}
-                    >
-                      <TableCell>
-                        <Typography variant="body2" fontWeight="600">
-                          {job.jobTitle}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>{job.structuralElement?.gridNo || 'N/A'}</TableCell>
-                      <TableCell>{job.structuralElement?.partMarkNo || 'N/A'}</TableCell>
-                      <TableCell>{job.structuralElement?.lengthMm ? `${job.structuralElement.lengthMm} mm` : 'N/A'}</TableCell>
-                      <TableCell>{job.structuralElement?.surfaceAreaSqm?.toFixed(2) || '0.00'}</TableCell>
-                      <TableCell>{job.structuralElement?.qty || 'N/A'}</TableCell>
-                      <TableCell>{job.structuralElement?.fireproofingThickness ? `${job.structuralElement.fireproofingThickness} mm` : 'N/A'}</TableCell>
-                      <TableCell>{job.structuralElement?.fireProofingWorkflow || 'N/A'}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={job.status === 'not_applicable' ? 'Non Clearance' : job.status || 'pending'}
-                          size="small"
-                          sx={{
-                            bgcolor: getStatusColor(job.status || 'pending'),
-                            color: 'white',
-                            fontWeight: 'bold'
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', gap: 1, flexDirection: 'column' }}>
-                          <Button
-                            size="small"
-                            fullWidth
-                            variant={job.status === 'pending' ? 'contained' : 'outlined'}
-                            onClick={() => handleStatusUpdate(job._id, 'pending')}
-                            disabled={updatingJob === job._id}
-                            sx={{
-                              bgcolor: job.status === 'pending' ? '#f59e0b' : 'transparent',
-                              color: job.status === 'pending' ? 'white' : '#f59e0b',
-                              borderColor: '#f59e0b',
-                              '&:hover': { bgcolor: '#f59e0b', color: 'white' },
-                              textTransform: 'none',
-                              fontSize: '0.75rem'
-                            }}
-                          >
-                            Pending
-                          </Button>
-                          <Button
-                            size="small"
-                            fullWidth
-                            variant={job.status === 'completed' ? 'contained' : 'outlined'}
-                            onClick={() => handleStatusUpdate(job._id, 'completed')}
-                            disabled={updatingJob === job._id}
-                            sx={{
-                              bgcolor: job.status === 'completed' ? '#10b981' : 'transparent',
-                              color: job.status === 'completed' ? 'white' : '#10b981',
-                              borderColor: '#10b981',
-                              '&:hover': { bgcolor: '#10b981', color: 'white' },
-                              textTransform: 'none',
-                              fontSize: '0.75rem'
-                            }}
-                          >
-                            Complete
-                          </Button>
-                          <Button
-                            size="small"
-                            fullWidth
-                            variant={job.status === 'not_applicable' ? 'contained' : 'outlined'}
-                            onClick={() => handleStatusUpdate(job._id, 'not_applicable')}
-                            disabled={updatingJob === job._id}
-                            sx={{
-                              bgcolor: job.status === 'not_applicable' ? '#ef4444' : 'transparent',
-                              color: job.status === 'not_applicable' ? 'white' : '#ef4444',
-                              borderColor: '#ef4444',
-                              '&:hover': { bgcolor: '#ef4444', color: 'white' },
-                              textTransform: 'none',
-                              fontSize: '0.75rem'
-                            }}
-                          >
-                            Non Clearance
-                          </Button>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+        {/* Grouped Jobs Display */}
+        <Paper elevation={3} sx={{ borderRadius: 3, bgcolor: 'white', overflow: 'hidden' }}>
+          {loading ? (
+            <Box sx={{ p: 4, textAlign: 'center' }}>
+              <CircularProgress />
+              <Typography sx={{ mt: 2 }}>Loading groups...</Typography>
+            </Box>
+          ) : (
+            <Box>
+              {Object.keys(groupMetrics).length === 0 ? (
+                <Box sx={{ p: 4, textAlign: 'center' }}>
+                  <Typography variant="h6" color="text.secondary">
+                    No jobs found for {TABS.find(t => t.id === activeTab)?.label || 'this level'}
+                  </Typography>
+                </Box>
+              ) : (
+                <Box>
+                  {Object.keys(groupMetrics).sort().map(groupKey => {
+                    const metrics = groupMetrics[groupKey] || { count: 0, sqm: 0, subGroups: {} };
+                    const group = groupJobs[groupKey];
+                    const isExpanded = expandedGroups[groupKey] || false;
+                    const isLoading = loadingGroups[groupKey] || false;
 
-          <TablePagination
-            component="div"
-            count={totalJobs}
-            page={page}
-            onPageChange={(e, newPage) => setPage(newPage)}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={(e) => {
-              setRowsPerPage(parseInt(e.target.value, 10));
-              setPage(0);
-            }}
-            rowsPerPageOptions={[25, 50, 100]}
-            sx={{ borderTop: '1px solid #e0e0e0' }}
-          />
+                    return (
+                      <Accordion
+                        key={groupKey}
+                        expanded={isExpanded}
+                        onChange={() => toggleGroup(groupKey)}
+                        sx={{ 
+                          mb: 2,
+                          border: '1px solid #e0e0e0', 
+                          borderRadius: '12px !important',
+                          overflow: 'hidden',
+                          '&:before': { display: 'none' },
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                        }}
+                      >
+                        <AccordionSummary 
+                          expandIcon={<ExpandMoreIcon />}
+                          sx={{ 
+                            py: 1.5,
+                            px: 2,
+                            minHeight: '56px !important',
+                            background: 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)',
+                            '&:hover': { background: 'linear-gradient(135deg, #f5f5f5 0%, #eeeeee 100%)' },
+                            '& .MuiAccordionSummary-content': {
+                              margin: '8px 0 !important'
+                            }
+                          }}
+                        >
+                          <Typography variant="h6" fontWeight="700" sx={{ color: '#333' }}>
+                            {groupKey}
+                          </Typography>
+                        </AccordionSummary>
+                        <AccordionDetails
+                          sx={{
+                            p: 3,
+                            bgcolor: '#fafafa'
+                          }}
+                        >
+                          {isLoading ? (
+                            <Box sx={{ p: 2, textAlign: 'center' }}>
+                              <CircularProgress size={24} />
+                              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                Loading jobs...
+                              </Typography>
+                            </Box>
+                          ) : !group ? (
+                            <Box sx={{ p: 2, textAlign: 'center' }}>
+                              <Typography color="text.secondary">No data loaded</Typography>
+                            </Box>
+                          ) : Object.keys(group).length === 0 || (group.jobs && group.jobs.length === 0) ? (
+                            <Box sx={{ p: 2, textAlign: 'center' }}>
+                              <Typography color="text.secondary">No jobs found in this group</Typography>
+                            </Box>
+                          ) : subGroupBy && Object.keys(metrics.subGroups || {}).length > 0 ? (
+                            Object.keys(metrics.subGroups).sort().map(subGroupKey => {
+                              const subGroupMetrics = metrics.subGroups[subGroupKey] || { count: 0, jobCount: 0, sqm: 0 };
+                              const subGroupJobsList = group[subGroupKey] || [];
+                              if (!Array.isArray(subGroupJobsList)) return null;
+
+                              return (
+                                <Accordion key={subGroupKey} sx={{ mb: 2, boxShadow: 1 }}>
+                                  <AccordionSummary 
+                                    expandIcon={<ExpandMoreIcon />}
+                                    sx={{ 
+                                      bgcolor: '#f8f9fa',
+                                      '&:hover': { bgcolor: '#e9ecef' }
+                                    }}
+                                  >
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                                      <LocalFireDepartment sx={{ color: '#ff6b35' }} />
+                                      <Typography variant="subtitle1" fontWeight="600" sx={{ color: '#666', flexGrow: 1 }}>
+                                        {getFireProofingLabel(subGroupKey)}
+                                      </Typography>
+                                      <Chip 
+                                        label={`${subGroupMetrics.jobCount || 0} Jobs • ${subGroupMetrics.count || 0} Elements (${(subGroupMetrics.sqm || 0).toFixed(2)} SQM)`} 
+                                        size="small" 
+                                        sx={{ bgcolor: '#e3f2fd', color: '#1976d2' }}
+                                      />
+                                    </Box>
+                                  </AccordionSummary>
+                                  <AccordionDetails sx={{ p: 2 }}>
+                                  
+                                  <TableContainer component={Paper} variant="outlined">
+                                    <Table size="small">
+                                      <TableHead>
+                                        <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                                          <TableCell sx={{ fontWeight: 'bold' }}>Job Title</TableCell>
+                                          <TableCell sx={{ fontWeight: 'bold' }}>Grid</TableCell>
+                                          <TableCell sx={{ fontWeight: 'bold' }}>Part Mark</TableCell>
+                                          <TableCell sx={{ fontWeight: 'bold' }}>Length</TableCell>
+                                          <TableCell sx={{ fontWeight: 'bold' }}>SQM</TableCell>
+                                          <TableCell sx={{ fontWeight: 'bold' }}>Qty</TableCell>
+                                          <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Status</TableCell>
+                                          <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Actions</TableCell>
+                                        </TableRow>
+                                      </TableHead>
+                                      <TableBody>
+                                        {subGroupJobsList.map((job) => (
+                                          <TableRow key={job._id} sx={{ '&:hover': { bgcolor: '#f8f9fa' } }}>
+                                            <TableCell>{job.jobTitle}</TableCell>
+                                            <TableCell>{job.structuralElement?.gridNo || 'N/A'}</TableCell>
+                                            <TableCell>{job.structuralElement?.partMarkNo || 'N/A'}</TableCell>
+                                            <TableCell>{job.structuralElement?.lengthMm ? `${job.structuralElement.lengthMm} mm` : 'N/A'}</TableCell>
+                                            <TableCell>{job.structuralElement?.surfaceAreaSqm?.toFixed(2) || '0.00'}</TableCell>
+                                            <TableCell>{job.structuralElement?.qty || 'N/A'}</TableCell>
+                                            <TableCell align="center">
+                                              <Chip
+                                                label={job.status === 'not_applicable' ? 'NC' : job.status || 'pending'}
+                                                size="small"
+                                                sx={{
+                                                  bgcolor: job.status === 'pending' ? '#f59e0b' : job.status === 'completed' ? '#10b981' : '#ef4444',
+                                                  color: 'white',
+                                                  fontWeight: 'bold',
+                                                  fontSize: '0.7rem'
+                                                }}
+                                              />
+                                            </TableCell>
+                                            <TableCell>
+                                              <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                                                <Button
+                                                  size="small"
+                                                  variant={job.status === 'pending' ? 'contained' : 'outlined'}
+                                                  onClick={() => handleStatusUpdate(job._id, 'pending')}
+                                                  disabled={updatingJob === job._id}
+                                                  sx={{
+                                                    minWidth: '60px',
+                                                    bgcolor: job.status === 'pending' ? '#f59e0b' : 'transparent',
+                                                    color: job.status === 'pending' ? 'white' : '#f59e0b',
+                                                    borderColor: '#f59e0b',
+                                                    '&:hover': { bgcolor: '#f59e0b', color: 'white' },
+                                                    textTransform: 'none',
+                                                    fontSize: '0.7rem',
+                                                    py: 0.5
+                                                  }}
+                                                >
+                                                  P
+                                                </Button>
+                                                <Button
+                                                  size="small"
+                                                  variant={job.status === 'completed' ? 'contained' : 'outlined'}
+                                                  onClick={() => handleStatusUpdate(job._id, 'completed')}
+                                                  disabled={updatingJob === job._id}
+                                                  sx={{
+                                                    minWidth: '60px',
+                                                    bgcolor: job.status === 'completed' ? '#10b981' : 'transparent',
+                                                    color: job.status === 'completed' ? 'white' : '#10b981',
+                                                    borderColor: '#10b981',
+                                                    '&:hover': { bgcolor: '#10b981', color: 'white' },
+                                                    textTransform: 'none',
+                                                    fontSize: '0.7rem',
+                                                    py: 0.5
+                                                  }}
+                                                >
+                                                  C
+                                                </Button>
+                                                <Button
+                                                  size="small"
+                                                  variant={job.status === 'not_applicable' ? 'contained' : 'outlined'}
+                                                  onClick={() => handleStatusUpdate(job._id, 'not_applicable')}
+                                                  disabled={updatingJob === job._id}
+                                                  sx={{
+                                                    minWidth: '60px',
+                                                    bgcolor: job.status === 'not_applicable' ? '#ef4444' : 'transparent',
+                                                    color: job.status === 'not_applicable' ? 'white' : '#ef4444',
+                                                    borderColor: '#ef4444',
+                                                    '&:hover': { bgcolor: '#ef4444', color: 'white' },
+                                                    textTransform: 'none',
+                                                    fontSize: '0.7rem',
+                                                    py: 0.5
+                                                  }}
+                                                >
+                                                  NC
+                                                </Button>
+                                              </Box>
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </TableContainer>
+                                  </AccordionDetails>
+                                </Accordion>
+                              );
+                            })
+                          ) : (
+                            <TableContainer component={Paper} variant="outlined">
+                              <Table size="small">
+                                <TableHead>
+                                  <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>Job Title</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>Grid</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>Part Mark</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>Length</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>SQM</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>Qty</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Status</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Actions</TableCell>
+                                  </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                  {(group.jobs || []).map((job) => (
+                                    <TableRow key={job._id} sx={{ '&:hover': { bgcolor: '#f8f9fa' } }}>
+                                      <TableCell>{job.jobTitle}</TableCell>
+                                      <TableCell>{job.structuralElement?.gridNo || 'N/A'}</TableCell>
+                                      <TableCell>{job.structuralElement?.partMarkNo || 'N/A'}</TableCell>
+                                      <TableCell>{job.structuralElement?.lengthMm ? `${job.structuralElement.lengthMm} mm` : 'N/A'}</TableCell>
+                                      <TableCell>{job.structuralElement?.surfaceAreaSqm?.toFixed(2) || '0.00'}</TableCell>
+                                      <TableCell>{job.structuralElement?.qty || 'N/A'}</TableCell>
+                                      <TableCell align="center">
+                                        <Chip
+                                          label={job.status === 'not_applicable' ? 'NC' : job.status || 'pending'}
+                                          size="small"
+                                          sx={{
+                                            bgcolor: job.status === 'pending' ? '#f59e0b' : job.status === 'completed' ? '#10b981' : '#ef4444',
+                                            color: 'white',
+                                            fontWeight: 'bold',
+                                            fontSize: '0.7rem'
+                                          }}
+                                        />
+                                      </TableCell>
+                                      <TableCell>
+                                        <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                                          <Button
+                                            size="small"
+                                            variant={job.status === 'pending' ? 'contained' : 'outlined'}
+                                            onClick={() => handleStatusUpdate(job._id, 'pending')}
+                                            disabled={updatingJob === job._id}
+                                            sx={{
+                                              minWidth: '60px',
+                                              bgcolor: job.status === 'pending' ? '#f59e0b' : 'transparent',
+                                              color: job.status === 'pending' ? 'white' : '#f59e0b',
+                                              borderColor: '#f59e0b',
+                                              '&:hover': { bgcolor: '#f59e0b', color: 'white' },
+                                              textTransform: 'none',
+                                              fontSize: '0.7rem',
+                                              py: 0.5
+                                            }}
+                                          >
+                                            P
+                                          </Button>
+                                          <Button
+                                            size="small"
+                                            variant={job.status === 'completed' ? 'contained' : 'outlined'}
+                                            onClick={() => handleStatusUpdate(job._id, 'completed')}
+                                            disabled={updatingJob === job._id}
+                                            sx={{
+                                              minWidth: '60px',
+                                              bgcolor: job.status === 'completed' ? '#10b981' : 'transparent',
+                                              color: job.status === 'completed' ? 'white' : '#10b981',
+                                              borderColor: '#10b981',
+                                              '&:hover': { bgcolor: '#10b981', color: 'white' },
+                                              textTransform: 'none',
+                                              fontSize: '0.7rem',
+                                              py: 0.5
+                                            }}
+                                          >
+                                            C
+                                          </Button>
+                                          <Button
+                                            size="small"
+                                            variant={job.status === 'not_applicable' ? 'contained' : 'outlined'}
+                                            onClick={() => handleStatusUpdate(job._id, 'not_applicable')}
+                                            disabled={updatingJob === job._id}
+                                            sx={{
+                                              minWidth: '60px',
+                                              bgcolor: job.status === 'not_applicable' ? '#ef4444' : 'transparent',
+                                              color: job.status === 'not_applicable' ? 'white' : '#ef4444',
+                                              borderColor: '#ef4444',
+                                              '&:hover': { bgcolor: '#ef4444', color: 'white' },
+                                              textTransform: 'none',
+                                              fontSize: '0.7rem',
+                                              py: 0.5
+                                            }}
+                                          >
+                                            NC
+                                          </Button>
+                                        </Box>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </TableContainer>
+                          )}
+                        </AccordionDetails>
+                      </Accordion>
+                    );
+                  })}
+                </Box>
+              )}
+            </Box>
+          )}
         </Paper>
       </Box>
     </Box>
