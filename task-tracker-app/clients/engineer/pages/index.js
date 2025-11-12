@@ -64,8 +64,8 @@ export default function EngineerDashboard() {
   const [updatingJob, setUpdatingJob] = useState(null);
   const [activeTab, setActiveTab] = useState('pending');
   const [searchTerm, setSearchTerm] = useState('');
-  const [groupBy, setGroupBy] = useState('gridNo');
-  const [subGroupBy, setSubGroupBy] = useState('fireProofingWorkflow');
+  const [groupBy, setGroupBy] = useState('jobTitle'); // Default to jobTitle (job names)
+  const [subGroupBy, setSubGroupBy] = useState('');
   const [expandedGroups, setExpandedGroups] = useState({});
   const [groupMetrics, setGroupMetrics] = useState({}); // Store count/metrics per group
   const [groupJobs, setGroupJobs] = useState({}); // Store actual jobs per group (lazy loaded)

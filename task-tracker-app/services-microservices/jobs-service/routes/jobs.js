@@ -1559,6 +1559,7 @@ router.get('/engineer/groups', auth, cacheMiddleware(300, engineerGroupsCacheKey
     // Only query the specific field we need for groupBy
     const fieldMap = {
       'fireProofingType': null, // This comes from jobs, handle separately
+      'jobTitle': null, // This comes from jobs, handle separately
       'level': 'level',
       'gridNo': 'gridNo',
       'memberType': 'memberType'
@@ -1575,8 +1576,8 @@ router.get('/engineer/groups', auth, cacheMiddleware(300, engineerGroupsCacheKey
       });
       groups = uniqueValues.filter(v => v != null).sort();
       console.log(`✅ Found ${groups.length} unique ${groupBy} values from structural elements`);
-    } else if (groupBy === 'fireProofingType') {
-      // For fireProofingType, we need to query jobs (but use distinct which is faster)
+    } else if (groupBy === 'fireProofingType' || groupBy === 'jobTitle') {
+      // For fireProofingType or jobTitle, we need to query jobs (but use distinct which is faster)
       const structuralElements = await StructuralElement.find({
         subProject: { $in: subProjectIds }
       }).select('_id');
@@ -1603,10 +1604,11 @@ router.get('/engineer/groups', auth, cacheMiddleware(300, engineerGroupsCacheKey
         ];
       }
 
-      // Use distinct for fireProofingType (faster than aggregation)
-      const uniqueValues = await Job.distinct('fireProofingType', statusFilter);
+      // Use distinct for fireProofingType or jobTitle (faster than aggregation)
+      const fieldName = groupBy === 'jobTitle' ? 'jobTitle' : 'fireProofingType';
+      const uniqueValues = await Job.distinct(fieldName, statusFilter);
       groups = uniqueValues.filter(v => v != null).sort();
-      console.log(`✅ Found ${groups.length} unique fireProofingType values from jobs`);
+      console.log(`✅ Found ${groups.length} unique ${groupBy} values from jobs`);
     }
 
     // Get subgroups if needed
@@ -1614,6 +1616,7 @@ router.get('/engineer/groups', auth, cacheMiddleware(300, engineerGroupsCacheKey
     if (subGroupBy) {
       const subFieldMap = {
         'fireProofingType': null,
+        'jobTitle': null,
         'level': 'level',
         'gridNo': 'gridNo',
         'memberType': 'memberType'
