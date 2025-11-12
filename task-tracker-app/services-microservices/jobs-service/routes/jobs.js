@@ -1455,7 +1455,7 @@ router.post('/refresh-element-status/:elementId', auth, async (req, res) => {
  * Cache key generator for engineer jobs endpoint
  */
 const engineerJobsCacheKeyGenerator = (req) => {
-  const { page = 1, limit = 10000, status, project } = req.query;
+  const { page = 1, limit = 10000, status, project, jobTitle, gridNo, level, search } = req.query;
   const userId = req.user?.id || 'anon';
   
   // Create a deterministic cache key based on user and query params
@@ -1465,6 +1465,10 @@ const engineerJobsCacheKeyGenerator = (req) => {
     `user:${userId}`,
     `project:${project || 'all'}`,
     `status:${status || 'all'}`,
+    `jobTitle:${jobTitle || 'all'}`,
+    `grid:${gridNo || 'all'}`,
+    `level:${level || 'all'}`,
+    `search:${search || 'none'}`,
     `page:${page}`,
     `limit:${limit}`
   ];
