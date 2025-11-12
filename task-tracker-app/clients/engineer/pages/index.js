@@ -53,10 +53,22 @@ export default function EngineerJobsTable() {
   const [jobTitles, setJobTitles] = useState([]);
   const [grids, setGrids] = useState([]);
   const [levels, setLevels] = useState([]);
+  
+  // Debounced search term
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
   useEffect(() => {
     fetchProjects();
   }, []);
+  
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     if (selectedProject) {
@@ -64,7 +76,7 @@ export default function EngineerJobsTable() {
       fetchFilterOptions();
       fetchJobs();
     }
-  }, [selectedProject, statusFilter, page, rowsPerPage, jobTitleFilter, gridFilter, levelFilter, searchTerm]);
+  }, [selectedProject, statusFilter, page, rowsPerPage, jobTitleFilter, gridFilter, levelFilter, debouncedSearchTerm]);
 
   const fetchProjects = async () => {
     try {
@@ -89,17 +101,17 @@ export default function EngineerJobsTable() {
         pending: { 
           count: data.statusBreakdown.pending?.count || 0, 
           sqm: data.statusBreakdown.pending?.sqm || 0,
-          elements: data.statusBreakdown.pending?.elements || 0
+          elements: data.statusBreakdown.pending?.elementCount || 0
         },
         completed: { 
           count: data.statusBreakdown.completed?.count || 0, 
           sqm: data.statusBreakdown.completed?.sqm || 0,
-          elements: data.statusBreakdown.completed?.elements || 0
+          elements: data.statusBreakdown.completed?.elementCount || 0
         },
         not_applicable: { 
           count: data.statusBreakdown.not_applicable?.count || 0, 
           sqm: data.statusBreakdown.not_applicable?.sqm || 0,
-          elements: data.statusBreakdown.not_applicable?.elements || 0
+          elements: data.statusBreakdown.not_applicable?.elementCount || 0
         }
       });
     } catch (error) {
@@ -141,7 +153,18 @@ export default function EngineerJobsTable() {
       if (jobTitleFilter) params.append('jobTitle', jobTitleFilter);
       if (gridFilter) params.append('gridNo', gridFilter);
       if (levelFilter) params.append('level', levelFilter);
-      if (searchTerm) params.append('search', searchTerm);
+      if (debouncedSearchTerm) params.append('search', debouncedSearchTerm);
+      
+      console.log('🔍 Fetching jobs with filters:', {
+        project: selectedProject,
+        status: statusFilter,
+        jobTitle: jobTitleFilter,
+        grid: gridFilter,
+        level: levelFilter,
+        search: debouncedSearchTerm,
+        page: page + 1,
+        limit: rowsPerPage
+      });
       
       const response = await api.get(`/jobs/engineer/jobs?${params.toString()}`);
       
@@ -149,12 +172,12 @@ export default function EngineerJobsTable() {
       setJobs(jobsData);
       setTotalJobs(response.data.pagination?.totalJobs || 0);
       
-      // Calculate filtered metrics
+      // Calculate filtered metrics from current page
       const totalSqm = jobsData.reduce((sum, job) => sum + (job.structuralElement?.surfaceAreaSqm || 0), 0);
       const uniqueElements = new Set(jobsData.map(job => job.structuralElement?._id)).size;
       
       setFilteredStats({
-        totalJobs: jobsData.length,
+        totalJobs: response.data.pagination?.totalJobs || 0, // Total matching records, not just current page
         totalSqm: totalSqm,
         totalElements: uniqueElements
       });
@@ -529,12 +552,12 @@ export default function EngineerJobsTable() {
                       </TableCell>
                       <TableCell>{job.structuralElement?.level || 'N/A'}</TableCell>
                       <TableCell>{job.structuralElement?.gridNo || 'N/A'}</TableCell>
-                      <TableCell>{job.structuralElement?.partMark || 'N/A'}</TableCell>
-                      <TableCell>{job.structuralElement?.length ? `${job.structuralElement.length} mm` : 'N/A'}</TableCell>
+                      <TableCell>{job.structuralElement?.partMarkNo || 'N/A'}</TableCell>
+                      <TableCell>{job.structuralElement?.lengthMm ? `${job.structuralElement.lengthMm} mm` : 'N/A'}</TableCell>
                       <TableCell>{job.structuralElement?.surfaceAreaSqm?.toFixed(2) || '0.00'}</TableCell>
-                      <TableCell>{job.structuralElement?.quantity || 'N/A'}</TableCell>
-                      <TableCell>{job.fireProofingThickness ? `${job.fireProofingThickness} mm` : 'N/A'}</TableCell>
-                      <TableCell>{job.fireProofingType || 'N/A'}</TableCell>
+                      <TableCell>{job.structuralElement?.qty || 'N/A'}</TableCell>
+                      <TableCell>{job.structuralElement?.fireproofingThickness ? `${job.structuralElement.fireproofingThickness} mm` : 'N/A'}</TableCell>
+                      <TableCell>{job.structuralElement?.fireProofingWorkflow || 'N/A'}</TableCell>
                       <TableCell>
                         <Chip
                           label={job.status === 'not_applicable' ? 'Non Clearance' : job.status || 'pending'}
