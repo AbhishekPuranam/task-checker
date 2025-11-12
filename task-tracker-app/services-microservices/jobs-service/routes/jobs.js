@@ -1551,150 +1551,119 @@ router.get('/engineer/groups', auth, cacheMiddleware(300, engineerGroupsCacheKey
 
     const subProjectIds = subProjects.map(sp => sp._id);
 
-    // Get all structural elements from these subprojects
-    const structuralElements = await StructuralElement.find({
-      subProject: { $in: subProjectIds }
-    }).select('_id');
-
-    if (structuralElements.length === 0) {
+    if (subProjectIds.length === 0) {
       return res.json({ groups: [], subGroups: {} });
     }
 
-    const elementIds = structuralElements.map(el => el._id);
-
-    // Build filter for jobs
-    const filter = {
-      structuralElement: { $in: elementIds }
+    // Get unique values directly from structural elements (much faster than querying jobs)
+    // Only query the specific field we need for groupBy
+    const fieldMap = {
+      'fireProofingType': null, // This comes from jobs, handle separately
+      'level': 'level',
+      'gridNo': 'gridNo',
+      'memberType': 'memberType'
     };
 
-    // Add status filter
-    if (status && status !== 'pending') {
-      filter.status = status;
-    } else if (!status || status === 'pending') {
-      filter.$or = [
-        { status: { $exists: false } },
-        { status: null },
-        { status: 'pending' },
-        { status: 'in_progress' }
-      ];
+    const structuralField = fieldMap[groupBy];
+    
+    let groups = [];
+    
+    if (structuralField) {
+      // Query structural elements for unique values (very fast)
+      const uniqueValues = await StructuralElement.distinct(structuralField, {
+        subProject: { $in: subProjectIds }
+      });
+      groups = uniqueValues.filter(v => v != null).sort();
+      console.log(`✅ Found ${groups.length} unique ${groupBy} values from structural elements`);
+    } else if (groupBy === 'fireProofingType') {
+      // For fireProofingType, we need to query jobs (but use distinct which is faster)
+      const structuralElements = await StructuralElement.find({
+        subProject: { $in: subProjectIds }
+      }).select('_id');
+      
+      const elementIds = structuralElements.map(el => el._id);
+      
+      if (elementIds.length === 0) {
+        return res.json({ groups: [], subGroups: {} });
+      }
+
+      // Build status filter
+      const statusFilter = {
+        structuralElement: { $in: elementIds }
+      };
+
+      if (status && status !== 'pending') {
+        statusFilter.status = status;
+      } else if (!status || status === 'pending') {
+        statusFilter.$or = [
+          { status: { $exists: false } },
+          { status: null },
+          { status: 'pending' },
+          { status: 'in_progress' }
+        ];
+      }
+
+      // Use distinct for fireProofingType (faster than aggregation)
+      const uniqueValues = await Job.distinct('fireProofingType', statusFilter);
+      groups = uniqueValues.filter(v => v != null).sort();
+      console.log(`✅ Found ${groups.length} unique fireProofingType values from jobs`);
     }
 
-    // Determine the field path for groupBy
-    const groupByFieldMap = {
-      'fireProofingType': 'fireProofingType',
-      'level': 'structuralElement.level',
-      'gridNo': 'structuralElement.gridNo',
-      'memberType': 'structuralElement.memberType'
-    };
-
-    const groupByField = groupByFieldMap[groupBy] || groupBy;
-
-    // Get distinct values for primary groupBy
-    const pipeline = [
-      { $match: filter },
-      {
-        $lookup: {
-          from: 'structuralelements',
-          localField: 'structuralElement',
-          foreignField: '_id',
-          as: 'elementData'
-        }
-      },
-      { $unwind: { path: '$elementData', preserveNullAndEmptyArrays: true } }
-    ];
-
-    // Add grouping stage
-    if (groupByField.startsWith('structuralElement.')) {
-      const field = groupByField.replace('structuralElement.', '');
-      pipeline.push({
-        $group: {
-          _id: `$elementData.${field}`,
-          count: { $sum: 1 }
-        }
-      });
-    } else {
-      pipeline.push({
-        $group: {
-          _id: `$${groupByField}`,
-          count: { $sum: 1 }
-        }
-      });
-    }
-
-    pipeline.push({ $sort: { _id: 1 } });
-
-    const groupResults = await Job.aggregate(pipeline);
-    const groups = groupResults
-      .map(g => g._id || 'Other')
-      .filter(g => g !== null);
-
-    // Get subgroups if subGroupBy is specified
+    // Get subgroups if needed
     let subGroups = {};
     if (subGroupBy) {
-      const subGroupByFieldMap = {
-        'fireProofingType': 'fireProofingType',
-        'level': 'structuralElement.level',
-        'gridNo': 'structuralElement.gridNo',
-        'memberType': 'structuralElement.memberType'
+      const subFieldMap = {
+        'fireProofingType': null,
+        'level': 'level',
+        'gridNo': 'gridNo',
+        'memberType': 'memberType'
       };
       
-      const subGroupByField = subGroupByFieldMap[subGroupBy] || subGroupBy;
+      const subStructuralField = subFieldMap[subGroupBy];
       
-      // For each group, get its subgroups
-      for (const group of groups) {
-        const subPipeline = [
-          { $match: filter },
+      if (subStructuralField && structuralField) {
+        // Both from structural elements - use aggregation on elements (fast)
+        const pipeline = [
+          { $match: { subProject: { $in: subProjectIds } } },
           {
-            $lookup: {
-              from: 'structuralelements',
-              localField: 'structuralElement',
-              foreignField: '_id',
-              as: 'elementData'
+            $group: {
+              _id: {
+                primary: `$${structuralField}`,
+                secondary: `$${subStructuralField}`
+              }
             }
           },
-          { $unwind: { path: '$elementData', preserveNullAndEmptyArrays: true } }
+          { $sort: { '_id.primary': 1, '_id.secondary': 1 } }
         ];
-
-        // Add filter for this specific group
-        if (groupByField.startsWith('structuralElement.')) {
-          const field = groupByField.replace('structuralElement.', '');
-          subPipeline.push({
-            $match: { [`elementData.${field}`]: group === 'Other' ? null : group }
-          });
-        } else {
-          subPipeline.push({
-            $match: { [groupByField]: group === 'Other' ? null : group }
-          });
-        }
-
-        // Add subgroup aggregation
-        if (subGroupByField.startsWith('structuralElement.')) {
-          const field = subGroupByField.replace('structuralElement.', '');
-          subPipeline.push({
-            $group: {
-              _id: `$elementData.${field}`,
-              count: { $sum: 1 }
-            }
-          });
-        } else {
-          subPipeline.push({
-            $group: {
-              _id: `$${subGroupByField}`,
-              count: { $sum: 1 }
-            }
-          });
-        }
-
-        subPipeline.push({ $sort: { _id: 1 } });
-
-        const subGroupResults = await Job.aggregate(subPipeline);
-        subGroups[group] = subGroupResults
-          .map(sg => sg._id || 'Other')
-          .filter(sg => sg !== null);
+        
+        const results = await StructuralElement.aggregate(pipeline);
+        
+        results.forEach(r => {
+          const primaryKey = r._id.primary || 'Other';
+          const secondaryKey = r._id.secondary || 'Other';
+          
+          if (!subGroups[primaryKey]) {
+            subGroups[primaryKey] = [];
+          }
+          if (!subGroups[primaryKey].includes(secondaryKey)) {
+            subGroups[primaryKey].push(secondaryKey);
+          }
+        });
+        
+        // Sort subgroups
+        Object.keys(subGroups).forEach(key => {
+          subGroups[key].sort();
+        });
+      } else {
+        // If subGroupBy involves jobs, return empty subgroups for now
+        // They will be calculated when accordion expands
+        groups.forEach(group => {
+          subGroups[group] = [];
+        });
       }
     }
 
-    console.log(`✅ Found ${groups.length} groups for ${groupBy}`);
+    console.log(`✅ Returning ${groups.length} groups for ${groupBy}`);
     
     res.json({
       groups,
