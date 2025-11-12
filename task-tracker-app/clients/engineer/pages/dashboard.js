@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Container, Paper, Typography, Box, AppBar, Toolbar, Button, IconButton,
-  Grid, Card, CardContent, List, ListItem, ListItemButton, ListItemText,
-  Drawer, CircularProgress, Chip, Divider, Select, MenuItem, FormControl,
-  TextField, InputAdornment, LinearProgress
+  Container, Paper, Typography, Box, AppBar, Toolbar, Button,
+  Grid, Card, CardContent, CircularProgress, Chip, Divider, Select, MenuItem, FormControl,
+  TextField, InputAdornment
 } from '@mui/material';
 import {
   AccountCircle, LogoutOutlined, Dashboard as DashboardIcon,
@@ -14,7 +13,75 @@ import { useRouter } from 'next/router';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
-const DRAWER_WIDTH = 280;
+// Semi-circle gauge component
+const SemiCircleGauge = ({ value, total, label, color, icon: Icon }) => {
+  const percentage = total > 0 ? (value / total) * 100 : 0;
+  const radius = 80;
+  const strokeWidth = 12;
+  const normalizedRadius = radius - strokeWidth / 2;
+  const circumference = normalizedRadius * Math.PI; // Half circle
+  const strokeDashoffset = circumference - (percentage / 100) * circumference;
+
+  return (
+    <Card elevation={3} sx={{ height: '100%' }}>
+      <CardContent>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 2 }}>
+          {/* Icon */}
+          <Icon sx={{ fontSize: 40, color: color, mb: 2 }} />
+          
+          {/* Semi-circle gauge */}
+          <Box sx={{ position: 'relative', display: 'inline-flex', mb: 2 }}>
+            <svg height={radius + strokeWidth} width={(radius + strokeWidth) * 2}>
+              {/* Background arc */}
+              <path
+                d={`M ${strokeWidth / 2},${radius + strokeWidth / 2} A ${normalizedRadius},${normalizedRadius} 0 0,1 ${radius * 2 + strokeWidth / 2},${radius + strokeWidth / 2}`}
+                fill="none"
+                stroke="#e5e7eb"
+                strokeWidth={strokeWidth}
+                strokeLinecap="round"
+              />
+              {/* Progress arc */}
+              <path
+                d={`M ${strokeWidth / 2},${radius + strokeWidth / 2} A ${normalizedRadius},${normalizedRadius} 0 0,1 ${radius * 2 + strokeWidth / 2},${radius + strokeWidth / 2}`}
+                fill="none"
+                stroke={color}
+                strokeWidth={strokeWidth}
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+              />
+            </svg>
+            {/* Percentage in center */}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -25%)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+              }}
+            >
+              <Typography variant="h3" fontWeight="bold" color={color}>
+                {percentage.toFixed(1)}%
+              </Typography>
+            </Box>
+          </Box>
+          
+          {/* Label and stats */}
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            {label}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" textAlign="center">
+            {value.toLocaleString()} of {total.toLocaleString()}
+          </Typography>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+};
 
 export default function EngineerDashboard() {
   const { user, logout } = useAuth();
@@ -137,139 +204,61 @@ export default function EngineerDashboard() {
   );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f5f5f5' }}>
-      {/* Sidebar */}
-      <Drawer
-        variant="permanent"
-        sx={{
-          width: DRAWER_WIDTH,
-          flexShrink: 0,
-          '& .MuiDrawer-paper': {
-            width: DRAWER_WIDTH,
-            boxSizing: 'border-box',
-            bgcolor: '#1e293b',
-            color: 'white'
-          },
-        }}
-      >
-        <Box sx={{ p: 2, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <DashboardIcon /> Engineer Portal
-          </Typography>
-        </Box>
-
-        <Box sx={{ p: 2 }}>
-          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', mb: 1, display: 'block' }}>
-            PROJECT
-          </Typography>
-          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-            <Select
-              value={selectedProject}
-              onChange={(e) => handleProjectChange(e.target.value)}
+    <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f5' }}>
+      {/* Top Navigation Bar */}
+      <AppBar position="static" sx={{ bgcolor: '#1e293b', boxShadow: 2 }}>
+        <Toolbar>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexGrow: 1 }}>
+            <DashboardIcon />
+            <Typography variant="h6">Engineer Portal</Typography>
+          </Box>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <Select
+                value={selectedProject}
+                onChange={(e) => handleProjectChange(e.target.value)}
+                displayEmpty
+                sx={{
+                  color: 'white',
+                  '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
+                  '.MuiSvgIcon-root': { color: 'white' }
+                }}
+              >
+                <MenuItem value="" disabled>Select Project</MenuItem>
+                {projects.map((project) => (
+                  <MenuItem key={project._id} value={project._id}>
+                    {project.title}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <AccountCircle />
+              <Typography variant="body2">{user?.name}</Typography>
+            </Box>
+            
+            <Button
+              variant="outlined"
+              onClick={logout}
+              startIcon={<LogoutOutlined />}
               sx={{
                 color: 'white',
-                '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.2)' },
-                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.4)' },
-                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
-                '.MuiSvgIcon-root': { color: 'white' }
+                borderColor: 'rgba(255,255,255,0.3)',
+                '&:hover': { borderColor: 'white', bgcolor: 'rgba(255,255,255,0.1)' }
               }}
             >
-              {projects.map((project) => (
-                <MenuItem key={project._id} value={project._id}>
-                  {project.title}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <Divider sx={{ bgcolor: 'rgba(255,255,255,0.1)', my: 2 }} />
-
-          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', mb: 1, display: 'block' }}>
-            LEVELS ({filteredLevels.length})
-          </Typography>
-          
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Search levels..."
-            value={levelSearch}
-            onChange={(e) => setLevelSearch(e.target.value)}
-            sx={{
-              mb: 1,
-              '& .MuiOutlinedInput-root': {
-                color: 'white',
-                '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
-                '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.4)' },
-                '&.Mui-focused fieldset': { borderColor: 'white' },
-              },
-              '& .MuiInputBase-input::placeholder': { color: 'rgba(255,255,255,0.5)' }
-            }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search sx={{ color: 'rgba(255,255,255,0.5)' }} />
-                </InputAdornment>
-              ),
-            }}
-          />
-        </Box>
-
-        <List sx={{ overflow: 'auto', flex: 1 }}>
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-              <CircularProgress size={24} sx={{ color: 'white' }} />
-            </Box>
-          ) : filteredLevels.length === 0 ? (
-            <Box sx={{ p: 3, textAlign: 'center' }}>
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
-                No levels found
-              </Typography>
-            </Box>
-          ) : (
-            filteredLevels.map((level) => (
-              <ListItem key={level.level} disablePadding>
-                <ListItemButton onClick={() => handleLevelClick(level)}>
-                  <ListItemText
-                    primary={level.level}
-                    secondary={
-                      <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-                        <Chip label={level.pendingJobs} size="small" sx={{ bgcolor: '#f59e0b', color: 'white', fontSize: '0.85rem', height: 24 }} />
-                        <Chip label={level.completedJobs} size="small" sx={{ bgcolor: '#10b981', color: 'white', fontSize: '0.85rem', height: 24 }} />
-                        <Chip label={level.nonClearanceJobs} size="small" sx={{ bgcolor: '#ef4444', color: 'white', fontSize: '0.85rem', height: 24 }} />
-                      </Box>
-                    }
-                    secondaryTypographyProps={{ component: 'div' }}
-                    sx={{ '& .MuiListItemText-primary': { color: 'white', fontSize: '1.1rem', fontWeight: 500 } }}
-                  />
-                </ListItemButton>
-              </ListItem>
-            ))
-          )}
-        </List>
-
-        <Box sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-            <AccountCircle />
-            <Typography variant="body2">{user?.name}</Typography>
+              Logout
+            </Button>
           </Box>
-          <Button
-            fullWidth
-            variant="outlined"
-            onClick={logout}
-            startIcon={<LogoutOutlined />}
-            sx={{
-              color: 'white',
-              borderColor: 'rgba(255,255,255,0.2)',
-              '&:hover': { borderColor: 'white' }
-            }}
-          >
-            Logout
-          </Button>
-        </Box>
-      </Drawer>
+        </Toolbar>
+      </AppBar>
 
       {/* Main Content */}
-      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+      <Container maxWidth="xl" sx={{ mt: 3, mb: 3 }}>
         {/* Header */}
         <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
@@ -279,6 +268,201 @@ export default function EngineerDashboard() {
             Project overview and completion progress
           </Typography>
         </Paper>
+
+        {/* Search Bar for Levels */}
+        <Box sx={{ mb: 3 }}>
+          <TextField
+            fullWidth
+            placeholder="Search levels..."
+            value={levelSearch}
+            onChange={(e) => setLevelSearch(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              bgcolor: 'white',
+              borderRadius: 1,
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': { borderColor: '#e5e7eb' },
+                '&:hover fieldset': { borderColor: '#9ca3af' },
+              }
+            }}
+          />
+        </Box>
+
+        {/* Building Floors - Bento Box Grid */}
+        <Typography variant="h5" fontWeight="bold" gutterBottom sx={{ mb: 2 }}>
+          🏢 Building Levels ({filteredLevels.length})
+        </Typography>
+        
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
+            <CircularProgress />
+          </Box>
+        ) : filteredLevels.length === 0 ? (
+          <Paper sx={{ p: 5, textAlign: 'center' }}>
+            <Typography variant="h6" color="text.secondary">
+              No levels found
+            </Typography>
+          </Paper>
+        ) : (
+          <Grid container spacing={2} sx={{ mb: 4 }}>
+            {filteredLevels.map((level) => (
+              <Grid item xs={12} sm={6} md={4} lg={3} key={level.level}>
+                <Card 
+                  onClick={() => handleLevelClick(level)}
+                  sx={{ 
+                    cursor: 'pointer',
+                    height: '100%',
+                    position: 'relative',
+                    transition: 'all 0.3s ease',
+                    background: 'linear-gradient(180deg, #1e293b 0%, #334155 100%)',
+                    border: '2px solid #475569',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: 6,
+                      borderColor: '#64748b'
+                    }
+                  }}
+                >
+                  <CardContent sx={{ pb: 2 }}>
+                    {/* Floor Number Badge */}
+                    <Box sx={{ 
+                      position: 'absolute',
+                      top: 12,
+                      right: 12,
+                      bgcolor: 'rgba(255,255,255,0.1)',
+                      color: 'white',
+                      px: 1.5,
+                      py: 0.5,
+                      borderRadius: 1,
+                      fontSize: '0.75rem',
+                      fontWeight: 'bold'
+                    }}>
+                      LEVEL
+                    </Box>
+
+                    {/* Floor Name */}
+                    <Typography 
+                      variant="h5" 
+                      fontWeight="bold" 
+                      sx={{ 
+                        color: 'white',
+                        mb: 2,
+                        pr: 6
+                      }}
+                    >
+                      {level.level}
+                    </Typography>
+
+                    {/* Building Floor Lines */}
+                    <Box sx={{ mb: 2 }}>
+                      {[0, 1, 2, 3].map((i) => (
+                        <Box 
+                          key={i}
+                          sx={{ 
+                            height: '16px',
+                            borderBottom: '2px solid rgba(255,255,255,0.2)',
+                            mb: 0.5,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1,
+                            px: 1
+                          }}
+                        >
+                          {/* Window-like dots */}
+                          <Box sx={{ 
+                            width: 6, 
+                            height: 6, 
+                            borderRadius: '50%', 
+                            bgcolor: 'rgba(255,255,255,0.3)' 
+                          }} />
+                          <Box sx={{ 
+                            width: 6, 
+                            height: 6, 
+                            borderRadius: '50%', 
+                            bgcolor: 'rgba(255,255,255,0.3)' 
+                          }} />
+                          <Box sx={{ 
+                            width: 6, 
+                            height: 6, 
+                            borderRadius: '50%', 
+                            bgcolor: 'rgba(255,255,255,0.3)' 
+                          }} />
+                        </Box>
+                      ))}
+                    </Box>
+
+                    {/* Status Indicators as Floor Sections */}
+                    <Box sx={{ display: 'flex', gap: 0.5, mb: 1 }}>
+                      <Box sx={{ 
+                        flex: level.pendingJobs,
+                        height: 8,
+                        bgcolor: '#f59e0b',
+                        borderRadius: 0.5,
+                        minWidth: level.pendingJobs > 0 ? 20 : 0
+                      }} />
+                      <Box sx={{ 
+                        flex: level.completedJobs,
+                        height: 8,
+                        bgcolor: '#10b981',
+                        borderRadius: 0.5,
+                        minWidth: level.completedJobs > 0 ? 20 : 0
+                      }} />
+                      <Box sx={{ 
+                        flex: level.nonClearanceJobs,
+                        height: 8,
+                        bgcolor: '#ef4444',
+                        borderRadius: 0.5,
+                        minWidth: level.nonClearanceJobs > 0 ? 20 : 0
+                      }} />
+                    </Box>
+
+                    {/* Status Chips */}
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2 }}>
+                      <Chip 
+                        label={`${level.pendingJobs} Pending`}
+                        size="small" 
+                        sx={{ 
+                          bgcolor: '#f59e0b', 
+                          color: 'white', 
+                          fontWeight: 'bold',
+                          fontSize: '0.75rem'
+                        }} 
+                      />
+                      <Chip 
+                        label={`${level.completedJobs} Done`}
+                        size="small" 
+                        sx={{ 
+                          bgcolor: '#10b981', 
+                          color: 'white', 
+                          fontWeight: 'bold',
+                          fontSize: '0.75rem'
+                        }} 
+                      />
+                      <Chip 
+                        label={`${level.nonClearanceJobs} NC`}
+                        size="small" 
+                        sx={{ 
+                          bgcolor: '#ef4444', 
+                          color: 'white', 
+                          fontWeight: 'bold',
+                          fontSize: '0.75rem'
+                        }} 
+                      />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        )}
+
+        <Divider sx={{ my: 4 }} />
 
         {/* Status Cards */}
         <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -346,120 +530,42 @@ export default function EngineerDashboard() {
           </Grid>
         </Grid>
 
-        {/* Race Track Progress Bars */}
+        {/* Completion Gauges */}
         <Grid container spacing={3}>
           {/* Jobs Progress */}
-          <Grid item xs={12}>
-            <Card elevation={3}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <CheckCircle sx={{ fontSize: 40, color: '#10b981' }} />
-                    <Box>
-                      <Typography variant="h6" fontWeight="bold">
-                        Jobs Completion
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {stats.completed.count} of {stats.totalJobs} jobs completed
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Typography variant="h4" fontWeight="bold" color="#10b981">
-                    {stats.totalJobs > 0 ? ((stats.completed.count / stats.totalJobs) * 100).toFixed(1) : 0}%
-                  </Typography>
-                </Box>
-                <LinearProgress
-                  variant="determinate"
-                  value={stats.totalJobs > 0 ? (stats.completed.count / stats.totalJobs) * 100 : 0}
-                  sx={{
-                    height: 20,
-                    borderRadius: 10,
-                    bgcolor: '#e5e7eb',
-                    '& .MuiLinearProgress-bar': {
-                      borderRadius: 10,
-                      bgcolor: '#10b981'
-                    }
-                  }}
-                />
-              </CardContent>
-            </Card>
+          <Grid item xs={12} md={4}>
+            <SemiCircleGauge
+              value={stats.completed.count}
+              total={stats.totalJobs}
+              label="Jobs Completion"
+              color="#10b981"
+              icon={CheckCircle}
+            />
           </Grid>
 
           {/* Elements Progress */}
-          <Grid item xs={12}>
-            <Card elevation={3}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Layers sx={{ fontSize: 40, color: '#3b82f6' }} />
-                    <Box>
-                      <Typography variant="h6" fontWeight="bold">
-                        Elements Completion
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {stats.completed.elements} of {stats.totalElements} elements completed
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Typography variant="h4" fontWeight="bold" color="#3b82f6">
-                    {stats.totalElements > 0 ? ((stats.completed.elements / stats.totalElements) * 100).toFixed(1) : 0}%
-                  </Typography>
-                </Box>
-                <LinearProgress
-                  variant="determinate"
-                  value={stats.totalElements > 0 ? (stats.completedElements / stats.totalElements) * 100 : 0}
-                  sx={{
-                    height: 20,
-                    borderRadius: 10,
-                    bgcolor: '#e5e7eb',
-                    '& .MuiLinearProgress-bar': {
-                      borderRadius: 10,
-                      bgcolor: '#3b82f6'
-                    }
-                  }}
-                />
-              </CardContent>
-            </Card>
+          <Grid item xs={12} md={4}>
+            <SemiCircleGauge
+              value={stats.completed.elements}
+              total={stats.totalElements}
+              label="Elements Completion"
+              color="#3b82f6"
+              icon={Layers}
+            />
           </Grid>
 
           {/* SQM Progress */}
-          <Grid item xs={12}>
-            <Card elevation={3}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Cancel sx={{ fontSize: 40, color: '#f59e0b' }} />
-                    <Box>
-                      <Typography variant="h6" fontWeight="bold">
-                        SQM Completion
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {stats.completed.sqm.toFixed(2)} of {stats.totalSqm.toFixed(2)} SQM completed
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Typography variant="h4" fontWeight="bold" color="#f59e0b">
-                    {stats.totalSqm > 0 ? ((stats.completed.sqm / stats.totalSqm) * 100).toFixed(1) : 0}%
-                  </Typography>
-                </Box>
-                <LinearProgress
-                  variant="determinate"
-                  value={stats.totalSqm > 0 ? (stats.completed.sqm / stats.totalSqm) * 100 : 0}
-                  sx={{
-                    height: 20,
-                    borderRadius: 10,
-                    bgcolor: '#e5e7eb',
-                    '& .MuiLinearProgress-bar': {
-                      borderRadius: 10,
-                      bgcolor: '#f59e0b'
-                    }
-                  }}
-                />
-              </CardContent>
-            </Card>
+          <Grid item xs={12} md={4}>
+            <SemiCircleGauge
+              value={parseFloat(stats.completed.sqm.toFixed(2))}
+              total={parseFloat(stats.totalSqm.toFixed(2))}
+              label="SQM Completion"
+              color="#f59e0b"
+              icon={Cancel}
+            />
           </Grid>
         </Grid>
-      </Box>
+      </Container>
     </Box>
   );
 }
