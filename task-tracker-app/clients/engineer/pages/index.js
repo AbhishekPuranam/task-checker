@@ -24,9 +24,16 @@ export default function EngineerJobsTable() {
   
   // Metrics
   const [stats, setStats] = useState({
-    pending: { count: 0, sqm: 0 },
-    completed: { count: 0, sqm: 0 },
-    not_applicable: { count: 0, sqm: 0 },
+    pending: { count: 0, sqm: 0, elements: 0 },
+    completed: { count: 0, sqm: 0, elements: 0 },
+    not_applicable: { count: 0, sqm: 0, elements: 0 },
+  });
+  
+  // Filtered metrics (based on current filters)
+  const [filteredStats, setFilteredStats] = useState({
+    totalJobs: 0,
+    totalSqm: 0,
+    totalElements: 0
   });
   
   // Table data
@@ -81,15 +88,18 @@ export default function EngineerJobsTable() {
       setStats({
         pending: { 
           count: data.statusBreakdown.pending?.count || 0, 
-          sqm: data.statusBreakdown.pending?.sqm || 0 
+          sqm: data.statusBreakdown.pending?.sqm || 0,
+          elements: data.statusBreakdown.pending?.elements || 0
         },
         completed: { 
           count: data.statusBreakdown.completed?.count || 0, 
-          sqm: data.statusBreakdown.completed?.sqm || 0 
+          sqm: data.statusBreakdown.completed?.sqm || 0,
+          elements: data.statusBreakdown.completed?.elements || 0
         },
         not_applicable: { 
           count: data.statusBreakdown.not_applicable?.count || 0, 
-          sqm: data.statusBreakdown.not_applicable?.sqm || 0 
+          sqm: data.statusBreakdown.not_applicable?.sqm || 0,
+          elements: data.statusBreakdown.not_applicable?.elements || 0
         }
       });
     } catch (error) {
@@ -135,8 +145,19 @@ export default function EngineerJobsTable() {
       
       const response = await api.get(`/jobs/engineer/jobs?${params.toString()}`);
       
-      setJobs(response.data.jobs || []);
+      const jobsData = response.data.jobs || [];
+      setJobs(jobsData);
       setTotalJobs(response.data.pagination?.totalJobs || 0);
+      
+      // Calculate filtered metrics
+      const totalSqm = jobsData.reduce((sum, job) => sum + (job.structuralElement?.surfaceAreaSqm || 0), 0);
+      const uniqueElements = new Set(jobsData.map(job => job.structuralElement?._id)).size;
+      
+      setFilteredStats({
+        totalJobs: jobsData.length,
+        totalSqm: totalSqm,
+        totalElements: uniqueElements
+      });
     } catch (error) {
       console.error('Error fetching jobs:', error);
       toast.error('Failed to fetch jobs');
@@ -262,7 +283,7 @@ export default function EngineerJobsTable() {
                   </Box>
                 </Box>
                 <Typography variant="body2" color="text.secondary">
-                  {stats.pending.sqm.toFixed(2)} SQM
+                  {stats.pending.sqm.toFixed(2)} SQM | {stats.pending.elements} Elements
                 </Typography>
               </CardContent>
             </Card>
@@ -292,7 +313,7 @@ export default function EngineerJobsTable() {
                   </Box>
                 </Box>
                 <Typography variant="body2" color="text.secondary">
-                  {stats.completed.sqm.toFixed(2)} SQM
+                  {stats.completed.sqm.toFixed(2)} SQM | {stats.completed.elements} Elements
                 </Typography>
               </CardContent>
             </Card>
@@ -317,17 +338,58 @@ export default function EngineerJobsTable() {
                       {stats.not_applicable.count}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Not Applicable
+                      Non Clearance
                     </Typography>
                   </Box>
                 </Box>
                 <Typography variant="body2" color="text.secondary">
-                  {stats.not_applicable.sqm.toFixed(2)} SQM
+                  {stats.not_applicable.sqm.toFixed(2)} SQM | {stats.not_applicable.elements} Elements
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
         </Grid>
+
+        {/* Filtered Results Metrics Card */}
+        {(jobTitleFilter || gridFilter || levelFilter || searchTerm || statusFilter) && (
+          <Paper elevation={3} sx={{ p: 2, mb: 3, bgcolor: '#e3f2fd', borderRadius: 2 }}>
+            <Typography variant="h6" gutterBottom sx={{ color: '#1976d2', fontWeight: 'bold' }}>
+              📊 Filtered Results
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={4}>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="h5" fontWeight="bold" color="primary">
+                    {filteredStats.totalJobs}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Jobs Shown
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="h5" fontWeight="bold" color="primary">
+                    {filteredStats.totalSqm.toFixed(2)}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Total SQM
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="h5" fontWeight="bold" color="primary">
+                    {filteredStats.totalElements}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Unique Elements
+                  </Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          </Paper>
+        )}
 
         {/* Filters */}
         <Paper elevation={3} sx={{ p: 3, mb: 2, borderRadius: 2 }}>
@@ -425,11 +487,14 @@ export default function EngineerJobsTable() {
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Job Title</TableCell>
-                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Structure</TableCell>
-                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Grid</TableCell>
                   <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Level</TableCell>
-                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Member Type</TableCell>
+                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Grid</TableCell>
+                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Part Mark</TableCell>
+                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Length</TableCell>
                   <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>SQM</TableCell>
+                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Qty</TableCell>
+                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>FP Thickness</TableCell>
+                  <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>FP Workflow</TableCell>
                   <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold' }}>Status</TableCell>
                   <TableCell sx={{ bgcolor: '#f5f5f5', fontWeight: 'bold', textAlign: 'center' }}>Actions</TableCell>
                 </TableRow>
@@ -437,14 +502,14 @@ export default function EngineerJobsTable() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
                       <CircularProgress />
                       <Typography sx={{ mt: 2 }}>Loading jobs...</Typography>
                     </TableCell>
                   </TableRow>
                 ) : jobs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
                       <Typography color="text.secondary">No jobs found</Typography>
                     </TableCell>
                   </TableRow>
@@ -462,14 +527,17 @@ export default function EngineerJobsTable() {
                           {job.jobTitle}
                         </Typography>
                       </TableCell>
-                      <TableCell>{job.structuralElement?.structureNumber || 'N/A'}</TableCell>
-                      <TableCell>{job.structuralElement?.gridNo || 'N/A'}</TableCell>
                       <TableCell>{job.structuralElement?.level || 'N/A'}</TableCell>
-                      <TableCell>{job.structuralElement?.memberType || 'N/A'}</TableCell>
+                      <TableCell>{job.structuralElement?.gridNo || 'N/A'}</TableCell>
+                      <TableCell>{job.structuralElement?.partMark || 'N/A'}</TableCell>
+                      <TableCell>{job.structuralElement?.length ? `${job.structuralElement.length} mm` : 'N/A'}</TableCell>
                       <TableCell>{job.structuralElement?.surfaceAreaSqm?.toFixed(2) || '0.00'}</TableCell>
+                      <TableCell>{job.structuralElement?.quantity || 'N/A'}</TableCell>
+                      <TableCell>{job.fireProofingThickness ? `${job.fireProofingThickness} mm` : 'N/A'}</TableCell>
+                      <TableCell>{job.fireProofingType || 'N/A'}</TableCell>
                       <TableCell>
                         <Chip
-                          label={job.status || 'pending'}
+                          label={job.status === 'not_applicable' ? 'Non Clearance' : job.status || 'pending'}
                           size="small"
                           sx={{
                             bgcolor: getStatusColor(job.status || 'pending'),
@@ -479,51 +547,57 @@ export default function EngineerJobsTable() {
                         />
                       </TableCell>
                       <TableCell>
-                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                        <Box sx={{ display: 'flex', gap: 1, flexDirection: 'column' }}>
                           <Button
                             size="small"
+                            fullWidth
                             variant={job.status === 'pending' ? 'contained' : 'outlined'}
                             onClick={() => handleStatusUpdate(job._id, 'pending')}
                             disabled={updatingJob === job._id}
                             sx={{
-                              minWidth: '32px',
                               bgcolor: job.status === 'pending' ? '#f59e0b' : 'transparent',
                               color: job.status === 'pending' ? 'white' : '#f59e0b',
-                              '&:hover': { bgcolor: '#f59e0b', color: 'white' }
+                              borderColor: '#f59e0b',
+                              '&:hover': { bgcolor: '#f59e0b', color: 'white' },
+                              textTransform: 'none',
+                              fontSize: '0.75rem'
                             }}
-                            title="Pending"
                           >
-                            🟡
+                            Pending
                           </Button>
                           <Button
                             size="small"
+                            fullWidth
                             variant={job.status === 'completed' ? 'contained' : 'outlined'}
                             onClick={() => handleStatusUpdate(job._id, 'completed')}
                             disabled={updatingJob === job._id}
                             sx={{
-                              minWidth: '32px',
                               bgcolor: job.status === 'completed' ? '#10b981' : 'transparent',
                               color: job.status === 'completed' ? 'white' : '#10b981',
-                              '&:hover': { bgcolor: '#10b981', color: 'white' }
+                              borderColor: '#10b981',
+                              '&:hover': { bgcolor: '#10b981', color: 'white' },
+                              textTransform: 'none',
+                              fontSize: '0.75rem'
                             }}
-                            title="Completed"
                           >
-                            🟢
+                            Complete
                           </Button>
                           <Button
                             size="small"
+                            fullWidth
                             variant={job.status === 'not_applicable' ? 'contained' : 'outlined'}
                             onClick={() => handleStatusUpdate(job._id, 'not_applicable')}
                             disabled={updatingJob === job._id}
                             sx={{
-                              minWidth: '32px',
                               bgcolor: job.status === 'not_applicable' ? '#ef4444' : 'transparent',
                               color: job.status === 'not_applicable' ? 'white' : '#ef4444',
-                              '&:hover': { bgcolor: '#ef4444', color: 'white' }
+                              borderColor: '#ef4444',
+                              '&:hover': { bgcolor: '#ef4444', color: 'white' },
+                              textTransform: 'none',
+                              fontSize: '0.75rem'
                             }}
-                            title="Not Applicable"
                           >
-                            🔴
+                            Non Clearance
                           </Button>
                         </Box>
                       </TableCell>
