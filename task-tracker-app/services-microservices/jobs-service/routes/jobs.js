@@ -1881,7 +1881,8 @@ router.patch('/engineer/:id/status', auth, async (req, res) => {
     // Invalidate cache
     await invalidateCache(`cache:jobs:project:${updatedJob.project}:*`);
     await invalidateCache(`cache:stats:project:${updatedJob.project}`);
-    await invalidateCache(`cache:engineer:jobs:user:${req.user.id}:*`); // Invalidate engineer cache
+    await invalidateCache(`cache:engineer:jobs:user:${req.user.id}:*`); // Invalidate engineer jobs cache
+    await invalidateCache(`cache:engineer:metrics:*:project:${updatedJob.project}:*`); // Invalidate engineer metrics cache
     if (updatedJob.structuralElement) {
       await invalidateCache(`cache:structural:jobs:${updatedJob.structuralElement._id || updatedJob.structuralElement}`);
       await invalidateCache(`cache:structural:summary:${updatedJob.project}:*`);
