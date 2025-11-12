@@ -426,13 +426,14 @@ export default function EngineerDashboard() {
 
       toast.success('Job status updated successfully!', { id: 'status-update' });
       
-      // Refresh metrics and clear caches to force reload
-      await fetchMetrics();
-      
-      // Clear all caches since status changed
+      // Clear all caches completely
       setGroupJobs({});
       setExpandedGroups({});
-      setAllJobsCache({}); // Clear jobs cache to refetch with new status
+      setAllJobsCache({});
+      setGroupMetrics({});
+      
+      // Refresh metrics for current tab
+      await fetchMetrics();
       
     } catch (error) {
       console.error('Error updating job status:', error);
