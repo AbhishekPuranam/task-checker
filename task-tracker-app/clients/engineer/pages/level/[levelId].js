@@ -648,6 +648,11 @@ export default function LevelDetailPage() {
                     const isExpanded = expandedGroups[groupKey] || false;
                     const isLoading = loadingGroups[groupKey] || false;
 
+                    // Skip accordion if no jobs in this group
+                    if (metrics.jobCount === 0) {
+                      return null;
+                    }
+
                     return (
                       <Accordion
                         key={groupKey}
