@@ -105,12 +105,15 @@ export default function LevelDetailPage() {
         
         console.log(`📂 Fetched ${groupsData.groups.length} unique groups for ${groupBy}`);
         
+        // Use metrics from API response if available
         const metrics = {};
         groupsData.groups.forEach(groupName => {
+          const apiMetrics = groupsData.metrics?.[groupName];
+          
           metrics[groupName] = {
-            count: 0,
-            jobCount: 0,
-            sqm: 0,
+            count: apiMetrics?.elementCount || 0,
+            jobCount: apiMetrics?.jobCount || 0,
+            sqm: apiMetrics?.sqm || 0,
             qty: 0,
             subGroups: {}
           };
@@ -128,7 +131,7 @@ export default function LevelDetailPage() {
         });
         
         setGroupMetrics(metrics);
-        console.log('Group structure created. Job data will be fetched on accordion expansion.');
+        console.log('📊 Group metrics loaded:', Object.keys(metrics).length, 'groups');
       } catch (error) {
         console.error('Error fetching groups:', error);
         setGroupMetrics({});

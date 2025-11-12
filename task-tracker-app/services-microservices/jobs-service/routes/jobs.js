@@ -1802,11 +1802,78 @@ router.get('/engineer/groups', auth, cacheMiddleware(300, engineerGroupsCacheKey
       }
     }
 
-    console.log(`✅ Returning ${groups.length} groups for ${groupBy}${level ? ` (level: ${level})` : ''}`);
+    // Calculate metrics for each group
+    const groupMetrics = {};
+    
+    // Get all structural elements for metrics calculation
+    const structuralElements = await StructuralElement.find(structuralElementMatch)
+      .select('_id surfaceAreaSqm ' + (structuralField || 'gridNo'));
+    
+    // Build job match criteria
+    const elementIds = structuralElements.map(el => el._id);
+    const jobMatch = {
+      structuralElement: { $in: elementIds }
+    };
+    
+    // Add status filter to job match
+    if (status && status !== 'pending') {
+      jobMatch.status = status;
+    } else if (!status || status === 'pending') {
+      jobMatch.$or = [
+        { status: { $exists: false } },
+        { status: null },
+        { status: 'pending' },
+        { status: 'in_progress' }
+      ];
+    }
+    
+    // Get all jobs for metrics
+    const jobs = await Job.find(jobMatch)
+      .select('structuralElement jobTitle fireProofingType')
+      .populate('structuralElement', 'surfaceAreaSqm ' + (structuralField || 'gridNo'));
+    
+    console.log(`📊 Calculating metrics for ${jobs.length} jobs across ${groups.length} groups`);
+    
+    // Calculate metrics for each group
+    groups.forEach(groupName => {
+      const groupJobs = jobs.filter(job => {
+        if (!job.structuralElement) return false;
+        
+        let groupValue;
+        if (structuralField) {
+          groupValue = job.structuralElement[structuralField];
+        } else if (groupBy === 'fireProofingType') {
+          groupValue = job.fireProofingType;
+        } else if (groupBy === 'jobTitle') {
+          groupValue = job.jobTitle;
+        }
+        
+        return groupValue === groupName;
+      });
+      
+      const uniqueElements = new Set();
+      let totalSqm = 0;
+      
+      groupJobs.forEach(job => {
+        if (job.structuralElement) {
+          uniqueElements.add(job.structuralElement._id.toString());
+          totalSqm += job.structuralElement.surfaceAreaSqm || 0;
+        }
+      });
+      
+      groupMetrics[groupName] = {
+        jobCount: groupJobs.length,
+        elementCount: uniqueElements.size,
+        sqm: Math.round(totalSqm * 100) / 100 // Round to 2 decimals
+      };
+    });
+    
+    console.log(`✅ Returning ${groups.length} groups with metrics for ${groupBy}${level ? ` (level: ${level})` : ''}`);
     
     res.json({
       groups,
       subGroups,
+      metrics: groupMetrics,
       groupBy,
       subGroupBy: subGroupBy || null
     });
