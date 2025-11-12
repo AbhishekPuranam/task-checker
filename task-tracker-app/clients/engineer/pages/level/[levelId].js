@@ -614,7 +614,7 @@ export default function LevelDetailPage() {
               ) : (
                 <Box>
                   {Object.keys(groupMetrics).sort().map(groupKey => {
-                    const metrics = groupMetrics[groupKey] || { count: 0, sqm: 0, subGroups: {} };
+                    const metrics = groupMetrics[groupKey] || { count: 0, jobCount: 0, sqm: 0, subGroups: {} };
                     const group = groupJobs[groupKey];
                     const isExpanded = expandedGroups[groupKey] || false;
                     const isLoading = loadingGroups[groupKey] || false;
