@@ -2048,6 +2048,7 @@ router.get('/engineer/metrics', auth, cacheMiddleware(120, engineerMetricsCacheK
 
     res.json({
       totalCount,
+      totalJobs: totalCount, // Add totalJobs for frontend compatibility
       totalElements,
       totalSqm,
       statusBreakdown
