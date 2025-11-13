@@ -42,6 +42,7 @@ export default function LevelDetailPage() {
   const [subGroupBy, setSubGroupBy] = useState('');
   const [expandedGroups, setExpandedGroups] = useState({});
   const [groupMetrics, setGroupMetrics] = useState({});
+  const [allStatusMetrics, setAllStatusMetrics] = useState({}); // Store metrics for all statuses
   const [groupJobs, setGroupJobs] = useState({});
   const [loadingGroups, setLoadingGroups] = useState({});
   const [allJobsCache, setAllJobsCache] = useState({});
@@ -96,6 +97,38 @@ export default function LevelDetailPage() {
     try {
       setLoading(true);
       
+      // Fetch metrics for all statuses to display in the cards
+      const allMetrics = {};
+      for (const tab of TABS) {
+        try {
+          const groupsResponse = await api.get(`/jobs/engineer/groups?project=${projectId}&level=${decodeURIComponent(levelId)}&status=${tab.id}&groupBy=${groupBy}${subGroupBy ? `&subGroupBy=${subGroupBy}` : ''}`);
+          const groupsData = groupsResponse.data;
+          
+          let totalElements = 0;
+          let totalJobCount = 0;
+          let totalSqm = 0;
+          
+          groupsData.groups.forEach(groupName => {
+            const apiMetrics = groupsData.metrics?.[groupName];
+            totalElements += apiMetrics?.elementCount || 0;
+            totalJobCount += apiMetrics?.jobCount || 0;
+            totalSqm += apiMetrics?.sqm || 0;
+          });
+          
+          allMetrics[tab.id] = {
+            elementCount: totalElements,
+            jobCount: totalJobCount,
+            sqm: totalSqm
+          };
+        } catch (error) {
+          console.error(`Error fetching metrics for ${tab.id}:`, error);
+          allMetrics[tab.id] = { elementCount: 0, jobCount: 0, sqm: 0 };
+        }
+      }
+      
+      setAllStatusMetrics(allMetrics);
+      
+      // Fetch groups for the active tab only
       const statusForCurrentTab = activeTab || '';
       
       try {
@@ -537,19 +570,9 @@ export default function LevelDetailPage() {
         {/* Status Metric Cards - Replace Tabs */}
         <Grid container spacing={2} sx={{ mb: 3 }}>
           {TABS.map(tab => {
-            // Aggregate metrics for each status
-            let totalElements = 0;
-            let totalSqm = 0;
-            let jobCount = 0;
+            // Get metrics for this specific status from allStatusMetrics
+            const statusMetrics = allStatusMetrics[tab.id] || { elementCount: 0, jobCount: 0, sqm: 0 };
             
-            Object.entries(groupMetrics).forEach(([groupName, metrics]) => {
-              if (metrics) {
-                totalElements += metrics.elementCount || 0;
-                totalSqm += metrics.sqm || 0;
-                jobCount += metrics.jobCount || 0;
-              }
-            });
-
             const isSelected = activeTab === tab.id;
             
             return (
@@ -578,7 +601,7 @@ export default function LevelDetailPage() {
                       {tab.id === 'not_applicable' && <Cancel sx={{ fontSize: 50, color: tab.color, mr: 2 }} />}
                       <Box>
                         <Typography variant="h2" fontWeight="bold" sx={{ color: tab.color }}>
-                          {jobCount}
+                          {statusMetrics.jobCount}
                         </Typography>
                         <Typography variant="h6" color="text.secondary" fontWeight="medium">
                           {tab.label}
@@ -591,7 +614,7 @@ export default function LevelDetailPage() {
                         Elements
                       </Typography>
                       <Typography variant="h6" fontWeight="bold" sx={{ color: tab.color }}>
-                        {totalElements}
+                        {statusMetrics.elementCount}
                       </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -599,7 +622,7 @@ export default function LevelDetailPage() {
                         SQM
                       </Typography>
                       <Typography variant="h6" fontWeight="bold" sx={{ color: tab.color }}>
-                        {totalSqm.toFixed(2)}
+                        {statusMetrics.sqm.toFixed(2)}
                       </Typography>
                     </Box>
                   </CardContent>
