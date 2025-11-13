@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import {
   AccountCircle, LogoutOutlined, Dashboard as DashboardIcon,
-  HourglassEmpty, CheckCircle, Cancel, Layers, Search
+  HourglassEmpty, CheckCircle, Cancel, Layers, Search, WorkOutline, SquareFoot
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from 'next/router';
@@ -446,7 +446,7 @@ export default function EngineerDashboard() {
               total={stats.totalJobs}
               label="Jobs Completion"
               color="#10b981"
-              icon={CheckCircle}
+              icon={WorkOutline}
             />
           </Grid>
 
@@ -468,7 +468,7 @@ export default function EngineerDashboard() {
               total={parseFloat(stats.totalSqm.toFixed(2))}
               label="SQM Completion"
               color="#f59e0b"
-              icon={Cancel}
+              icon={SquareFoot}
             />
           </Grid>
         </Grid>
@@ -559,26 +559,26 @@ export default function EngineerDashboard() {
                     cursor: 'pointer',
                     height: '100%',
                     transition: 'all 0.3s ease',
-                    background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
-                    border: '3px solid #e5e7eb',
+                    background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                    border: '3px solid #475569',
                     '&:hover': {
                       transform: 'translateY(-4px)',
                       boxShadow: 6,
-                      borderColor: '#3b82f6'
+                      borderColor: '#64748b'
                     }
                   }}
                 >
                   <CardContent sx={{ p: 3 }}>
                     {/* Level Name - Large and Centered */}
-                    <Box sx={{ textAlign: 'center', mb: 3, pb: 2, borderBottom: '2px solid #e5e7eb' }}>
-                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 'bold', letterSpacing: 1 }}>
+                    <Box sx={{ textAlign: 'center', mb: 3, pb: 2, borderBottom: '2px solid rgba(255,255,255,0.2)' }}>
+                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', fontWeight: 'bold', letterSpacing: 1 }}>
                         LEVEL
                       </Typography>
                       <Typography 
                         variant="h3" 
                         fontWeight="bold" 
                         sx={{ 
-                          color: '#1e293b',
+                          color: 'white',
                           mt: 0.5
                         }}
                       >
@@ -590,7 +590,7 @@ export default function EngineerDashboard() {
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                       {/* Pending */}
                       <Box sx={{ 
-                        bgcolor: '#fff3e0',
+                        bgcolor: 'rgba(245, 158, 11, 0.15)',
                         border: '2px solid #f59e0b',
                         borderRadius: 1,
                         p: 1.5,
@@ -598,7 +598,7 @@ export default function EngineerDashboard() {
                         justifyContent: 'space-between',
                         alignItems: 'center'
                       }}>
-                        <Typography variant="body2" fontWeight="bold" sx={{ color: '#92400e' }}>
+                        <Typography variant="body2" fontWeight="bold" sx={{ color: '#fbbf24' }}>
                           Pending
                         </Typography>
                         <Typography variant="h4" fontWeight="bold" sx={{ color: '#f59e0b' }}>
@@ -608,7 +608,7 @@ export default function EngineerDashboard() {
 
                       {/* Completed */}
                       <Box sx={{ 
-                        bgcolor: '#e8f5e9',
+                        bgcolor: 'rgba(16, 185, 129, 0.15)',
                         border: '2px solid #10b981',
                         borderRadius: 1,
                         p: 1.5,
@@ -616,7 +616,7 @@ export default function EngineerDashboard() {
                         justifyContent: 'space-between',
                         alignItems: 'center'
                       }}>
-                        <Typography variant="body2" fontWeight="bold" sx={{ color: '#064e3b' }}>
+                        <Typography variant="body2" fontWeight="bold" sx={{ color: '#34d399' }}>
                           Completed
                         </Typography>
                         <Typography variant="h4" fontWeight="bold" sx={{ color: '#10b981' }}>
@@ -626,7 +626,7 @@ export default function EngineerDashboard() {
 
                       {/* Non Clearance */}
                       <Box sx={{ 
-                        bgcolor: '#fee2e2',
+                        bgcolor: 'rgba(239, 68, 68, 0.15)',
                         border: '2px solid #ef4444',
                         borderRadius: 1,
                         p: 1.5,
@@ -634,7 +634,7 @@ export default function EngineerDashboard() {
                         justifyContent: 'space-between',
                         alignItems: 'center'
                       }}>
-                        <Typography variant="body2" fontWeight="bold" sx={{ color: '#7f1d1d' }}>
+                        <Typography variant="body2" fontWeight="bold" sx={{ color: '#f87171' }}>
                           Non Clearance
                         </Typography>
                         <Typography variant="h4" fontWeight="bold" sx={{ color: '#ef4444' }}>
