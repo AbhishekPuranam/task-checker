@@ -5,7 +5,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TablePagination, TextField, Select, MenuItem, FormControl, InputLabel,
   Chip, CircularProgress, Button, Drawer, List, ListItem, ListItemButton, ListItemText,
-  IconButton, Divider, InputAdornment, Accordion, AccordionSummary, AccordionDetails, Tabs, Tab
+  IconButton, Divider, InputAdornment, Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
 import {
   HourglassEmpty, CheckCircle, Cancel, Search, Refresh, AccountCircle,
@@ -521,51 +521,80 @@ export default function LevelDetailPage() {
           </Typography>
         </Paper>
 
-        {/* Tabs */}
-        <Paper elevation={3} sx={{ mb: 2, borderRadius: 2 }}>
-          <Tabs
-            value={activeTab}
-            onChange={(e, newValue) => setActiveTab(newValue)}
-            sx={{
-              '& .MuiTab-root': { textTransform: 'none', fontWeight: 600 },
-              borderBottom: '1px solid #e0e0e0'
-            }}
-          >
-            {TABS.map(tab => (
-              <Tab
-                key={tab.id}
-                label={tab.label}
-                value={tab.id}
-                sx={{
-                  color: tab.color,
-                  '&.Mui-selected': {
-                    color: tab.color,
-                    fontWeight: 'bold',
-                    borderBottom: `3px solid ${tab.color}`
-                  }
-                }}
-              />
-            ))}
-          </Tabs>
-          {/* Metrics summary below tabs */}
-          <Box sx={{ display: 'flex', gap: 3, px: 3, py: 2, alignItems: 'center' }}>
-            {(() => {
-              // Aggregate metrics for current tab
-              let totalElements = 0;
-              let totalSqm = 0;
-              Object.values(groupMetrics).forEach(m => {
-                totalElements += m.count || 0;
-                totalSqm += m.sqm || 0;
-              });
-              return (
-                <>
-                  <Chip label={`Total Elements: ${totalElements}`} sx={{ bgcolor: '#f3e5f5', color: '#7b1fa2', fontWeight: 'bold', fontSize: 16 }} />
-                  <Chip label={`Total SQM: ${totalSqm.toFixed(2)}`} sx={{ bgcolor: '#fff3e0', color: '#e65100', fontWeight: 'bold', fontSize: 16 }} />
-                </>
-              );
-            })()}
-          </Box>
-        </Paper>
+        {/* Status Metric Cards - Replace Tabs */}
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          {TABS.map(tab => {
+            // Aggregate metrics for each status
+            let totalElements = 0;
+            let totalSqm = 0;
+            let jobCount = 0;
+            
+            Object.entries(groupMetrics).forEach(([groupName, metrics]) => {
+              if (metrics) {
+                totalElements += metrics.elementCount || 0;
+                totalSqm += metrics.sqm || 0;
+                jobCount += metrics.jobCount || 0;
+              }
+            });
+
+            const isSelected = activeTab === tab.id;
+            
+            return (
+              <Grid item xs={12} md={4} key={tab.id}>
+                <Card
+                  onClick={() => setActiveTab(tab.id)}
+                  sx={{
+                    cursor: 'pointer',
+                    background: isSelected 
+                      ? `linear-gradient(135deg, ${tab.color}15 0%, ${tab.color}25 100%)`
+                      : 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
+                    border: isSelected ? `3px solid ${tab.color}` : '2px solid #e5e7eb',
+                    transition: 'all 0.3s ease',
+                    height: '100%',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: 4,
+                      borderColor: tab.color
+                    }
+                  }}
+                >
+                  <CardContent sx={{ p: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                      {tab.id === 'pending' && <HourglassEmpty sx={{ fontSize: 50, color: tab.color, mr: 2 }} />}
+                      {tab.id === 'completed' && <CheckCircle sx={{ fontSize: 50, color: tab.color, mr: 2 }} />}
+                      {tab.id === 'not_applicable' && <Cancel sx={{ fontSize: 50, color: tab.color, mr: 2 }} />}
+                      <Box>
+                        <Typography variant="h2" fontWeight="bold" sx={{ color: tab.color }}>
+                          {jobCount}
+                        </Typography>
+                        <Typography variant="h6" color="text.secondary" fontWeight="medium">
+                          {tab.label}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Divider sx={{ my: 2 }} />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography variant="body1" fontWeight="medium" color="text.secondary">
+                        Elements
+                      </Typography>
+                      <Typography variant="h6" fontWeight="bold" sx={{ color: tab.color }}>
+                        {totalElements}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="body1" fontWeight="medium" color="text.secondary">
+                        SQM
+                      </Typography>
+                      <Typography variant="h6" fontWeight="bold" sx={{ color: tab.color }}>
+                        {totalSqm.toFixed(2)}
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            );
+          })}
+        </Grid>
 
         {/* Search and Grouping Controls */}
         <Paper elevation={3} sx={{ p: 3, mb: 2, borderRadius: 2 }}>

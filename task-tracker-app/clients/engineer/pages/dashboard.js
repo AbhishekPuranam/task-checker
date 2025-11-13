@@ -263,8 +263,8 @@ export default function EngineerDashboard() {
       {/* Main Content */}
       <Container maxWidth="xl" sx={{ mt: 3, mb: 3 }}>
         {/* Header with Project Selector */}
-        <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+        <Paper elevation={3} sx={{ p: 3, mb: 3, background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)', border: '2px solid #e5e7eb' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 3 }}>
             <Box>
               <Typography variant="h4" fontWeight="bold" gutterBottom>
                 📊 Dashboard
@@ -273,19 +273,48 @@ export default function EngineerDashboard() {
                 Project overview and completion progress
               </Typography>
             </Box>
-            <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                PROJECT
+            <Box sx={{ 
+              p: 2, 
+              bgcolor: '#3b82f6', 
+              borderRadius: 2, 
+              boxShadow: 3,
+              minWidth: 350
+            }}>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  display: 'block', 
+                  mb: 1, 
+                  color: 'white', 
+                  fontWeight: 'bold',
+                  letterSpacing: 1,
+                  textTransform: 'uppercase'
+                }}
+              >
+                📁 Select Project
               </Typography>
-              <FormControl size="medium" sx={{ minWidth: 300 }}>
+              <FormControl fullWidth size="large">
                 <Select
                   value={selectedProject}
                   onChange={(e) => handleProjectChange(e.target.value)}
                   displayEmpty
                   sx={{
                     bgcolor: 'white',
-                    '& .MuiOutlinedInput-notchedOutline': { borderColor: '#e5e7eb' },
-                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#9ca3af' },
+                    fontWeight: 'bold',
+                    fontSize: '1.1rem',
+                    '& .MuiOutlinedInput-notchedOutline': { 
+                      borderColor: 'white',
+                      borderWidth: 2 
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': { 
+                      borderColor: '#60a5fa',
+                      borderWidth: 2
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { 
+                      borderColor: '#3b82f6',
+                      borderWidth: 3
+                    },
+                    boxShadow: 2
                   }}
                 >
                   <MenuItem value="" disabled>Select Project</MenuItem>
@@ -529,142 +558,89 @@ export default function EngineerDashboard() {
                   sx={{ 
                     cursor: 'pointer',
                     height: '100%',
-                    position: 'relative',
                     transition: 'all 0.3s ease',
-                    background: 'linear-gradient(180deg, #1e293b 0%, #334155 100%)',
-                    border: '2px solid #475569',
+                    background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+                    border: '3px solid #e5e7eb',
                     '&:hover': {
                       transform: 'translateY(-4px)',
                       boxShadow: 6,
-                      borderColor: '#64748b'
+                      borderColor: '#3b82f6'
                     }
                   }}
                 >
-                  <CardContent sx={{ pb: 2 }}>
-                    {/* Floor Number Badge */}
-                    <Box sx={{ 
-                      position: 'absolute',
-                      top: 12,
-                      right: 12,
-                      bgcolor: 'rgba(255,255,255,0.1)',
-                      color: 'white',
-                      px: 1.5,
-                      py: 0.5,
-                      borderRadius: 1,
-                      fontSize: '0.75rem',
-                      fontWeight: 'bold'
-                    }}>
-                      LEVEL
+                  <CardContent sx={{ p: 3 }}>
+                    {/* Level Name - Large and Centered */}
+                    <Box sx={{ textAlign: 'center', mb: 3, pb: 2, borderBottom: '2px solid #e5e7eb' }}>
+                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 'bold', letterSpacing: 1 }}>
+                        LEVEL
+                      </Typography>
+                      <Typography 
+                        variant="h3" 
+                        fontWeight="bold" 
+                        sx={{ 
+                          color: '#1e293b',
+                          mt: 0.5
+                        }}
+                      >
+                        {level.level}
+                      </Typography>
                     </Box>
 
-                    {/* Floor Name */}
-                    <Typography 
-                      variant="h5" 
-                      fontWeight="bold" 
-                      sx={{ 
-                        color: 'white',
-                        mb: 2,
-                        pr: 6
-                      }}
-                    >
-                      {level.level}
-                    </Typography>
-
-                    {/* Building Floor Lines */}
-                    <Box sx={{ mb: 2 }}>
-                      {[0, 1, 2, 3].map((i) => (
-                        <Box 
-                          key={i}
-                          sx={{ 
-                            height: '16px',
-                            borderBottom: '2px solid rgba(255,255,255,0.2)',
-                            mb: 0.5,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1,
-                            px: 1
-                          }}
-                        >
-                          {/* Window-like dots */}
-                          <Box sx={{ 
-                            width: 6, 
-                            height: 6, 
-                            borderRadius: '50%', 
-                            bgcolor: 'rgba(255,255,255,0.3)' 
-                          }} />
-                          <Box sx={{ 
-                            width: 6, 
-                            height: 6, 
-                            borderRadius: '50%', 
-                            bgcolor: 'rgba(255,255,255,0.3)' 
-                          }} />
-                          <Box sx={{ 
-                            width: 6, 
-                            height: 6, 
-                            borderRadius: '50%', 
-                            bgcolor: 'rgba(255,255,255,0.3)' 
-                          }} />
-                        </Box>
-                      ))}
-                    </Box>
-
-                    {/* Status Indicators as Floor Sections */}
-                    <Box sx={{ display: 'flex', gap: 0.5, mb: 1 }}>
+                    {/* Large Job Count Cards */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                      {/* Pending */}
                       <Box sx={{ 
-                        flex: level.pendingJobs,
-                        height: 8,
-                        bgcolor: '#f59e0b',
-                        borderRadius: 0.5,
-                        minWidth: level.pendingJobs > 0 ? 20 : 0
-                      }} />
-                      <Box sx={{ 
-                        flex: level.completedJobs,
-                        height: 8,
-                        bgcolor: '#10b981',
-                        borderRadius: 0.5,
-                        minWidth: level.completedJobs > 0 ? 20 : 0
-                      }} />
-                      <Box sx={{ 
-                        flex: level.nonClearanceJobs,
-                        height: 8,
-                        bgcolor: '#ef4444',
-                        borderRadius: 0.5,
-                        minWidth: level.nonClearanceJobs > 0 ? 20 : 0
-                      }} />
-                    </Box>
+                        bgcolor: '#fff3e0',
+                        border: '2px solid #f59e0b',
+                        borderRadius: 1,
+                        p: 1.5,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}>
+                        <Typography variant="body2" fontWeight="bold" sx={{ color: '#92400e' }}>
+                          Pending
+                        </Typography>
+                        <Typography variant="h4" fontWeight="bold" sx={{ color: '#f59e0b' }}>
+                          {level.pendingJobs}
+                        </Typography>
+                      </Box>
 
-                    {/* Status Chips */}
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2 }}>
-                      <Chip 
-                        label={`${level.pendingJobs} Pending`}
-                        size="small" 
-                        sx={{ 
-                          bgcolor: '#f59e0b', 
-                          color: 'white', 
-                          fontWeight: 'bold',
-                          fontSize: '0.75rem'
-                        }} 
-                      />
-                      <Chip 
-                        label={`${level.completedJobs} Done`}
-                        size="small" 
-                        sx={{ 
-                          bgcolor: '#10b981', 
-                          color: 'white', 
-                          fontWeight: 'bold',
-                          fontSize: '0.75rem'
-                        }} 
-                      />
-                      <Chip 
-                        label={`${level.nonClearanceJobs} NC`}
-                        size="small" 
-                        sx={{ 
-                          bgcolor: '#ef4444', 
-                          color: 'white', 
-                          fontWeight: 'bold',
-                          fontSize: '0.75rem'
-                        }} 
-                      />
+                      {/* Completed */}
+                      <Box sx={{ 
+                        bgcolor: '#e8f5e9',
+                        border: '2px solid #10b981',
+                        borderRadius: 1,
+                        p: 1.5,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}>
+                        <Typography variant="body2" fontWeight="bold" sx={{ color: '#064e3b' }}>
+                          Completed
+                        </Typography>
+                        <Typography variant="h4" fontWeight="bold" sx={{ color: '#10b981' }}>
+                          {level.completedJobs}
+                        </Typography>
+                      </Box>
+
+                      {/* Non Clearance */}
+                      <Box sx={{ 
+                        bgcolor: '#fee2e2',
+                        border: '2px solid #ef4444',
+                        borderRadius: 1,
+                        p: 1.5,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}>
+                        <Typography variant="body2" fontWeight="bold" sx={{ color: '#7f1d1d' }}>
+                          Non Clearance
+                        </Typography>
+                        <Typography variant="h4" fontWeight="bold" sx={{ color: '#ef4444' }}>
+                          {level.nonClearanceJobs}
+                        </Typography>
+                      </Box>
                     </Box>
                   </CardContent>
                 </Card>
