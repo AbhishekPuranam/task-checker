@@ -23,7 +23,7 @@ const SemiCircleGauge = ({ value, total, label, color, icon: Icon }) => {
   const strokeDashoffset = circumference - (percentage / 100) * circumference;
 
   return (
-    <Card elevation={3} sx={{ height: '100%' }}>
+    <Card elevation={3} sx={{ height: '100%', background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', border: '2px solid #475569' }}>
       <CardContent>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 2 }}>
           {/* Icon */}
@@ -36,7 +36,7 @@ const SemiCircleGauge = ({ value, total, label, color, icon: Icon }) => {
               <path
                 d={`M ${strokeWidth / 2},${radius + strokeWidth / 2} A ${normalizedRadius},${normalizedRadius} 0 0,1 ${radius * 2 + strokeWidth / 2},${radius + strokeWidth / 2}`}
                 fill="none"
-                stroke="#e5e7eb"
+                stroke="#334155"
                 strokeWidth={strokeWidth}
                 strokeLinecap="round"
               />
@@ -71,10 +71,10 @@ const SemiCircleGauge = ({ value, total, label, color, icon: Icon }) => {
           </Box>
           
           {/* Label and stats */}
-          <Typography variant="h6" fontWeight="bold" gutterBottom>
+          <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ color: 'white' }}>
             {label}
           </Typography>
-          <Typography variant="body2" color="text.secondary" textAlign="center">
+          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }} textAlign="center">
             {value.toLocaleString()} of {total.toLocaleString()}
           </Typography>
         </Box>
@@ -207,7 +207,7 @@ export default function EngineerDashboard() {
   });
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#f5f5f5' }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: '#0f172a' }}>
       {/* Top Navigation Bar */}
       <AppBar position="static" sx={{ bgcolor: '#1e293b', boxShadow: 2 }}>
         <Toolbar>
@@ -263,13 +263,13 @@ export default function EngineerDashboard() {
       {/* Main Content */}
       <Container maxWidth="xl" sx={{ mt: 3, mb: 3 }}>
         {/* Header with Project Selector */}
-        <Paper elevation={3} sx={{ p: 3, mb: 3, background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)', border: '2px solid #e5e7eb' }}>
+        <Paper elevation={3} sx={{ p: 3, mb: 3, background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', border: '2px solid #475569' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 3 }}>
             <Box>
-              <Typography variant="h4" fontWeight="bold" gutterBottom>
+              <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ color: 'white' }}>
                 📊 Dashboard
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
                 Project overview and completion progress
               </Typography>
             </Box>
@@ -332,7 +332,7 @@ export default function EngineerDashboard() {
         {/* Status Cards */}
         <Grid container spacing={3} sx={{ mb: 3 }}>
           <Grid item xs={12} md={4}>
-            <Card sx={{ background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)', border: '3px solid #f59e0b', height: '100%' }}>
+            <Card sx={{ background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', border: '3px solid #f59e0b', height: '100%' }}>
               <CardContent sx={{ p: 4 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                   <HourglassEmpty sx={{ fontSize: 60, color: '#f59e0b', mr: 3 }} />
@@ -340,14 +340,14 @@ export default function EngineerDashboard() {
                     <Typography variant="h2" fontWeight="bold" color="#f59e0b">
                       {stats.pending.count}
                     </Typography>
-                    <Typography variant="h5" color="text.secondary" fontWeight="medium">
+                    <Typography variant="h5" sx={{ color: 'rgba(255,255,255,0.8)' }} fontWeight="medium">
                       Pending Jobs
                     </Typography>
                   </Box>
                 </Box>
                 <Divider sx={{ my: 2 }} />
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
-                  <Typography variant="h6" fontWeight="medium" color="text.secondary">
+                  <Typography variant="h6" fontWeight="medium" sx={{ color: 'rgba(255,255,255,0.7)' }}>
                     SQM
                   </Typography>
                   <Typography variant="h5" fontWeight="bold" color="#f59e0b">
@@ -355,7 +355,7 @@ export default function EngineerDashboard() {
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="h6" fontWeight="medium" color="text.secondary">
+                  <Typography variant="h6" fontWeight="medium" sx={{ color: 'rgba(255,255,255,0.7)' }}>
                     Elements
                   </Typography>
                   <Typography variant="h5" fontWeight="bold" color="#f59e0b">
@@ -367,7 +367,7 @@ export default function EngineerDashboard() {
           </Grid>
 
           <Grid item xs={12} md={4}>
-            <Card sx={{ background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)', border: '3px solid #10b981', height: '100%' }}>
+            <Card sx={{ background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', border: '3px solid #10b981', height: '100%' }}>
               <CardContent sx={{ p: 4 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                   <CheckCircle sx={{ fontSize: 60, color: '#10b981', mr: 3 }} />
@@ -375,14 +375,14 @@ export default function EngineerDashboard() {
                     <Typography variant="h2" fontWeight="bold" color="#10b981">
                       {stats.completed.count}
                     </Typography>
-                    <Typography variant="h5" color="text.secondary" fontWeight="medium">
+                    <Typography variant="h5" sx={{ color: 'rgba(255,255,255,0.8)' }} fontWeight="medium">
                       Completed Jobs
                     </Typography>
                   </Box>
                 </Box>
                 <Divider sx={{ my: 2 }} />
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
-                  <Typography variant="h6" fontWeight="medium" color="text.secondary">
+                  <Typography variant="h6" fontWeight="medium" sx={{ color: 'rgba(255,255,255,0.7)' }}>
                     SQM
                   </Typography>
                   <Typography variant="h5" fontWeight="bold" color="#10b981">
@@ -390,7 +390,7 @@ export default function EngineerDashboard() {
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="h6" fontWeight="medium" color="text.secondary">
+                  <Typography variant="h6" fontWeight="medium" sx={{ color: 'rgba(255,255,255,0.7)' }}>
                     Elements
                   </Typography>
                   <Typography variant="h5" fontWeight="bold" color="#10b981">
@@ -402,7 +402,7 @@ export default function EngineerDashboard() {
           </Grid>
 
           <Grid item xs={12} md={4}>
-            <Card sx={{ background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)', border: '3px solid #ef4444', height: '100%' }}>
+            <Card sx={{ background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', border: '3px solid #ef4444', height: '100%' }}>
               <CardContent sx={{ p: 4 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                   <Cancel sx={{ fontSize: 60, color: '#ef4444', mr: 3 }} />
@@ -410,14 +410,14 @@ export default function EngineerDashboard() {
                     <Typography variant="h2" fontWeight="bold" color="#ef4444">
                       {stats.not_applicable.count}
                     </Typography>
-                    <Typography variant="h5" color="text.secondary" fontWeight="medium">
+                    <Typography variant="h5" sx={{ color: 'rgba(255,255,255,0.8)' }} fontWeight="medium">
                       Non Clearance
                     </Typography>
                   </Box>
                 </Box>
                 <Divider sx={{ my: 2 }} />
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
-                  <Typography variant="h6" fontWeight="medium" color="text.secondary">
+                  <Typography variant="h6" fontWeight="medium" sx={{ color: 'rgba(255,255,255,0.7)' }}>
                     SQM
                   </Typography>
                   <Typography variant="h5" fontWeight="bold" color="#ef4444">
@@ -425,7 +425,7 @@ export default function EngineerDashboard() {
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="h6" fontWeight="medium" color="text.secondary">
+                  <Typography variant="h6" fontWeight="medium" sx={{ color: 'rgba(255,255,255,0.7)' }}>
                     Elements
                   </Typography>
                   <Typography variant="h5" fontWeight="bold" color="#ef4444">
@@ -473,12 +473,12 @@ export default function EngineerDashboard() {
           </Grid>
         </Grid>
 
-        <Divider sx={{ my: 4 }} />
+        <Divider sx={{ my: 4, borderColor: 'rgba(255,255,255,0.1)' }} />
 
         {/* Building Levels Section */}
         <Box sx={{ mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h5" fontWeight="bold">
+            <Typography variant="h5" fontWeight="bold" sx={{ color: 'white' }}>
               🏢 Building Levels ({filteredLevels.length})
             </Typography>
             
@@ -497,7 +497,7 @@ export default function EngineerDashboard() {
               }
               label={
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="body1" fontWeight="medium">
+                  <Typography variant="body1" fontWeight="medium" sx={{ color: 'white' }}>
                     Show Only Non-Clearance Levels
                   </Typography>
                   <Chip 
@@ -523,17 +523,23 @@ export default function EngineerDashboard() {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search />
+                  <Search sx={{ color: 'rgba(255,255,255,0.5)' }} />
                 </InputAdornment>
               ),
             }}
             sx={{
-              bgcolor: 'white',
+              bgcolor: '#1e293b',
               borderRadius: 1,
               mb: 3,
               '& .MuiOutlinedInput-root': {
-                '& fieldset': { borderColor: '#e5e7eb' },
-                '&:hover fieldset': { borderColor: '#9ca3af' },
+                color: 'white',
+                '& fieldset': { borderColor: '#475569' },
+                '&:hover fieldset': { borderColor: '#64748b' },
+                '&.Mui-focused fieldset': { borderColor: '#3b82f6' },
+              },
+              '& .MuiInputBase-input::placeholder': {
+                color: 'rgba(255,255,255,0.5)',
+                opacity: 1
               }
             }}
           />
@@ -541,11 +547,11 @@ export default function EngineerDashboard() {
         
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
-            <CircularProgress />
+            <CircularProgress sx={{ color: 'white' }} />
           </Box>
         ) : filteredLevels.length === 0 ? (
-          <Paper sx={{ p: 5, textAlign: 'center' }}>
-            <Typography variant="h6" color="text.secondary">
+          <Paper sx={{ p: 5, textAlign: 'center', bgcolor: '#1e293b', border: '1px solid #475569' }}>
+            <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.7)' }}>
               No levels found
             </Typography>
           </Paper>
