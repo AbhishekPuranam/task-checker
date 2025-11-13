@@ -326,9 +326,22 @@ export default function LevelDetailPage() {
       await api.patch(`/jobs/engineer/${jobId}/status`, { status: newStatus });
       toast.success('Status updated successfully!');
       
+      // Clear cache and fetch fresh data
       setAllJobsCache({});
+      
+      // Store currently expanded groups before clearing
+      const currentlyExpandedGroups = Object.keys(expandedGroups).filter(key => expandedGroups[key]);
+      
+      // Clear group jobs
       setGroupJobs({});
-      fetchMetrics();
+      
+      // Fetch metrics first
+      await fetchMetrics();
+      
+      // Refetch jobs for all currently expanded groups
+      for (const groupKey of currentlyExpandedGroups) {
+        await fetchGroupJobs(groupKey);
+      }
     } catch (error) {
       console.error('Error updating status:', error);
       toast.error('Failed to update status');
