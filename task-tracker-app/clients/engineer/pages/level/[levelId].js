@@ -611,14 +611,6 @@ export default function LevelDetailPage() {
                     <Divider sx={{ my: 2 }} />
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                       <Typography variant="body1" fontWeight="medium" color="text.secondary">
-                        Jobs
-                      </Typography>
-                      <Typography variant="h6" fontWeight="bold" sx={{ color: tab.color }}>
-                        {statusMetrics.jobCount}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                      <Typography variant="body1" fontWeight="medium" color="text.secondary">
                         Elements
                       </Typography>
                       <Typography variant="h6" fontWeight="bold" sx={{ color: tab.color }}>
