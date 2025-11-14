@@ -3,12 +3,12 @@ import { useRouter } from 'next/router';
 import {
   Container, Paper, Typography, Box, Grid, Card, CardContent,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  TablePagination, TextField, Select, MenuItem, FormControl, InputLabel,
-  Chip, CircularProgress, Button, Drawer, List, ListItem, ListItemButton, ListItemText,
-  IconButton, Divider, InputAdornment, Accordion, AccordionSummary, AccordionDetails
+  TextField, Select, MenuItem, FormControl, InputLabel,
+  Chip, CircularProgress, Button, Drawer, List, ListItemButton, ListItemText,
+  Divider, InputAdornment, Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
 import {
-  HourglassEmpty, CheckCircle, Cancel, Search, Refresh, AccountCircle,
+  HourglassEmpty, CheckCircle, Cancel, Search, AccountCircle,
   LogoutOutlined, Dashboard as DashboardIcon, ArrowBack, ExpandMore as ExpandMoreIcon,
   LocalFireDepartment
 } from '@mui/icons-material';
@@ -45,7 +45,6 @@ export default function LevelDetailPage() {
   const [allStatusMetrics, setAllStatusMetrics] = useState({}); // Store metrics for all statuses
   const [groupJobs, setGroupJobs] = useState({});
   const [loadingGroups, setLoadingGroups] = useState({});
-  const [allJobsCache, setAllJobsCache] = useState({});
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -177,84 +176,6 @@ export default function LevelDetailPage() {
     }
   }, [projectId, levelId, activeTab, groupBy, subGroupBy, searchTerm]);
 
-  const calculateGroupMetrics = (jobsData) => {
-    const metrics = {};
-    const groupElements = {};
-    const subGroupElements = {};
-    const groupJobCounts = {};
-    const subGroupJobCounts = {};
-    
-    jobsData.forEach(job => {
-      const jobStatus = !job.status || job.status === 'in_progress' ? 'pending' : job.status;
-      
-      if (activeTab && jobStatus !== activeTab) return;
-      
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        const matches = 
-          job.jobTitle?.toLowerCase().includes(searchLower) ||
-          job.structuralElement?.structureNumber?.toLowerCase().includes(searchLower) ||
-          job.structuralElement?.gridNo?.toLowerCase().includes(searchLower) ||
-          job.structuralElement?.partMarkNo?.toLowerCase().includes(searchLower) ||
-          job.structuralElement?.level?.toLowerCase().includes(searchLower);
-        
-        if (!matches) return;
-      }
-      
-      const primaryKey = job.structuralElement?.[groupBy] || job[groupBy] || 'Other';
-      
-      if (!metrics[primaryKey]) {
-        metrics[primaryKey] = { count: 0, jobCount: 0, sqm: 0, qty: 0, subGroups: {} };
-        groupElements[primaryKey] = new Set();
-        groupJobCounts[primaryKey] = 0;
-        subGroupElements[primaryKey] = {};
-        subGroupJobCounts[primaryKey] = {};
-      }
-      
-      groupJobCounts[primaryKey]++;
-      
-      const elementId = job.structuralElement?._id?.toString();
-      if (elementId) {
-        if (!groupElements[primaryKey].has(elementId)) {
-          groupElements[primaryKey].add(elementId);
-          metrics[primaryKey].sqm += job.structuralElement?.surfaceAreaSqm || 0;
-          metrics[primaryKey].qty += job.structuralElement?.qty || 0;
-        }
-      }
-      
-      if (subGroupBy) {
-        const secondaryKey = job[subGroupBy] || job.structuralElement?.[subGroupBy] || 'Other';
-        if (!metrics[primaryKey].subGroups[secondaryKey]) {
-          metrics[primaryKey].subGroups[secondaryKey] = { count: 0, jobCount: 0, sqm: 0, qty: 0 };
-          subGroupElements[primaryKey][secondaryKey] = new Set();
-          subGroupJobCounts[primaryKey][secondaryKey] = 0;
-        }
-        
-        subGroupJobCounts[primaryKey][secondaryKey]++;
-        
-        if (elementId && !subGroupElements[primaryKey][secondaryKey].has(elementId)) {
-          subGroupElements[primaryKey][secondaryKey].add(elementId);
-          metrics[primaryKey].subGroups[secondaryKey].sqm += job.structuralElement?.surfaceAreaSqm || 0;
-          metrics[primaryKey].subGroups[secondaryKey].qty += job.structuralElement?.qty || 0;
-        }
-      }
-    });
-    
-    Object.keys(metrics).forEach(primaryKey => {
-      metrics[primaryKey].count = groupElements[primaryKey].size;
-      metrics[primaryKey].jobCount = groupJobCounts[primaryKey];
-      
-      if (subGroupBy) {
-        Object.keys(metrics[primaryKey].subGroups).forEach(secondaryKey => {
-          metrics[primaryKey].subGroups[secondaryKey].count = subGroupElements[primaryKey][secondaryKey].size;
-          metrics[primaryKey].subGroups[secondaryKey].jobCount = subGroupJobCounts[primaryKey][secondaryKey];
-        });
-      }
-    });
-    
-    return metrics;
-  };
-
   const fetchGroupJobs = useCallback(async (groupKey) => {
     try {
       setLoadingGroups(prev => ({ ...prev, [groupKey]: true }));
@@ -324,13 +245,6 @@ export default function LevelDetailPage() {
         [groupKey]: groupedData
       }));
       
-      // Calculate metrics for this group
-      const groupMetricsData = calculateGroupMetrics(fetchedJobs);
-      setGroupMetrics(prev => ({
-        ...prev,
-        [groupKey]: groupMetricsData[groupKey] || { count: 0, jobCount: 0, sqm: 0, qty: 0, subGroups: {} }
-      }));
-      
     } catch (error) {
       console.error('Error fetching group jobs:', error);
       toast.error('Failed to load jobs for this group');
@@ -358,9 +272,6 @@ export default function LevelDetailPage() {
       setUpdatingJob(jobId);
       await api.patch(`/jobs/engineer/${jobId}/status`, { status: newStatus });
       toast.success('Status updated successfully!');
-      
-      // Clear cache and fetch fresh data
-      setAllJobsCache({});
       
       // Store currently expanded groups before clearing
       const currentlyExpandedGroups = Object.keys(expandedGroups).filter(key => expandedGroups[key]);
@@ -396,15 +307,6 @@ export default function LevelDetailPage() {
   const filteredLevels = levels.filter(level => 
     level.level.toLowerCase().includes(levelSearch.toLowerCase())
   );
-
-  const getStatusColor = (status) => {
-    const colors = {
-      pending: '#f59e0b',
-      completed: '#10b981',
-      not_applicable: '#ef4444'
-    };
-    return colors[status] || '#9ca3af';
-  };
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f5f5f5' }}>
