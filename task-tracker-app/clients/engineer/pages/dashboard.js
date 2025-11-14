@@ -94,6 +94,7 @@ export default function EngineerDashboard() {
   const [levels, setLevels] = useState([]);
   const [levelSearch, setLevelSearch] = useState('');
   const [showOnlyNonClearance, setShowOnlyNonClearance] = useState(false);
+  const [sortBy, setSortBy] = useState('default'); // 'default', 'pendingJobs', 'totalSqm'
   
   // Metrics
   const [stats, setStats] = useState({
@@ -187,6 +188,7 @@ export default function EngineerDashboard() {
     setSelectedProject(projectId);
     setLevels([]);
     setLevelSearch('');
+    setSortBy('default');
     setStats({
       pending: { count: 0, sqm: 0, elements: 0 },
       completed: { count: 0, sqm: 0, elements: 0 },
@@ -204,6 +206,27 @@ export default function EngineerDashboard() {
     const matchesSearch = level.level.toLowerCase().includes(levelSearch.toLowerCase());
     const matchesNonClearance = !showOnlyNonClearance || level.nonClearanceJobs > 0;
     return matchesSearch && matchesNonClearance;
+  });
+
+  // Sort levels based on selected option
+  const sortedLevels = [...filteredLevels].sort((a, b) => {
+    if (sortBy === 'pendingJobs') {
+      return b.pendingJobs - a.pendingJobs; // Highest first
+    } else if (sortBy === 'totalSqm') {
+      return b.totalSqm - a.totalSqm; // Highest first
+    }
+    // Default sorting (by level name)
+    const aLevel = a.level;
+    const bLevel = b.level;
+    
+    if (aLevel.includes('Basement') && !bLevel.includes('Basement')) return -1;
+    if (!aLevel.includes('Basement') && bLevel.includes('Basement')) return 1;
+    if (aLevel.includes('Ground') && !bLevel.includes('Ground')) return 1;
+    if (!aLevel.includes('Ground') && bLevel.includes('Ground')) return -1;
+    if (aLevel.includes('Terrace')) return 1;
+    if (bLevel.includes('Terrace')) return -1;
+    
+    return aLevel.localeCompare(bLevel);
   });
 
   return (
@@ -479,39 +502,61 @@ export default function EngineerDashboard() {
         <Box sx={{ mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Typography variant="h5" fontWeight="bold" sx={{ color: 'white' }}>
-              🏢 Building Levels ({filteredLevels.length})
+              🏢 Building Levels ({sortedLevels.length})
             </Typography>
             
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={showOnlyNonClearance}
-                  onChange={(e) => setShowOnlyNonClearance(e.target.checked)}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {/* Sort By Dropdown */}
+              <FormControl size="small" sx={{ minWidth: 200 }}>
+                <Select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
                   sx={{
-                    color: '#ef4444',
-                    '&.Mui-checked': {
-                      color: '#ef4444',
-                    },
+                    bgcolor: '#1e293b',
+                    color: 'white',
+                    '.MuiOutlinedInput-notchedOutline': { borderColor: '#475569' },
+                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#64748b' },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#3b82f6' },
+                    '.MuiSvgIcon-root': { color: 'white' }
                   }}
-                />
-              }
-              label={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="body1" fontWeight="medium" sx={{ color: 'white' }}>
-                    Show Only Non-Clearance Levels
-                  </Typography>
-                  <Chip 
-                    label={levels.filter(l => l.nonClearanceJobs > 0).length}
-                    size="small"
-                    sx={{ 
-                      bgcolor: '#ef4444', 
-                      color: 'white',
-                      fontWeight: 'bold'
+                >
+                  <MenuItem value="default">Sort: Default</MenuItem>
+                  <MenuItem value="pendingJobs">Sort: Highest Pending Jobs</MenuItem>
+                  <MenuItem value="totalSqm">Sort: Highest SQM</MenuItem>
+                </Select>
+              </FormControl>
+
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={showOnlyNonClearance}
+                    onChange={(e) => setShowOnlyNonClearance(e.target.checked)}
+                    sx={{
+                      color: '#ef4444',
+                      '&.Mui-checked': {
+                        color: '#ef4444',
+                      },
                     }}
                   />
-                </Box>
-              }
-            />
+                }
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="body1" fontWeight="medium" sx={{ color: 'white' }}>
+                      Show Only Non-Clearance Levels
+                    </Typography>
+                    <Chip 
+                      label={levels.filter(l => l.nonClearanceJobs > 0).length}
+                      size="small"
+                      sx={{ 
+                        bgcolor: '#ef4444', 
+                        color: 'white',
+                        fontWeight: 'bold'
+                      }}
+                    />
+                  </Box>
+                }
+              />
+            </Box>
           </Box>
           
           {/* Search Bar for Levels */}
@@ -557,7 +602,7 @@ export default function EngineerDashboard() {
           </Paper>
         ) : (
           <Grid container spacing={2} sx={{ mb: 4 }}>
-            {filteredLevels.map((level) => (
+            {sortedLevels.map((level) => (
               <Grid item xs={12} sm={6} md={4} lg={3} key={level.level}>
                 <Card 
                   onClick={() => handleLevelClick(level)}
@@ -592,6 +637,23 @@ export default function EngineerDashboard() {
                       </Typography>
                     </Box>
 
+                    {/* Total SQM Display */}
+                    <Box sx={{ 
+                      bgcolor: 'rgba(59, 130, 246, 0.15)',
+                      border: '2px solid #3b82f6',
+                      borderRadius: 1,
+                      p: 1.5,
+                      mb: 2,
+                      textAlign: 'center'
+                    }}>
+                      <Typography variant="caption" fontWeight="bold" sx={{ color: '#93c5fd', display: 'block' }}>
+                        Total SQM
+                      </Typography>
+                      <Typography variant="h5" fontWeight="bold" sx={{ color: '#3b82f6' }}>
+                        {level.totalSqm?.toFixed(2) || '0.00'}
+                      </Typography>
+                    </Box>
+
                     {/* Large Job Count Cards */}
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                       {/* Pending */}
@@ -604,9 +666,14 @@ export default function EngineerDashboard() {
                         justifyContent: 'space-between',
                         alignItems: 'center'
                       }}>
-                        <Typography variant="body2" fontWeight="bold" sx={{ color: '#fbbf24' }}>
-                          Pending
-                        </Typography>
+                        <Box>
+                          <Typography variant="body2" fontWeight="bold" sx={{ color: '#fbbf24' }}>
+                            Pending
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#fcd34d' }}>
+                            {level.pendingSqm?.toFixed(2) || '0.00'} sqm
+                          </Typography>
+                        </Box>
                         <Typography variant="h4" fontWeight="bold" sx={{ color: '#f59e0b' }}>
                           {level.pendingJobs}
                         </Typography>
@@ -622,9 +689,14 @@ export default function EngineerDashboard() {
                         justifyContent: 'space-between',
                         alignItems: 'center'
                       }}>
-                        <Typography variant="body2" fontWeight="bold" sx={{ color: '#34d399' }}>
-                          Completed
-                        </Typography>
+                        <Box>
+                          <Typography variant="body2" fontWeight="bold" sx={{ color: '#34d399' }}>
+                            Completed
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#6ee7b7' }}>
+                            {level.completedSqm?.toFixed(2) || '0.00'} sqm
+                          </Typography>
+                        </Box>
                         <Typography variant="h4" fontWeight="bold" sx={{ color: '#10b981' }}>
                           {level.completedJobs}
                         </Typography>
@@ -640,9 +712,14 @@ export default function EngineerDashboard() {
                         justifyContent: 'space-between',
                         alignItems: 'center'
                       }}>
-                        <Typography variant="body2" fontWeight="bold" sx={{ color: '#f87171' }}>
-                          Non Clearance
-                        </Typography>
+                        <Box>
+                          <Typography variant="body2" fontWeight="bold" sx={{ color: '#f87171' }}>
+                            Non Clearance
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#fca5a5' }}>
+                            {level.nonClearanceSqm?.toFixed(2) || '0.00'} sqm
+                          </Typography>
+                        </Box>
                         <Typography variant="h4" fontWeight="bold" sx={{ color: '#ef4444' }}>
                           {level.nonClearanceJobs}
                         </Typography>

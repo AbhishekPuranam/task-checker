@@ -1569,12 +1569,13 @@ router.get('/engineer/levels', auth, cacheMiddleware(300, engineerGroupsCacheKey
       levelMap[level].elementIds.push(el._id);
     });
 
-    // Get job counts for each level
+    // Get job counts and SQM data for each level
     const Job = require('../shared/models/Job');
     const levels = await Promise.all(
       Object.keys(levelMap).map(async (levelKey) => {
         const elementIds = levelMap[levelKey].elementIds;
         
+        // Get job counts
         const [totalJobs, pendingJobs, completedJobs, nonClearanceJobs] = await Promise.all([
           Job.countDocuments({ structuralElement: { $in: elementIds } }),
           Job.countDocuments({ structuralElement: { $in: elementIds }, status: 'pending' }),
@@ -1582,13 +1583,51 @@ router.get('/engineer/levels', auth, cacheMiddleware(300, engineerGroupsCacheKey
           Job.countDocuments({ structuralElement: { $in: elementIds }, status: 'not_applicable' })
         ]);
 
+        // Get SQM data by aggregating from structural elements and their job statuses
+        const elementsWithSqm = await StructuralElement.find({
+          _id: { $in: elementIds }
+        }).select('_id surfaceAreaSqm').lean();
+
+        // Map element IDs to their SQM values
+        const elementSqmMap = {};
+        let totalSqm = 0;
+        elementsWithSqm.forEach(el => {
+          const sqm = el.surfaceAreaSqm || 0;
+          elementSqmMap[el._id.toString()] = sqm;
+          totalSqm += sqm;
+        });
+
+        // Get jobs with their element IDs to calculate SQM by status
+        const jobs = await Job.find({
+          structuralElement: { $in: elementIds }
+        }).select('structuralElement status').lean();
+
+        let pendingSqm = 0;
+        let completedSqm = 0;
+        let nonClearanceSqm = 0;
+
+        jobs.forEach(job => {
+          const sqm = elementSqmMap[job.structuralElement.toString()] || 0;
+          if (job.status === 'pending') {
+            pendingSqm += sqm;
+          } else if (job.status === 'completed') {
+            completedSqm += sqm;
+          } else if (job.status === 'not_applicable') {
+            nonClearanceSqm += sqm;
+          }
+        });
+
         return {
           level: levelKey,
           elementCount: elementIds.length,
           totalJobs,
           pendingJobs,
           completedJobs,
-          nonClearanceJobs
+          nonClearanceJobs,
+          totalSqm: parseFloat(totalSqm.toFixed(2)),
+          pendingSqm: parseFloat(pendingSqm.toFixed(2)),
+          completedSqm: parseFloat(completedSqm.toFixed(2)),
+          nonClearanceSqm: parseFloat(nonClearanceSqm.toFixed(2))
         };
       })
     );
