@@ -751,11 +751,6 @@ export default function LevelDetailPage() {
                                   sx={{ bgcolor: '#e3f2fd', color: '#1976d2', fontWeight: 'bold' }}
                                 />
                                 <Chip 
-                                  label={`${metrics.count} Elements`} 
-                                  size="small" 
-                                  sx={{ bgcolor: '#f3e5f5', color: '#7b1fa2', fontWeight: 'bold' }}
-                                />
-                                <Chip 
                                   label={`${metrics.sqm.toFixed(2)} SQM`} 
                                   size="small" 
                                   sx={{ bgcolor: '#fff3e0', color: '#e65100', fontWeight: 'bold' }}
@@ -806,7 +801,7 @@ export default function LevelDetailPage() {
                                         {getFireProofingLabel(subGroupKey)}
                                       </Typography>
                                       <Chip 
-                                        label={`${subGroupMetrics.jobCount || 0} Jobs • ${subGroupMetrics.count || 0} Elements (${(subGroupMetrics.sqm || 0).toFixed(2)} SQM)`} 
+                                        label={`${subGroupMetrics.jobCount || 0} Jobs • ${(subGroupMetrics.sqm || 0).toFixed(2)} SQM`} 
                                         size="small" 
                                         sx={{ bgcolor: '#e3f2fd', color: '#1976d2' }}
                                       />
